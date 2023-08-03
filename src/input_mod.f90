@@ -17,6 +17,83 @@ subroutine test
 
 end subroutine
 
+subroutine init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
+
+    ! subroutine to pick angles that will be looped over
+    integer, intent(in) :: num_orients ! number of orientations
+    logical, intent(in) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+    real(8), dimension(:), allocatable, intent(out) :: alpha_vals, beta_vals, gamma_vals
+    integer(8) num_angles, leftover_angles
+    real(8), allocatable, dimension(:) :: intelli_vals
+    integer(8) i, j, k, counter
+    real(8) spacing, rand
+
+    allocate(alpha_vals(1:num_orients))
+    allocate(beta_vals(1:num_orients))
+    allocate(gamma_vals(1:num_orients))
+
+    if (intellirot) then
+
+        print*,'number of orientations:',num_orients
+        num_angles = floor(num_orients**(1d0/3d0))
+        print*,'number of intelligent euler angles:',num_angles
+        leftover_angles = num_orients - num_angles**3
+        print*,'number of (leftover) random euler angles: ',leftover_angles
+
+        allocate(intelli_vals(1:num_angles)) ! allocate array to hold intelligent euler angles
+        if(num_angles .eq. 1) then
+            intelli_vals(1) = 0.5 ! set to middle if less than than 8 orientations specified
+        else
+            spacing = 1d0/(num_angles-1)
+            do i = 1, num_angles ! for each entry, linear interpolate from 0 to 1
+                intelli_vals(i) = spacing * (i-1)
+                ! print*,'intelli_vals(i)',intelli_vals(i)
+            end do
+        end if
+
+        ! loop through and assign intelligent angles
+        counter = 0
+        do i = 1, num_angles
+            do j = 1,num_angles
+                do k = 1,num_angles
+                    counter = counter + 1 ! count how many orientations we have set up
+                    alpha_vals(counter) = intelli_vals(i)
+                    beta_vals(counter) = intelli_vals(j)
+                    gamma_vals(counter) = intelli_vals(k)
+
+                end do
+            end do
+        end do
+
+        ! fix numerical errors with a very small amount of extra rotation
+        alpha_vals(1:counter) = abs(alpha_vals(1:counter) - 0.0001)
+        beta_vals(1:counter) = abs(beta_vals(1:counter) - 0.0001)
+        gamma_vals(1:counter) = abs(gamma_vals(1:counter) - 0.0001)
+
+        ! fill in remainining angles with random numbers
+        do i = 1, leftover_angles
+            counter = counter + 1
+            call random_number(rand)
+            alpha_vals(counter) = rand
+            call random_number(rand)
+            beta_vals(counter) = rand
+            call random_number(rand)
+            gamma_vals(counter) = rand                        
+        end do
+
+        ! ! print intelligent euler angles
+        ! do i = 1, num_orients
+        !     print'(A,f6.4,A,f6.4,A,f6.4)','alpha: ',alpha_vals(i),' beta: ',beta_vals(i),' gamma: ',gamma_vals(i)
+        ! end do
+
+    else
+        call random_number(alpha_vals)
+        call random_number(beta_vals)
+        call random_number(gamma_vals)
+    end if
+
+    end subroutine
+
 subroutine PROT(ifn,rot_method,verts)
 
     ! rotates particle
@@ -162,9 +239,9 @@ subroutine PROT(ifn,rot_method,verts)
 
 end subroutine
 
-subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_rands, &
-                    beta_rands, &
-                    gamma_rands, loop_index)
+subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_vals, &
+                    beta_vals, &
+                    gamma_vals, loop_index)
 
     ! rotates particle
     ! modified to ensure different mpi processes have different 
@@ -172,7 +249,7 @@ subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_rands, &
     character(100), intent(in) :: rot_method ! rotation method
     real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
     real(8), dimension(:,:), allocatable, intent(out) :: verts_rot ! unique vertices    
-    real(8), dimension(:), allocatable, intent(in) :: alpha_rands, beta_rands, gamma_rands
+    real(8), dimension(:), allocatable, intent(in) :: alpha_vals, beta_vals, gamma_vals
     integer(8) offs(1:2)
     real(8) eulers(1:3)
     real(8) vec(1:3) ! off rotation vector
@@ -272,13 +349,13 @@ subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_rands, &
         end do
         
     else if(rot_method(1:len(trim(rot_method))) .eq. 'multi') then
-        rand = alpha_rands(loop_index)    
+        rand = alpha_vals(loop_index)    
         eulers(1) = 2*pi*(rand)
 
-        rand = beta_rands(loop_index) 
+        rand = beta_vals(loop_index) 
         eulers(2) = acos(1.0 - 2.0*rand)
 
-        rand = gamma_rands(loop_index) 
+        rand = gamma_vals(loop_index) 
         eulers(3) = 2*pi*(rand)
 
         print*,'alpha:',eulers(1)*180/pi
@@ -745,7 +822,7 @@ end do
     
 end subroutine
 
-subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num_orients)
+subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num_orients,intellirot)
     
     integer, intent(out) :: rec ! max number of internal beam recursions
     character(100), intent(out) :: cfn ! crystal filename
@@ -755,6 +832,7 @@ subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num
     character(len=*), intent(in) :: ifn
     character(100), intent(out) :: rot_method ! rotation method
     logical, intent(out) :: is_multithreaded ! whether or not multithreaded subroutines should be used (where appropriate)
+    logical, intent(out) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
     integer, intent(out) :: num_orients ! number of orientations
 
     ! subroutine PDAS reads inputs from the input file
@@ -765,6 +843,7 @@ subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num
     ! aps - number of aperturesread_real
 
     is_multithreaded = .false. ! assume no multithreading, unless read from input file
+    intellirot = .false. ! assume no intelligent euler angle choices, unless read from input file
     
     print*,'========== start sr SDATIN'
     
@@ -807,6 +886,8 @@ subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num
 
     is_multithreaded = read_flag(ifn,"mt") ! check input file for multithread option
 
+    intellirot = read_flag(ifn,"intellirot") ! check input file for intelligent euler angle choices for orientation avergaing
+
     if(rot_method(1:len(trim(rot_method))) .eq. 'multi') then
         num_orients = read_int(ifn,"rot multi")
     else
@@ -819,6 +900,12 @@ subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num
         print*,'multithreading: enabled'
     else
         print*,'multithreading: disabled'
+    end if
+
+    if (intellirot .and. num_orients .gt. 1) then
+        print*,'multirot method: intelligent'
+    else if (.not. intellirot .and. num_orients .gt. 1) then
+        print*,'multirot method: random'
     end if
 
     print*,'========== end sr SDATIN'
