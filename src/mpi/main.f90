@@ -51,6 +51,7 @@ integer rec ! max number of internal beam recursions
 character(100) rot_method ! rotation method
 logical is_multithreaded ! whether or not code should use multithreading
 integer num_orients ! number of orientations
+logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
 
 ! sr PDAL2
 integer(8) num_vert ! number of unique vertices
@@ -95,7 +96,7 @@ integer source, dest
 integer status(MPI_STATUS_SIZE)
 integer my_start, my_end, my_rank
 integer n1, n2
-real(8), dimension(:), allocatable :: alpha_rands, beta_rands, gamma_rands
+real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 
 ! ############################################################################################################
 
@@ -116,12 +117,13 @@ call SDATIN(ifn,            & ! <-  input filename
             cft,            & !  -> crystal file type
             la,             & !  -> wavelength
             rbi,            & !  -> real part of the refractive index
-            ibi,            & !  -> imaginary part of the refractive 
+            ibi,            & !  -> imaginary part of the refractive index
             afn,            & !  -> apertures filename
             rec,            & !  -> max number of internal beam recursions
             rot_method,     & !  -> particle rotation method
             is_multithreaded, & !  -> whether ot not code should use multithreading) 
-            num_orients)
+            num_orients, &
+            intellirot)
 
 ! read particle file
 call PDAL2( cfn,            & ! <-  crystal filename
@@ -142,23 +144,21 @@ if (my_rank .ge. n2) then
 end if
 print*,'my rank:',my_rank,'start: ',my_start,'end: ',my_end
 
-allocate(alpha_rands(1:num_orients))
-allocate(beta_rands(1:num_orients))
-allocate(gamma_rands(1:num_orients))
+allocate(alpha_vals(1:num_orients))
+allocate(beta_vals(1:num_orients))
+allocate(gamma_vals(1:num_orients))
 
 if (my_rank .eq. 0) then
-    call random_number(alpha_rands)
-    call random_number(beta_rands)
-    call random_number(gamma_rands)
+    call init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
     do dest = 1, p-1
-        call MPI_SEND(alpha_rands,size(alpha_rands,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
-        call MPI_SEND(beta_rands,size(beta_rands,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
-        call MPI_SEND(gamma_rands,size(gamma_rands,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(alpha_vals,size(alpha_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(beta_vals,size(beta_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(gamma_vals,size(gamma_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
     end do
 else
-    call MPI_RECV(alpha_rands,size(alpha_rands,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
-    call MPI_RECV(beta_rands,size(beta_rands,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
-    call MPI_RECV(gamma_rands,size(gamma_rands,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
+    call MPI_RECV(alpha_vals,size(alpha_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
+    call MPI_RECV(beta_vals,size(beta_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
+    call MPI_RECV(gamma_vals,size(gamma_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
 end if
 
 ! print*,'finished receiving eulers :)'
@@ -174,9 +174,9 @@ do i = my_start, my_end
                     rot_method, & ! <-  particle rotation method
                     vert_in, &    ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
                     vert, &
-                    alpha_rands, &
-                    beta_rands, &
-                    gamma_rands, &
+                    alpha_vals, &
+                    beta_vals, &
+                    gamma_vals, &
                     i)
 
     ! ! write rotated particle to file (optional)            
