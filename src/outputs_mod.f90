@@ -23,7 +23,8 @@ module outputs_mod
                            energy_out_beam, &
                            energy_out_ext_diff, &
                            mueller, &
-                           mueller_1d)   
+                           mueller_1d,&
+                           la)   
 
    complex(8), dimension(:,:), allocatable, intent(in) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
    complex(8), dimension(:,:), allocatable, intent(in)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
@@ -32,12 +33,16 @@ module outputs_mod
    real(8), intent(in) :: energy_out_ext_diff
    real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
    real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
+   real(8), intent(in) :: la ! wavelength
 
    complex(8), dimension(:,:), allocatable :: ampl_far11, ampl_far12, ampl_far21, ampl_far22 ! total
    real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
    real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
    integer i, j
-   real(8) scatt, scatt_beam, scatt_ext_diff
+   real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff
+   real(8) waveno
+
+   waveno = 2*pi/la
 
    ! allocate total amplitude matrix (beam - ext diff)
    allocate(ampl_far11(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
@@ -354,6 +359,17 @@ module outputs_mod
 
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_ext_diff) ! p11*sin(theta)
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+
+   call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt,asymmetry) ! p11*sin(theta)
+   print'(A40,f16.8)','asymmetry parameter (total):',asymmetry
+
+   call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam,asymmetry_beam) ! p11*sin(theta)
+   print'(A40,f16.8)','asymmetry parameter (beam):',asymmetry_beam
+
+   call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff,asymmetry_ext_diff) ! p11*sin(theta)
+   print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
+
+   print*,'scattering cross section via optical theorem:',abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! Jackson 10.137
 
    ! open(10,file="mueller_scatgrid")
    ! do i = 1, size(ampl_far_beam11,2)
