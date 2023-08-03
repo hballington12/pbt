@@ -1,19 +1,60 @@
 BIN = ./
 SRC = ./
 SEQ_DIR =./seq/
-MPI_DIR =./seq/
+MPI_DIR =./mpi/
 
-debug: $(SEQ_DIR)abt.f90
-	ifort types_mod.f90 misc_submod.f90 input_mod.f90 beam_loop_submod.f90 diff_mod.f90 outputs_mod.f90 $(SEQ_DIR)abt.f90 -g -traceback -O -qopenmp -o $(SEQ_DIR)abt.o
+# FSWITCHES = -traceback -debug:full -openmp # debug - windows
+# FSWITCHES = -traceback -g -O -qopenmp # debug - linux
+# FSWITCHES = -O3 -openmp # release - windows
+FSWITCHES = -O3 -qopenmp -xAVX # release - linux
 
-debug_mpi: $(MPI_DIR)abt_mpi.f90
-	mpif90 -f90=ifort types_mod.f90 misc_submod.f90 input_mod.f90 beam_loop_submod.f90 diff_mod.f90 outputs_mod.f90 $(MPI_DIR)abt_mpi.f90 -g -traceback -O -qopenmp -o $(MPI_DIR)abt.o
+# O_EXT = .obj # windows
+O_EXT = .o # linux
+MOD_EXT = .mod
 
-release: $(SEQ_DIR)abt.f90
-	ifort types_mod.f90 misc_submod.f90 input_mod.f90 beam_loop_submod.f90 diff_mod.f90 outputs_mod.f90 $(SEQ_DIR)abt.f90 -O3 -qopenmp -xAVX -o $(SEQ_DIR)abt.o
+objects = 	types_mod$(O_EXT) \
+		misc_submod$(O_EXT) \
+		input_mod$(O_EXT) \
+		beam_loop_mod$(O_EXT) \
+		diff_mod$(O_EXT) \
+		outputs_mod$(O_EXT) # for linux
 
-release_mpi: $(MPI_DIR)abt_mpi.f90
-	mpif90 -f90=ifort types_mod.f90 misc_submod.f90 input_mod.f90 beam_loop_submod.f90 diff_mod.f90 outputs_mod.f90 $(MPI_DIR)abt_mpi.f90 -O3 -qopenmp -xAVX -o $(MPI_DIR)abt.o
+modules = 	types_mod$(MOD_EXT) \
+		misc_submod$(MOD_EXT) \
+		input_mod$(MOD_EXT) \
+		beam_loop_mod$(MOD_EXT) \
+		diff_mod$(MOD_EXT) \
+		outputs_mod$(MOD_EXT) # for linux
 
-release_debug: abt.exe
-	ifort types_mod.f90 misc_submod.f90 input_mod.f90 beam_loop_submod.f90 diff_mod.f90 outputs_mod.f90 abt.f90 -O3 -debug:full -Qopt-report=5 -openmp -o abt.exe
+.PHONY: abt # sequential target
+.PHONY: abt_mpi # mpi target
+
+abt: $(SEQ_DIR)main.f90 $(objects)
+	ifort $(FSWITCHES) $(objects) $(SEQ_DIR)main.f90 -o $(SEQ_DIR)abt
+
+abt_mpi: $(MPI_DIR)main.f90 $(objects)
+	mpif90 -f90=ifort $(FSWITCHES) $(objects) $(MPI_DIR)main.f90 -o $(MPI_DIR)abt
+
+outputs_mod$(O_EXT) : outputs_mod.f90 misc_submod$(O_EXT)
+	ifort $(FSWITCHES) -c outputs_mod.f90
+
+diff_mod$(O_EXT) : diff_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT)
+	ifort $(FSWITCHES) -c diff_mod.f90
+
+beam_loop_mod$(O_EXT) : beam_loop_mod.f90 input_mod$(O_EXT) misc_submod$(O_EXT) types_mod$(O_EXT)
+	ifort $(FSWITCHES) -c beam_loop_mod.f90
+
+input_mod$(O_EXT) : input_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT)
+	ifort $(FSWITCHES) -c input_mod.f90
+
+misc_submod$(O_EXT) : misc_submod.f90
+	ifort $(FSWITCHES) -c misc_submod.f90
+
+types_mod$(O_EXT) : types_mod.f90
+	ifort $(FSWITCHES) -c types_mod.f90
+
+clean :
+	rm $(objects) $(modules) $(SEQ_DIR)abt
+
+clean_mpi :
+	rm $(objects) $(modules) $(MPI_DIR)abt
