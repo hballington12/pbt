@@ -27,7 +27,7 @@ implicit none
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
-! fix phi = 0 numerical error
+! fix theta = 0 error for 30 x 30 at lambda = 0.532
 
 ! ############################################################################################################
 
@@ -49,6 +49,7 @@ integer rec ! max number of internal beam recursions
 character(100) rot_method ! rotation method
 logical is_multithreaded ! whether or not code should use multithreading
 integer num_orients ! number of orientations
+logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
 
 ! sr PDAL2
 integer(8) num_vert ! number of unique vertices
@@ -85,7 +86,7 @@ complex(8), dimension(:,:), allocatable :: ampl_far_ext_diff11, ampl_far_ext_dif
 real(8), dimension(:,:,:), allocatable :: mueller, mueller_total, mueller_recv ! mueller matrices
 real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d_recv ! phi-integrated mueller matrices
 
-real(8), dimension(:), allocatable :: alpha_rands, beta_rands, gamma_rands
+real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 
 ! ############################################################################################################
 
@@ -106,7 +107,8 @@ call SDATIN(ifn,            & ! <-  input filename
             rec,            & !  -> max number of internal beam recursions
             rot_method,     & !  -> particle rotation method
             is_multithreaded, & !  -> whether ot not code should use multithreading) 
-            num_orients)
+            num_orients, &
+            intellirot)
 
 ! read particle file
 call PDAL2( cfn,            & ! <-  crystal filename
@@ -117,13 +119,7 @@ call PDAL2( cfn,            & ! <-  crystal filename
             vert_in,        & !  -> unique vertices
             num_face_vert)    !  -> number of vertices in each face
 
-allocate(alpha_rands(1:num_orients))
-allocate(beta_rands(1:num_orients))
-allocate(gamma_rands(1:num_orients))
-
-call random_number(alpha_rands)
-call random_number(beta_rands)
-call random_number(gamma_rands)
+call init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
 
 do i = 1, num_orients  
 
@@ -132,9 +128,9 @@ do i = 1, num_orients
                     rot_method, & ! <-  particle rotation method
                     vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
                     vert,       &
-                    alpha_rands,&
-                    beta_rands, &
-                    gamma_rands,&
+                    alpha_vals,&
+                    beta_vals, &
+                    gamma_vals,&
                     i)
 
     ! write rotated particle to file (optional)            
