@@ -254,7 +254,8 @@ do i = my_start, my_end
                     energy_out_beam,     & ! <-  total energy out from beams (before diffraction)
                     energy_out_ext_diff, & ! <-  total energy out from external diffraction (before diffraction)
                     mueller,             & !  -> 2d mueller matrix
-                    mueller_1d)            !  -> 1d mueller matrix
+                    mueller_1d,          & !  -> 1d mueller matrix
+                    la)                    ! <-  wavelength (for optical theorem)
 
     ! call writeup(mueller, mueller_1d, theta_vals, phi_vals) ! write current mueller to file
 
