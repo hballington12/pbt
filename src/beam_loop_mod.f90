@@ -69,6 +69,13 @@ subroutine energy_checks(   beam_outbeam_tree,beam_outbeam_tree_counter,&
         energy_out_ext_diff = energy_out_ext_diff + intensity_out*area*cos_theta
     end do
 
+    write(101,*),'------------------------------------------------------'
+    write(101,'(A41,f16.8)'),'energy in (ill. geom. cross sec.): ', energy_in
+    write(101,'(A41,f16.8)'),'beam energy out: ',energy_out_beam
+    write(101,'(A41,f16.8)'),'ext diff energy out: ',energy_out_ext_diff
+    write(101,'(A41,f16.8,A2)'),'beam energy conservation: ',energy_out_beam/energy_in*100,' %'
+    write(101,'(A41,f16.8,A2)'),'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
+
     print'(A40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
     print'(A40,f16.8)','beam energy out: ',energy_out_beam
     print'(A40,f16.8)','ext diff energy out: ',energy_out_ext_diff

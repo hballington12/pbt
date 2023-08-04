@@ -4,19 +4,64 @@
     
 module misc_submod
 
+use ifport
+
 implicit none
 
 real(8), parameter, public :: pi = 3.14159265358979 
 
 contains
 
-subroutine PDAS(verts,face_ids)
+subroutine make_dir(dir_path_in,cwd_out)
+
+    ! makes job directory - quick and dirty method
+
+    character(len=*), intent(in) :: dir_path_in
+    character(len=255) dir_path
+    character(len=255), intent(out) :: cwd_out
+    logical exists ! for checking if directories or files exist
+    integer result ! true if subdirectory was made, false if subdirectory was not made
+    integer job_num ! job number
+    character(len=255) job_num_string ! job number
+
+    job_num = 1
+    result = .false.
+
+    do while (result .eq. .false.) ! while a new directory has not been made
+
+        ! append job_num to directory name
+        write(job_num_string,"(I)") job_num
+        call StripSpaces(job_num_string)
+        ! print*,'job_num_string:',trim(job_num_string)
+        ! print*,'dir_path: ',trim(dir_path_in)//trim(job_num_string)
+        write(dir_path,*) trim(dir_path_in)//trim(job_num_string)
+        call StripSpaces(dir_path)
+        ! print*,'attempting to make directory with name "',trim(dir_path),'"'
+
+        inquire(directory = trim(dir_path), exist = exists)
+        if(exists .eq. .false.) then 
+            ! print*,'Creating job directory at "',trim(dir_path),'"'
+            write(cwd_out,*) trim(dir_path)
+            result = makedirqq(trim(dir_path))
+        else
+            ! if already exists, add 1 to job number and try again
+            job_num = job_num + 1
+            ! print*,'error: job directory already exists'
+            ! stop
+        end if
+
+    end do
+
+end subroutine
+
+subroutine PDAS(verts,face_ids,output_dir)
 
     ! writes rotated particle to file
     ! to do: add Macke-style output
 
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 integer(8), dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
+character(len=*), intent(in) :: output_dir
 
 integer num_verts, num_faces, i, j
 character(100) my_string, my_string2
@@ -41,9 +86,9 @@ call StripSpaces(my_string2)
 my_string = "v "//trim(my_string2)//" "//trim(my_string2)//" "//trim(my_string2)
 
 ! print*,'my_string: ',my_string
+! print*,'output dir: "',trim(output_dir),'"'
 
-
-open(10,file="rotated_particle.obj")
+open(10,file=trim(output_dir)//"/"//"rotated_particle.obj")
 write(10,*) '# rotated particle'
 do i = 1, num_verts
     ! ! make string for line in file

@@ -262,6 +262,7 @@ module outputs_mod
    end do
 
    print*,'making 1d mueller matrices...'
+   write(101,*),'------------------------------------------------------'
 
    ! phi integrations...
    do i = 1, size(theta_vals,1) ! for each theta bin...
@@ -354,27 +355,35 @@ module outputs_mod
 
    ! theta integrations...
    call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt) ! p11*sin(theta)
+   write(101,'(A40,f16.8)'),'scatt. cross (total):',scatt
    print'(A40,f16.8)','scattering cross section (total):',scatt
 
    call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_beam) ! p11*sin(theta)
+   write(101,'(A40,f16.8,A2,f10.6,A3)'),'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
 
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_ext_diff) ! p11*sin(theta)
+   write(101,'(A40,f16.8,A2,f10.6,A3)'),'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
 
    ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
 
-   print'(A40,f16.8)','ext. cross section via opt. theorem:',ext 
+   write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem:',ext 
+   print'(A40,f16.8)','ext. cross (opt. theorem):',ext 
 
-   print'(A40,f16.8)','single-scattering albedo:',1-(ext-scatt)/ext 
+   write(101,'(A40,f16.8)'),'single-scattering albedo:',1-(ext-scatt)/ext 
+   print'(A40,f16.8)','single-scatt. albedo:',1-(ext-scatt)/ext 
 
    call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt,asymmetry) ! p11*sin(theta)
+   write(101,'(A40,f16.8)'),'asymmetry parameter (total):',asymmetry
    print'(A40,f16.8)','asymmetry parameter (total):',asymmetry
 
    call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam,asymmetry_beam) ! p11*sin(theta)
+   write(101,'(A40,f16.8)'),'asymmetry parameter (beam):',asymmetry_beam
    print'(A40,f16.8)','asymmetry parameter (beam):',asymmetry_beam
 
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff,asymmetry_ext_diff) ! p11*sin(theta)
+   write(101,'(A40,f16.8)'),'asymmetry parameter (ext diff):',asymmetry_ext_diff  
    print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
 
 
@@ -408,17 +417,18 @@ module outputs_mod
 
    end subroutine
 
-   subroutine writeup(mueller, mueller_1d, theta_vals, phi_vals)
+   subroutine writeup(mueller, mueller_1d, theta_vals, phi_vals, output_dir)
 
    real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
    real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
    real(8), dimension(:), allocatable, intent(in) :: theta_vals, phi_vals
+   character(len=*), intent(in) :: output_dir
 
    integer i, j
 
    print*,'writing mueller to file...'
 
-   open(10,file="mueller_scatgrid")
+   open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
    do i = 1, size(theta_vals,1)
       do j = 1, size(phi_vals,1)
          write(10,'(f12.4,f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
@@ -431,7 +441,7 @@ module outputs_mod
    end do
    close(10)
 
-   open(10,file="mueller_scatgrid_1d")
+   open(10,file=trim(output_dir)//"/"//"mueller_scatgrid_1d")
    do j = 1, size(theta_vals,1)
       write(10,'(f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
       theta_vals(j)*180/pi, &

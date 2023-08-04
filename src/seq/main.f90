@@ -19,10 +19,7 @@ implicit none
 
 ! to do:
 ! add vector re-normalisation checks after rotations (ie. sr rotate_into_aperture_system)
-! fix direct forward scattering
-! mpi support
-! asymmetry parameter, single scat albedo
-! add absorption
+! single scat albedo
 ! add quad support
 ! add support to avoid crash if nan detected
 ! automatic meshing
@@ -37,6 +34,9 @@ integer(8) i
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
+character(len=255) :: cwd ! current working directory
+character(len=255) :: output_dir ! output directory
+integer result ! logical for navigating directories
 
 ! sr SDATIN
 character(100) cfn ! crystal filename
@@ -93,6 +93,10 @@ real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 print*,'========== start main'
 start = omp_get_wtime()
 call seed(99)
+call make_dir("my_job",output_dir)
+call StripSpaces(output_dir)
+print*,'output directory is "',trim(output_dir),'"'
+open(101,file=trim(output_dir)//"/"//"log") ! open global non-standard log file for important records
 
 ! ############# input_mod #############
 
@@ -131,11 +135,13 @@ do i = 1, num_orients
                     alpha_vals,&
                     beta_vals, &
                     gamma_vals,&
-                    i)
+                    i, &
+                    num_orients)
 
     ! write rotated particle to file (optional)            
     call PDAS(  vert,       & ! <-  rotated vertices
-                face_ids)     ! <-  face vertex IDs
+                face_ids,   & ! <-  face vertex IDs
+                output_dir)   ! <-  output directory
     
     ! fast implementation of the incident beam
     call makeIncidentBeam(  beamV,         & ! ->  beam vertices
@@ -214,20 +220,24 @@ do i = 1, num_orients
 
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total)
 
-end do ! end dls chunk
+end do
 
 mueller_total = mueller_total / num_orients
 mueller_1d_total = mueller_1d_total / num_orients
 
 ! writing to file
-call writeup(mueller_total, mueller_1d_total, theta_vals, phi_vals) ! write total mueller to file
+call writeup(mueller_total, mueller_1d_total, theta_vals, phi_vals, output_dir) ! write total mueller to file
 
 finish = omp_get_wtime()
+
 print*,'=========='
 print'(A,f16.8,A)',"total time elapsed: ",finish-start," secs"
+write(101,*),'======================================================'
+write(101,'(A,f17.8,A)')," total time elapsed: ",finish-start," secs"
+write(101,*),'======================================================'
 print*,'========== end main'
 
-
+close(101) ! close global non-standard output file
 
 contains
 

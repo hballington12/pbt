@@ -241,7 +241,7 @@ end subroutine
 
 subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_vals, &
                     beta_vals, &
-                    gamma_vals, loop_index)
+                    gamma_vals, loop_index,num_orients)
 
     ! rotates particle
     ! modified to ensure different mpi processes have different 
@@ -259,8 +259,12 @@ subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_vals, &
     real(8) s1, s2, s3, c1, c2, c3
     real(8) rand
     integer(8), intent(in) :: loop_index
+    integer, intent(in) ::  num_orients ! number of orientations
 
     print*,'========== start sr PROT_MPI'
+    write(101,*),'======================================================'
+    write(101,*),'======================================================'
+    write(101,*),'orientation: ',loop_index,' / ',num_orients
 
     print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
 
@@ -274,15 +278,19 @@ subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_vals, &
 
         if(offs(1) .eq. 30 .and. offs(2) .eq. 0) then
             print*,'off setting: 30x0'
+            write(101,*),'off setting: "30x0"'
             vec = (/-0.866025,-0.5,0.0/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 10) then
             print*,'off setting: 30x10'
+            write(101,*),'off setting: "30x10"'
             vec = (/-0.866025,-0.492404,0.0868240/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 20) then
             print*,'off setting: 30x20'
+            write(101,*),'off setting: "30x20"'
             vec = (/-0.866025,-0.469846,0.171010/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 30) then
             print*,'off setting: 30x30'
+            write(101,*),'off setting: "30x30"'
             vec = (/-0.866025,-0.433013,0.25/)
         end if
 
@@ -320,8 +328,11 @@ subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_vals, &
     else if(rot_method(1:len(trim(rot_method))) .eq. 'euler') then
         call read_input_vals_real(ifn,"rot euler",eulers,3)
         print*,'alpha:',eulers(1)
-        print*,'beta:',eulers(2)
+        write(101,*),'alpha:',eulers(1)
+        print*,'beta: ',eulers(2)
+        write(101,*),'beta: ',eulers(2)
         print*,'gamma:',eulers(3)
+        write(101,*),'gamma:',eulers(3)
 
         eulers = eulers*pi/180 ! convert to rad
 
@@ -359,8 +370,11 @@ subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_vals, &
         eulers(3) = 2*pi*(rand)
 
         print*,'alpha:',eulers(1)*180/pi
-        print*,'beta:',eulers(2)*180/pi
+        write(101,*),'alpha:',eulers(1)*180/pi
+        print*,'beta: ',eulers(2)*180/pi
+        write(101,*),'beta: ',eulers(2)*180/pi
         print*,'gamma:',eulers(3)*180/pi
+        write(101,*),'gamma:',eulers(3)*180/pi
 
         ! mishchenko rotation
         s1 = sin(eulers(1))
@@ -846,30 +860,41 @@ subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num
     intellirot = .false. ! assume no intelligent euler angle choices, unless read from input file
     
     print*,'========== start sr SDATIN'
-    
+    write(101,*),'======================================================'
+    write(101,*),'=====================JOB SETTINGS====================='
+    write(101,*),'======================================================'
+
+
     cfn = read_string(ifn,"cfn") ! get crystal filename
     call StripSpaces(cfn) ! remove leading spaces
     print*,'particle filename: "',cfn(1:len(trim(cfn))),'"'
+    write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'
 
     cft = read_string(ifn,"cft") ! get crystal filename
     call StripSpaces(cft) ! remove leading spaces
     print*,'particle file type: "',cft(1:len(trim(cft))),'"'  
+    write(101,*),'particle file type:     "',cft(1:len(trim(cft))),'"' 
 
     afn = read_string(ifn,"afn") ! get crystal filename
     call StripSpaces(afn) ! remove leading spaces
     print*,'apertures filename: "',afn(1:len(trim(afn))),'"'    
+    write(101,*),'apertures filename:     "',afn(1:len(trim(afn))),'"'    
     
     la = read_real(ifn,"lambda")
     print*,'lambda: ',la
+    write(101,*),'lambda:                ',la
     
     rbi = read_real(ifn,"rbi")
     print*,'refractive index real: ',rbi
+    write(101,*),'refractive index real:',rbi
     
     ibi = read_real(ifn,"ibi")
     print*,'refractive index imag: ',ibi
+    write(101,*),'refractive index imag: ',ibi
 
     rec = read_int(ifn,"rec")
     print*,'max beam recursions: ',rec
+    write(101,*),'max beam recursions:   ',rec
  
     rot_method = readString2(ifn,"rot") ! get rotation method
     if( rot_method(1:len(trim(rot_method))) .eq. 'off' .or. &
@@ -882,8 +907,6 @@ subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num
         stop
     end if
 
-    print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
-
     is_multithreaded = read_flag(ifn,"mt") ! check input file for multithread option
 
     intellirot = read_flag(ifn,"intellirot") ! check input file for intelligent euler angle choices for orientation avergaing
@@ -895,17 +918,26 @@ subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num
     end if
 
     print*,'num_orients: ',num_orients
+    write(101,*),'num_orients:           ',num_orients
+
+    print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
+    write(101,*),'rotation method:        "',rot_method(1:len(trim(rot_method))),'"'
+
 
     if (is_multithreaded) then
         print*,'multithreading: enabled'
+        write(101,*),'multithreading:         ','enabled'
     else
         print*,'multithreading: disabled'
+        write(101,*),'multithreading:         ','disabled'
     end if
 
     if (intellirot .and. num_orients .gt. 1) then
         print*,'multirot method: intelligent'
+        write(101,*),'multirot method:        intelligent'
     else if (.not. intellirot .and. num_orients .gt. 1) then
         print*,'multirot method: random'
+        write(101,*),'multirot method:        random'
     end if
 
     print*,'========== end sr SDATIN'
@@ -952,8 +984,13 @@ subroutine PDAL2(cfn, cft, num_vert, num_face, face_ids, verts, num_face_vert)
     integer(8) i, io, j, k, l, m, n, p, o, q ! counting variables
 
     print*,'========== start sr PDAL2'
+    write(101,*),'======================================================'
+    write(101,*),'=================PARTICLE INFORMATION================='
+    write(101,*),'======================================================'
 
     print*,'crystal file type: "',trim(cft),'"'
+    write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'    
+    write(101,*),'particle file type:     "',trim(cft),'"'
 
     if (trim(cft) .eq. 'obj') then
 
@@ -1068,9 +1105,12 @@ subroutine PDAL2(cfn, cft, num_vert, num_face, face_ids, verts, num_face_vert)
         
         print*,'crystal geometry:'
         print*,'number of unique vertices: ',num_vert
+        
         print*,'number of unique faces: ',num_face
+        
         !print*,'number of unique normals: ',num_norm
-        print*,'max vertices per face:',num_face_vert_max
+        print*,'max vertices per face: ',num_face_vert_max
+
         
         !! print the number of vertices in each face
         ! print*,'num_face_vert array:'
@@ -1117,7 +1157,7 @@ subroutine PDAL2(cfn, cft, num_vert, num_face, face_ids, verts, num_face_vert)
         ! print*,'opening crystal file'
         open(unit = 10, file = cfn, status = 'old')
         read(10, *) num_face
-        print*,'num faces: ',num_face
+        print*,'number of unique faces: ',num_face
 
         allocate(face_ids_temp(num_face,num_face_vert_max_in)) ! allocate an array for the vertex IDs in each face
         allocate(num_face_vert(num_face)) ! allocate array for the number of vertices in each face
@@ -1197,8 +1237,13 @@ subroutine PDAL2(cfn, cft, num_vert, num_face, face_ids, verts, num_face_vert)
         close(10)
     else
         print*,'error: particle geometry file type "',trim(cft),'" is not supported.'
+        stop
     end if
     
+    write(101,*),'number of unique vertices: ',num_vert
+    write(101,*),'number of unique faces:    ',num_face
+    write(101,*),'max vertices per face:     ',num_face_vert_max
+
     print*,'========== end sr PDAL2'
     
 end subroutine

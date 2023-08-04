@@ -39,6 +39,10 @@ integer(8) i
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
+character(len=255) :: output_dir ! output directory
+character(len=255) :: my_rank_str ! string of my rank
+character(len=255) :: my_log_dir ! log file location for each mpi process
+integer result ! true if subdirectory was made, false if subdirectory was not made
 
 ! sr SDATIN
 character(100) cfn ! crystal filename
@@ -109,6 +113,27 @@ print*,'========== start main'
 start = omp_get_wtime()
 call seed(99)
 
+! setting up job directory
+! rank 0 process broadcasts job directory to other processes
+if (my_rank .eq. 0) then
+    call make_dir("my_job",output_dir)
+    call StripSpaces(output_dir)
+    ! print*,'output directory is "',trim(output_dir),'"'
+    result = makedirqq(trim(output_dir)//"/logs") ! make directory for logs
+    ! print*,'sending...'
+    do dest = 1, p-1
+        CALL MPI_SEND(output_dir, 255, MPI_CHARACTER, dest, tag, MPI_COMM_WORLD, ierr)
+    end do
+    ! print*,'sending complete.'
+else
+    call MPI_RECV(output_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
+end if
+write(my_rank_str,*) my_rank
+call StripSpaces(my_rank_str)
+write(my_log_dir,*) trim(output_dir)//"/logs/log",trim(my_rank_str)
+! print*,'my rank is : ,',my_rank,' , my output directory is "',trim(my_log_dir),'"'
+open(101,file=trim(my_log_dir)) ! open global non-standard log file for important records
+
 ! ############# input_mod #############
 
 ! read input parameters
@@ -172,16 +197,18 @@ do i = my_start, my_end
     ! rotate particle
     call PROT_MPI(  ifn,        & ! <-  input filename
                     rot_method, & ! <-  particle rotation method
-                    vert_in, &    ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
-                    vert, &
-                    alpha_vals, &
+                    vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
+                    vert,       &
+                    alpha_vals,&
                     beta_vals, &
-                    gamma_vals, &
-                    i)
+                    gamma_vals,&
+                    i, &
+                    num_orients)
 
     ! ! write rotated particle to file (optional)            
     ! call PDAS(  vert,       & ! <-  rotated vertices
-    !             face_ids)     ! <-  face vertex IDs
+    !             face_ids,   & ! <-  face vertex IDs
+    !             output_dir)   ! <-  output directory
 
     ! fast implementation of the incident beam
     call makeIncidentBeam(  beamV,         & ! ->  beam vertices
@@ -265,7 +292,6 @@ end do
 
 print*,'my rank:',my_rank,'finished'
 
-
 ! sum up mueller 2d and 1d across all mpi processes
 print*,'i have finished. my rank = ',my_rank
 if (my_rank .ne. 0) then ! if not rank 0 process, send mueller to rank 0
@@ -293,16 +319,20 @@ if (my_rank .eq. 0) then
     mueller_1d_total = mueller_1d_total / num_orients
 
     ! writing to file
-    call writeup(mueller_total, mueller_1d_total, theta_vals, phi_vals) ! write total mueller to file
+    call writeup(mueller_total, mueller_1d_total, theta_vals, phi_vals, output_dir) ! write total mueller to file
 
     finish = omp_get_wtime()
     print*,'=========='
     print'(A,f16.8,A)',"total time elapsed: ",finish-start," secs"
+    write(101,*),'======================================================'
+    write(101,'(A,f17.8,A)')," total time elapsed: ",finish-start," secs"
+    write(101,*),'======================================================'
     print*,'========== end main'
 end if
 
-call MPI_FINALIZE(ierr)
+close(101) ! close global non-standard output file
 
+call MPI_FINALIZE(ierr)
 
 contains
 
