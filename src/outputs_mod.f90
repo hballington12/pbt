@@ -39,7 +39,7 @@ module outputs_mod
    real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
    real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
    integer i, j
-   real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff
+   real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext
    real(8) waveno
 
    waveno = 2*pi/la
@@ -350,6 +350,8 @@ module outputs_mod
 
    print*,'calculating integrated parameters...'
 
+
+
    ! theta integrations...
    call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt) ! p11*sin(theta)
    print'(A40,f16.8)','scattering cross section (total):',scatt
@@ -360,6 +362,12 @@ module outputs_mod
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_ext_diff) ! p11*sin(theta)
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
 
+   ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
+
+   print'(A40,f16.8)','ext. cross section via opt. theorem:',ext 
+
+   print'(A40,f16.8)','single-scattering albedo:',1-(ext-scatt)/ext 
+
    call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt,asymmetry) ! p11*sin(theta)
    print'(A40,f16.8)','asymmetry parameter (total):',asymmetry
 
@@ -369,7 +377,6 @@ module outputs_mod
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff,asymmetry_ext_diff) ! p11*sin(theta)
    print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
 
-   print*,'scattering cross section via optical theorem:',abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! Jackson 10.137
 
    ! open(10,file="mueller_scatgrid")
    ! do i = 1, size(ampl_far_beam11,2)
