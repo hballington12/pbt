@@ -1197,26 +1197,26 @@ do i = 1, num_sufficiently_illuminated_apertures
     ! print*,'ampl(1:2,1:2,3121)',ampl(1:2,1:2,3121)
 
     call beam_scan( aperturePropagationVectors, apertureMidpoints, apertureNormals, &
-                        verts, Norm, midPoints, Face1, Face2, &
-                        aperture_id, &
-                        isWithinBeam, &
-                        apertures, &
-                        faceAreas, &
-                        maxIlluminatedFacets_ps, &
-                        threshold, &
-                        sufficientlyIlluminated2, &
-                        totalIlluminatedApertures, &
-                        prescan, &
-                        beamFaceAreas, &
-                        beamvk71, beamvk72, beamvk73, &
-                        beam_ampl, &
-                        isWithinBeam2, isWithinBeam2_ps, &
-                        rotatedapertureNormals, &
-                        rotationMatrices, &
-                        beamIDs_ps, distances_ps, &
-                        vk71, vk72, vk73, ampl, &
-                        rotatedVert, rotatedNorm, &
-                        isShadow)
+                    verts, Norm, midPoints, Face1, Face2, &
+                    aperture_id, &
+                    isWithinBeam, &
+                    apertures, &
+                    faceAreas, &
+                    maxIlluminatedFacets_ps, &
+                    threshold, &
+                    sufficientlyIlluminated2, &
+                    totalIlluminatedApertures, &
+                    prescan, &
+                    beamFaceAreas, &
+                    beamvk71, beamvk72, beamvk73, &
+                    beam_ampl, &
+                    isWithinBeam2, isWithinBeam2_ps, &
+                    rotatedapertureNormals, &
+                    rotationMatrices, &
+                    beamIDs_ps, distances_ps, &
+                    vk71, vk72, vk73, ampl, &
+                    rotatedVert, rotatedNorm, &
+                    isShadow)
 
     ! print*,'real(beam_ampl(1,1,1))',real(beam_ampl(1,1,1))
 
@@ -1297,7 +1297,9 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)',' beam ampl in: (',real(rot_ampl(1,1)),' + ',imag(rot_ampl(1,1)),'i, ',real(rot_ampl(1,2)),' + ',imag(rot_ampl(1,2)),'i)'
             ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)','               (',real(rot_ampl(2,1)),' + ',imag(rot_ampl(2,1)),'i, ',real(rot_ampl(2,2)),' + ',imag(rot_ampl(2,2)),'i)'
 
-            rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j))
+            ! rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) ! no absorption
+
+            rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) * exp(-2*waveno*ibi*distances_ps(j)) ! absorption
 
 
 
