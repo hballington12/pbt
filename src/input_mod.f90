@@ -1,6 +1,6 @@
 
 ! input_mod.f90
-! module for reading inputs
+! module containing various subroutines used to initiate aperture beam tracer
 
 module input_mod
 
@@ -11,15 +11,45 @@ implicit none
 
 contains
 
-subroutine test
+subroutine area_stats(face_areas)
 
-    print*,'Hello again'
+real(8), dimension(:), allocatable, intent(in) :: face_areas ! area of each facet
+integer i, num_facets
+real(8) min_area, max_area, total_area, avg_area
+
+! init
+min_area = face_areas(1)
+max_area = face_areas(1)
+total_area = 0
+
+num_facets = size(face_areas,1)
+
+do i = 1, num_facets
+
+    total_area = total_area + face_areas(i)
+    if(face_areas(i) .gt. max_area) max_area = face_areas(i)
+    if(face_areas(i) .lt. min_area) min_area = face_areas(i)
+
+end do
+
+avg_area = total_area / num_facets
+
+print*,'max facet area:      ',max_area
+print*,'min facet area:      ',min_area
+print*,'total surface area: ',total_area
+print*,'avg. facet area:     ',avg_area
+
+write(101,*),'max facet area:      ',max_area
+write(101,*),'min facet area:      ',min_area
+write(101,*),'total surface area: ',total_area
+write(101,*),'avg. facet area:     ',avg_area
 
 end subroutine
 
 subroutine init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
 
     ! subroutine to pick angles that will be looped over
+
     integer, intent(in) :: num_orients ! number of orientations
     logical, intent(in) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
     real(8), dimension(:), allocatable, intent(out) :: alpha_vals, beta_vals, gamma_vals
@@ -97,6 +127,7 @@ subroutine init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
 subroutine PROT(ifn,rot_method,verts)
 
     ! rotates particle
+
     character(len=*), intent(in) :: ifn
     character(100), intent(in) :: rot_method ! rotation method
     real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
@@ -239,12 +270,19 @@ subroutine PROT(ifn,rot_method,verts)
 
 end subroutine
 
-subroutine PROT_MPI(ifn,rot_method,verts,verts_rot,alpha_vals, &
-                    beta_vals, &
-                    gamma_vals, loop_index,num_orients)
+subroutine PROT_MPI(ifn,                & ! input filename (so we can read arguments from the "rot" line)
+                    rot_method,         & ! rotation method: "euler", "off", "none", "multi"
+                    verts,              & ! unrotated vertices
+                    verts_rot,          & ! rotated vertices
+                    alpha_vals,         & ! list of values for euler alpha angle in range 0 to 1 (for multirot only)
+                    beta_vals,          & ! list of values for beta alpha angle in range 0 to 1 (for multirot only)
+                    gamma_vals,         & ! list of values for gamma alpha angle in range 0 to 1 (for multirot only)
+                    loop_index,         & ! current loop index that each process is on
+                    num_orients)          ! total number of orientations for this process
 
     ! rotates particle
     ! modified to ensure different mpi processes have different 
+
     character(len=*), intent(in) :: ifn
     character(100), intent(in) :: rot_method ! rotation method
     real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
@@ -528,6 +566,9 @@ end subroutine
 
 subroutine readApertures(afn,apertures, face_ids)
 
+! sr readApertures reads the apertures filename
+! will exit if the apertures file does not have the correct number of lines
+
 integer(8), dimension(:), allocatable, intent(out) :: apertures
 character(100), intent(in) :: afn ! crystal filename
 integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
@@ -578,7 +619,7 @@ subroutine init(face_ids, isVisible, isVisiblePlusShadows, isWithinBeam, distanc
                 new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, ampl_diff, &
                 beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter)
 
-! subroutine init initialises shared variables
+! subroutine init initialises many variables for the beam tracing loop
 
 logical, dimension(:), allocatable, intent(out) :: isVisible, isVisiblePlusShadows, isWithinBeam, isWithinBeam_ps, isShadow
 integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
@@ -650,7 +691,7 @@ end subroutine
 
 subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, verts, face_ids, beamMidpoints, ampl_beam)
 
-! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle
+! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle (currently set to 1000)
 ! the width and length of the wavefront is set larger than the maximum x and y vertex values of the particle (full illumination)
 
 real(8), allocatable, intent(out), dimension(:,:) :: beamV, beamN
@@ -709,7 +750,7 @@ beamV(3,2) = max_y*fac
 beamV(4,1) = max_x*fac
 beamV(4,2) = min_y*fac
 ! beamV(1:4,3) = max_z*fac
-beamV(1:4,3) = 50 ! changed for comparing with Matlab
+beamV(1:4,3) = 1000 ! changed for comparing with Matlab
 
 !print*,'using truncated initial beam for testing purposes'
 !! partial illumination for test implementation
@@ -793,7 +834,7 @@ end subroutine
 
 subroutine make_normals(face_ids, verts, norm_ids, norms)
     
-! subroutine make_normals recomputes and returns the Normals and the corresponding IDs for each face
+! subroutine make_normals recomputes and returns the normals, as well as the corresponding IDs for each face
     
 integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
 integer(8), dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
@@ -836,8 +877,21 @@ end do
     
 end subroutine
 
-subroutine SDATIN(ifn,cfn,cft,la,rbi,ibi,afn,rec,rot_method,is_multithreaded,num_orients,intellirot)
+subroutine SDATIN(  ifn,                & ! input filename
+                    cfn,                & ! particle filename
+                    cft,                & ! particle file type
+                    la,                 & ! wavelength
+                    rbi,                & ! real refractive index
+                    ibi,                & ! imaginary refractive index
+                    afn,                & ! apertures filename
+                    rec,                & ! number of beam recursions
+                    rot_method,         & ! rotation method
+                    is_multithreaded,   & ! multithreading
+                    num_orients,        & ! number of orientations
+                    intellirot)           ! intelligent multiple rotations method
     
+    ! sr SDATIN reads the input file
+
     integer, intent(out) :: rec ! max number of internal beam recursions
     character(100), intent(out) :: cfn ! crystal filename
     character(100), intent(out) :: cft ! crystal file type
@@ -946,23 +1000,25 @@ end subroutine
 
 subroutine PDAL2(cfn, cft, num_vert, num_face, face_ids, verts, num_face_vert)
 
-! subroutine PDAL2 reads in a .obj file containing the crystal geometry
+! subroutine PDAL2 reads a file containing the particle geometry
+! accepted file types: "obj" - .obj files, "mrt" - macke ray-tracing style
+
 ! the inputs are:
-! cfn       = crystal filename
+! cfn = particle filename
+! cft = particle filetype
 ! the outputs are:
-! num_vert     = number of unique crystal vertices
-! num_face        = number of crystal faces
-! num_norm     = number of unique face normals
-! verts      = num_vert x 3 array of real values equal to the vertex coordinates, where each row corresponds to a unique vertex and each column corresponds to the x, y, and z components
-! num_face_vert    = num_face array of integers equal to the number of vertices in each face, where each row corresponds to each face
-! face_ids     = num_face x num_face_vert_max array of integers equal to the vertex IDs, where each row corresponds to each face and each column corresponds to the vertices in the face
-!               A vertex ID corresponds to the row of the vertex in verts
-! norms      = num_norm x 3 array of real values equal to the face normals, where each row corresponds to a unique face normal and each column corresponds to the x, y, and z components
-! norm_ids     = num_face array of integers equal to the normal IDs, where each row corresponds to each face
-!               A normal ID corresponds to the row of the normal in norms
+! num_vert      = number of unique particle vertices
+! num_face      = number of crystal faces
+! verts         = num_vert x 3 array of real values equal to the vertex coordinates, 
+!   where each row corresponds to a unique vertex and each column corresponds to the x, y, and z components
+! num_face_vert = num_face array of integers equal to the number of vertices in each face, 
+!   where each row corresponds to each face
+! face_ids      = num_face x num_face_vert_max array of integers equal to the vertex IDs, 
+!   where each row corresponds to each face and each column corresponds to the vertices in the face.
+!   A vertex ID is used to point to the row of the vertex in verts
         
-    character(len=*), intent(in) :: cfn
-    character(len=*), intent(in) :: cft
+    character(len=*), intent(in) :: cfn ! particle filename
+    character(len=*), intent(in) :: cft ! particle filetype
     integer(8), intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
     ! integer(8), intent(out) :: num_norm ! number of face normals
     integer(8), dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
@@ -982,6 +1038,8 @@ subroutine PDAL2(cfn, cft, num_vert, num_face, face_ids, verts, num_face_vert)
     integer(8) num_face_vert_max
     logical has_end_of_line_reached
     integer(8) i, io, j, k, l, m, n, p, o, q ! counting variables
+    real(8), dimension(:), allocatable :: faceAreas ! area of each facet
+    real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
 
     print*,'========== start sr PDAL2'
     write(101,*),'======================================================'
@@ -1243,6 +1301,10 @@ subroutine PDAL2(cfn, cft, num_vert, num_face, face_ids, verts, num_face_vert)
     write(101,*),'number of unique vertices: ',num_vert
     write(101,*),'number of unique faces:    ',num_face
     write(101,*),'max vertices per face:     ',num_face_vert_max
+
+    call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas) ! calculate particle facet areas (for doing some checks in the following sr)
+
+    call area_stats(faceAreas)
 
     print*,'========== end sr PDAL2'
     

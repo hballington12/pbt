@@ -1,5 +1,5 @@
-! input_mod.f90
-! module for reading inputs
+! beam_loop_mod.f90
+! module for the beam tracing loop
 
 module beam_loop_mod
 

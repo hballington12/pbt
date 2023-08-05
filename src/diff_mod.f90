@@ -1,3 +1,6 @@
+! diff_mod.f90
+! module containing various subroutines used for diffraction
+
 module diff_mod
 
     use misc_submod
@@ -35,6 +38,8 @@ module diff_mod
 
     subroutine random_rotation(cos_rot,sin_rot)
 
+        ! unused
+
         real(8), intent(out) :: cos_rot
         real(8), intent(out) :: sin_rot
         real(8) rand, test1, help1, w1, w2
@@ -54,6 +59,9 @@ module diff_mod
 
     subroutine trim_outbeam_tree(beam_tree,beam_tree_counter)
 
+    ! trims the outbeam tree
+    ! outgoing beams are ignored if the amplitude matrix has less than 1e-6 energy
+
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_tree ! beam_tree to be trimmed
     integer(8), intent(inout) :: beam_tree_counter ! counts the current number of beam outbeams
 
@@ -67,9 +75,9 @@ module diff_mod
     ! do i = 1, size(beam_tree,1) ! loop over beam_tree entries
     do i = 1, beam_tree_counter ! loop over beam_tree entries
             energy = 0.5*(  beam_tree(i)%ampl(1,1)*conjg(beam_tree(i)%ampl(1,1)) + &
-                        beam_tree(i)%ampl(1,2)*conjg(beam_tree(i)%ampl(1,2)) + &
-                        beam_tree(i)%ampl(2,1)*conjg(beam_tree(i)%ampl(2,1)) + &
-                        beam_tree(i)%ampl(2,2)*conjg(beam_tree(i)%ampl(2,2))) ! calc energy out
+                            beam_tree(i)%ampl(1,2)*conjg(beam_tree(i)%ampl(1,2)) + &
+                            beam_tree(i)%ampl(2,1)*conjg(beam_tree(i)%ampl(2,1)) + &
+                            beam_tree(i)%ampl(2,2)*conjg(beam_tree(i)%ampl(2,2))) ! calc energy out
         if(energy .gt. 1e-6) then ! if significant energy
             j = j + 1 ! update total number of outbeams
             beam_tree_temp(j) = beam_tree(i) ! add entry to trimmed outbeam tree
@@ -85,7 +93,7 @@ module diff_mod
 
     subroutine transform_bins2(x,y,z,com,rot,x3,y3,z3)
     
-        ! translates and rotates bins to aperture system (matmul method)
+        ! translates and rotates bins to aperture system (loop method)
     
     real(8), dimension(:,:), allocatable, intent(in) :: x, y, z ! far-field bin positions
     real(8), intent(in) :: com(1:3) ! aperture centre of mass
@@ -126,7 +134,7 @@ module diff_mod
     subroutine transform_bins(x,y,z,com,rot,x3,y3,z3)
     
         ! translates and rotates bins to aperture system (matmul method)
-        ! obselete
+        ! unused
     
     real(8), dimension(:,:), allocatable, intent(in) :: x, y, z ! far-field bin positions
     real(8), intent(in) :: com(1:3) ! aperture centre of mass
@@ -190,12 +198,13 @@ module diff_mod
     end subroutine
     
     
-    subroutine karczewski(  diff_ampl, &
-                            m, &
-                            k, &
-                            prop2, &
-                            x3, y3, z3)
-    
+    subroutine karczewski(  diff_ampl, & ! polarisation matrix
+                            m, & ! KW perp field vector
+                            k, & ! KW par field vector
+                            prop2, & ! outgoing propagation direction in aperture system
+                            x3, y3, z3) ! x, y, z coordinate of far-field bin
+        
+        ! sr karczewski computes the diff ampl matrix for polarisation of far-field diffraction at a far-field bin
         ! to do: add a debug mode with the numerical checks found in matlab code
     
     real(8), intent(out) :: diff_ampl(1:2,1:2)
@@ -210,21 +219,23 @@ module diff_mod
     
     ! print*,'start karcewski...'
 
-    bin_vec_size = sqrt(x3**2 + y3**2 + z3**2)
+    bin_vec_size = sqrt(x3**2 + y3**2 + z3**2) ! distance to each far-field bin
+
     k(1) = x3/bin_vec_size ! propagation vector components for each bin vector in aperture system
     k(2) = y3/bin_vec_size
     k(3) = z3/bin_vec_size
     
-    big_kx = prop2(1)
+    big_kx = prop2(1) ! propagation direction in aperture system
     big_ky = prop2(2)
     big_kz = prop2(3)
     
-    m(1) = -k(1)*k(2)/sqrt(1-k(2)**2)
+    m(1) = -k(1)*k(2)/sqrt(1-k(2)**2) ! perp field direction
     m(2) = sqrt(1-k(2)**2)
     m(3) = -k(2)*k(3)/sqrt(1-k(2)**2)
     
-    frac = sqrt((1-k(2)**2)/(1-big_ky**2))
+    frac = sqrt((1-k(2)**2)/(1-big_ky**2)) ! precalculate a factor
     
+    ! KW coefficients
     a1m = -big_kz*frac
     b2m = -k(3)/frac
     a1e = b2m
@@ -232,6 +243,7 @@ module diff_mod
     b1m = -k(1)*k(2)/frac + big_kx*big_ky*frac
     a2e = -b1m
     
+    ! combined (e-m theory) KW coefficients
     a1em = 0.5*(a1m+a1e)
     a2em = 0.5*a2e
     b1em = 0.5*b1m 
@@ -460,7 +472,20 @@ module diff_mod
     
     end subroutine
     
-    subroutine diffraction(ampl,v_in,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
+    subroutine diffraction( ampl,       & ! the outgoing amplitude matrix on the particle surface
+                            v_in,       & ! the vertices of the aperture
+                            prop0,      & ! the outgoing beam propagation direction (in lab system)
+                            perp0,      & ! the outgoing beam perpendicular field direction (in lab system)
+                            xfar,       & ! the x coordinate of each far-field bin (meshgrid style)
+                            yfar,       & ! the y coordinate of each far-field bin (meshgrid style)
+                            zfar,       & ! the z coordinate of each far-field bin (meshgrid style)
+                            lambda,     & ! wavelength
+                            amplC11s,   & ! the far-field diffraction amplitude matrix to be calculated (1,1)
+                            amplC12s,   & ! the far-field diffraction amplitude matrix to be calculated (1,2)
+                            amplC21s,   & ! the far-field diffraction amplitude matrix to be calculated (2,1)
+                            amplC22s,   & ! the far-field diffraction amplitude matrix to be calculated (2,2)
+                            phi_vals,   & ! phi values
+                            theta_vals)   ! theta values
     
         ! main diffraction subroutine
         ! takes in a few arguments and outputs the far-field scattering pattern
@@ -557,7 +582,7 @@ module diff_mod
     
     ! bodge to fix numerical error for rot4 rotation matrix
     ! if incidence direction is almost parallel to bin vector, phi is not well defined
-    ! therefore, use get phi for the direct forwards direction from the phi values of the closest bin with theta value greater than 1
+    ! therefore, get phi for the direct forwards direction from the phi values of the closest bin with theta value greater than 1
     success = .false.
     i = 0
     do while (i .lt. size(theta_vals,1) .and. .not. success)
@@ -595,7 +620,7 @@ module diff_mod
 
             call cross(k,m,evo2)
 
-            ! make roation matrix to rotate from KW plane to scattering plane
+            ! make rotation matrix to rotate from KW plane to scattering plane
             rot4(1,1) = dot_product(hc,m)
             rot4(2,2) = dot_product(hc,m)
             rot4(1,2) = -dot_product(hc,evo2)
@@ -648,9 +673,24 @@ module diff_mod
 
     end subroutine
     
-    subroutine diff_main(beam_outbeam_tree, beam_outbeam_tree_counter, lambda, ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22,theta_vals, phi_vals,&
-        ext_diff_outbeam_tree, ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22, is_multithreaded)
+    subroutine diff_main(   beam_outbeam_tree,          & ! tree of outgoing beams
+                            beam_outbeam_tree_counter,  & ! total number of outoing beams in beam tree
+                            lambda,                     & ! wavelength
+                            ampl_far_beam11,            & ! far-field diffracted beam amplitude matrix (1,1)
+                            ampl_far_beam12,            & ! far-field diffracted beam amplitude matrix (1,2)
+                            ampl_far_beam21,            & ! far-field diffracted beam amplitude matrix (2,1)
+                            ampl_far_beam22,            & ! far-field diffracted beam amplitude matrix (2,2)
+                            theta_vals,                 & ! theta values (in rad)
+                            phi_vals,                   & ! phi values (in rad)
+                            ext_diff_outbeam_tree,      & ! tree of outgoing external diffraction beams
+                            ampl_far_ext_diff11,        & ! far-field external diffraction amplitude matrix (1,1)
+                            ampl_far_ext_diff12,        & ! far-field external diffraction amplitude matrix (1,2)
+                            ampl_far_ext_diff21,        & ! far-field external diffraction amplitude matrix (2,1)
+                            ampl_far_ext_diff22,        & ! far-field external diffraction amplitude matrix (2,2)
+                            is_multithreaded)             ! whether multithreaded diffraction should be enabled
     
+        ! sr diff_main is the main shell for diffraction of all beams + external diffraction at a fixed orientation
+
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     real(8), intent(in) :: lambda ! wavelength
@@ -988,6 +1028,10 @@ module diff_mod
     end subroutine
         
     subroutine read_theta_vals(theta_vals)
+
+        ! sr read_theta,vals reads and makes the phi values
+        ! taken from sr anglesplit
+
         ! important values:
         !   k is the total number of bins
         !   anglesout are the centres of each angular bin - size (1:k)
@@ -1056,10 +1100,15 @@ module diff_mod
         end subroutine
 
     subroutine read_phi_vals(phi_vals)
+
+            ! sr read_phi_vals reads and makes the phi values
+            ! taken from sr anglesplit
+
             ! important values:
             !   k is the total number of bins
             !   anglesout are the centres of each angular bin - size (1:k)
             !   anglesteps are the sizes of each angular bin - size (1:k)
+
             real(8), dimension(:), allocatable, intent(out) :: phi_vals
             integer nlines, i, io, j, jmax
             real(8), dimension(:) ,allocatable :: anglesint ,splitsint

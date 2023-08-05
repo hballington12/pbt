@@ -133,6 +133,18 @@ end subroutine
 subroutine meshgrid_real(array_1, array_2, mesh_1, mesh_2)
 
     ! makes a meshgrid from two 1-dimensional input arrays of type real(8)
+    ! attempts to copy the Matlab meshgrid() function
+    ! each 1-d array contains the values of each axis of a 2-d grid
+    ! ie. x = 0, 1, 2, 3, 4, 5, ...
+    !     y = 0, 0.1, 0.2, ...
+    ! the outputs are 2-d arrays which contain the values at each grid point
+    ! ie. mesh_x = 0, 1, 2, 3, 4, 5, ...
+    !              0, 1, 2, 3, 4, 5, ...
+    !              0, 1, 2, 3, 4, 5, ...
+    !     mesh_y = 0, 0, 0, 0, 0, 0, ...
+    !              0.1, 0.1, 0.1, 0.1, 0.1, ...
+    !              0.2, 0.2, 0.2, 0.2, 0.2, ...
+    ! version for real arrays
 
 real(8), dimension(:), allocatable, intent(in) :: array_1, array_2
 real(8), dimension(:,:), allocatable, intent(out) :: mesh_1, mesh_2
@@ -236,7 +248,7 @@ end subroutine
 subroutine cat_prop(propagation_vectors2, propagation_vectors3)
 
     ! concatenates propagation_vectors2 onto the 3rd dimension of propagation_vectors3
-    ! wrote this in a giffy so its messy but will clean up later
+    ! wrote this in a giffy so its a bit messy
 
 real(8), dimension(:,:,:), allocatable, intent(in) :: propagation_vectors2
 real(8), dimension(:,:,:), allocatable, intent(inout) :: propagation_vectors3
@@ -287,6 +299,9 @@ end subroutine
 
 subroutine cat_int_var(var1, var2)
 
+    ! takes 2 2-d input arrays and stitches them together
+    ! extra space is padded with zeros
+    ! arrays are concatenated along the 2nd dimension (ie. column to column)
     ! var1 is what is to be concatenated
     ! var2 is what is to be concatenated on to
     ! version for integer arrays
@@ -348,9 +363,12 @@ end subroutine
 
 subroutine cat_real_var(var1, var2)
 
+    ! takes 2 2-d input arrays and stitches them together
+    ! extra space is padded with zeros
+    ! arrays are concatenated along the 2nd dimension (ie. column to column)
     ! var1 is what is to be concatenated
     ! var2 is what is to be concatenated on to
-    ! version for reall arrays
+    ! version for real arrays
 
 real(8), dimension(:,:), allocatable, intent(inout) :: var1
 real(8), dimension(:,:), allocatable, intent(inout) :: var2
@@ -409,6 +427,9 @@ end subroutine
 
 subroutine cat_complex_var(var1, var2)
 
+    ! takes 2 2-d input arrays and stitches them together
+    ! extra space is padded with zeros
+    ! arrays are concatenated along the 2nd dimension (ie. column to column)
     ! var1 is what is to be concatenated
     ! var2 is what is to be concatenated on to
     ! version for complex arrays
@@ -471,6 +492,12 @@ end subroutine
 subroutine trim_complex_1d_sr1(array, mask)
 
 ! trims an complex(8) 1d array according to a logical mask
+! mask and array should have the same length
+! pseudocode:
+! do i = 1, length of array
+!   if mask(i) is true, keep array(i)
+!   else if mask(i) is false, remove array(i)
+! end do
 
 logical, dimension(:), allocatable, intent(in) :: mask
 complex(8), dimension(:), allocatable, intent(inout) :: array
@@ -503,7 +530,13 @@ end subroutine
 subroutine trim_real_1d_sr1(array, mask)
 
 ! trims an real(8) 1d array according to a logical mask
-
+! mask and array should have the same length
+! pseudocode:
+! do i = 1, length of array
+!   if mask(i) is true, keep array(i)
+!   else if mask(i) is false, remove array(i)
+! end do
+    
 logical, dimension(:), allocatable, intent(in) :: mask
 real(8), dimension(:), allocatable, intent(inout) :: array
 
@@ -535,6 +568,12 @@ end subroutine
 subroutine trim_int_1d_sr1(array, mask)
 
 ! trims an integer(8) 1d array according to a logical mask
+! mask and array should have the same length
+! pseudocode:
+! do i = 1, length of array
+!   if mask(i) is true, keep array(i)
+!   else if mask(i) is false, remove array(i)
+! end do
 
 logical, dimension(:), allocatable, intent(in) :: mask
 integer(8), dimension(:), allocatable, intent(inout) :: array
@@ -616,7 +655,11 @@ exp2cmplx = cmplx(cos(arg),sin(arg))
 
 end function
 
-subroutine StripSpaces(string) ! taken from: https://stackoverflow.com/questions/27179549/removing-whitespace-in-string
+subroutine StripSpaces(string) 
+    
+    ! taken from: https://stackoverflow.com/questions/27179549/removing-whitespace-in-string
+    ! removes leading spaces from a character array
+
 character(len=*) :: string
 integer :: stringLen 
 integer :: last, actual
@@ -641,7 +684,9 @@ end subroutine
 
 subroutine midPointsAndAreas(face_ids, verts, midpoints, face_areas)
 
-! subroutine midPointsAndAreas computes midpoints and areas of each facet (assumes triangle facets)
+! subroutine midPointsAndAreas computes midpoints and areas of each facet
+! assumes triangle facets
+! to do: extend to quads
 
 integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids
 real(8), dimension(:,:), allocatable, intent(in) :: verts
@@ -717,6 +762,7 @@ subroutine surfSubdivide(VV, FF1)
 ! subroutine surfSubdivide divides each facet of surface mesh into 4 smaller ones
 ! each new facet is made from the midpoint of the facet,  2 edge midpoints, and an existing vertex
 ! input mesh is stored in a temporary array, deallocated, then rellocated with new array dimensions using Euler's characteristic formula
+! doesnt work, dont use
 
 real(8), dimension(:,:), allocatable, intent(inout) :: VV ! input and output vertex array
 integer(8), dimension(:,:), allocatable, intent(inout) :: FF1 ! input and output face array
@@ -838,6 +884,8 @@ end do
 end subroutine
 
 subroutine simpne ( ntab, x, y, result )
+
+    ! a method for integration
 
     !*****************************************************************************80
     !
@@ -979,6 +1027,7 @@ subroutine simpne ( ntab, x, y, result )
     SUBROUTINE PROUST(T)	!Remembrance of time passed.
 
         ! taken from: https://rosettacode.org/wiki/Convert_seconds_to_compound_duration#Fortran
+        ! used to format the predicted remaining time
 
         INTEGER T		!The time, in seconds. Positive only, please.
         INTEGER NTYPES		!How many types of time?

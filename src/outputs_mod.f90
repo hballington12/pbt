@@ -18,13 +18,20 @@ module outputs_mod
                            ampl_far_ext_diff12, & ! amplitude matrix (1,2) due to external diffraction
                            ampl_far_ext_diff21, & ! amplitude matrix (2,1) due to external diffraction
                            ampl_far_ext_diff22, & ! amplitude matrix (2,2) due to external diffraction
-                           theta_vals, &
-                           phi_vals, &
-                           energy_out_beam, &
-                           energy_out_ext_diff, &
-                           mueller, &
-                           mueller_1d,&
-                           la)   
+                           theta_vals,          & ! theta values (in rad)
+                           phi_vals,            & ! phi values (in rad)
+                           energy_out_beam,     & ! beam energy remaining before diffraction
+                           energy_out_ext_diff, & ! external diffraction energy remaining before diffraction
+                           mueller,             & ! 2d mueller matrix
+                           mueller_1d,          & ! 1d mueller matrix
+                           la)                    ! wavelength
+
+      ! sr finalise is called at the end of each rotation
+      ! it combines the beam and external diffraction far-field amplitude matrices to yield the total far-field
+      ! far-field amplitude matrix is then used to compute the 2d mueller matrix
+      ! the 2d mueller matrix is integrated using sr simpne, which yields the 1d mueller matrices
+      !  simpne interpolates a 3-point Lagrangian polynomial to the data and integrates that exactly
+      ! the 1d mueller matrices are integrated to compute various integrated scattering parameters
 
    complex(8), dimension(:,:), allocatable, intent(in) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
    complex(8), dimension(:,:), allocatable, intent(in)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
@@ -417,7 +424,13 @@ module outputs_mod
 
    end subroutine
 
-   subroutine writeup(mueller, mueller_1d, theta_vals, phi_vals, output_dir)
+   subroutine writeup(  mueller,    &
+                        mueller_1d, &
+                        theta_vals, &
+                        phi_vals,   &
+                        output_dir)
+
+   ! sr writeup writes the 1d and 2d mueller matrices to the job directory
 
    real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
    real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
@@ -454,7 +467,12 @@ module outputs_mod
 
    end subroutine
 
-   subroutine summation(mueller, mueller_total, mueller_1d, mueller_1d_total)
+   subroutine summation(mueller,          & ! current 2d mueller
+                        mueller_total,    & ! total 2d mueller
+                        mueller_1d,       & ! current 1d mueller
+                        mueller_1d_total)   ! total 1d mueller
+
+      ! sr summation adds the current mueller matrices to the total
 
       real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
       real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller_total ! mueller matrices
