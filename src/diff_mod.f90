@@ -482,7 +482,7 @@ module diff_mod
     ! if it goes over this, rescale it
     do i2 = 1, size(x3,2)
         do i1 = 1, size(x3,1)
-            if (abs(area_facs2(i1,i2)) .gt. 1) then
+            if (abs(area_facs2(i1,i2)) .gt. 100) then
                 nf = abs(area_facs2(i1,i2))
                 area_facs2(i1,i2) = area_facs2(i1,i2) / nf
             end if
@@ -622,7 +622,7 @@ module diff_mod
             call karczewski(diff_ampl,m,k,prop2,x3(i,j), y3(i,j),z3(i,j))
 
             ! get the vector perpendicular to the scattering plane as viewed in the aperture system
-            if(abs(dot_product(incidence2,k)) .lt. 0.9) then ! if bin is not in direct forwards
+            if(abs(dot_product(incidence2,k)) .lt. 0.999) then ! if bin is not in direct forwards
                 call cross(incidence2,k,hc)
             else ! rotate vector perp to scattering plane (y-z) into aperture system
                 ! call random_rotation(cos_rot,sin_rot)
