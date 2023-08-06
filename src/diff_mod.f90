@@ -390,6 +390,7 @@ module diff_mod
     real(8) alpha, beta, delta, omega1, omega2
     real(8) sumre, sumim
     real(8) delta1, delta2
+    real(8) nf
 
     waveno = 2.0*pi/lambda
     
@@ -450,7 +451,7 @@ module diff_mod
 
                 kxx = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_k ! kx' in derivation
                 kyy = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_k ! ky' in derivation
-            
+
                 delta = kxx*xj+kyy*yj
                 delta1 = kyy*mj+kxx
                 delta2 = kxx*nj+kyy
@@ -463,13 +464,31 @@ module diff_mod
                 sumim = +alpha*(cos(delta)-cos(delta+omega1)) - beta*(cos(delta)-cos(delta+omega2))
                 sumre = -alpha*(sin(delta)-sin(delta+omega1)) + beta*(sin(delta)-sin(delta+omega2))
 
-                area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k)) * cmplx(sumre,sumim) / lambda 
+                area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k)) * cmplx(sumre,sumim) / lambda
+
             end do
         end do
 
+        
+
+
+
     end do
     !!$OMP END PARALLEL
-    
+
+    ! loop to ignore bins which have numerical errors ie. when kyy -> 0 or kxx -> 0
+    ! this appears to just be a flaw in the theory -> merits further investigation
+    ! abs(area_facs2) appears to take value in the range 0 to 1 (check this!)
+    ! if it goes over this, rescale it
+    do i2 = 1, size(x3,2)
+        do i1 = 1, size(x3,1)
+            if (abs(area_facs2(i1,i2)) .gt. 1) then
+                nf = abs(area_facs2(i1,i2))
+                area_facs2(i1,i2) = area_facs2(i1,i2) / nf
+            end if
+        end do
+    end do
+
     end subroutine
     
     subroutine diffraction( ampl,       & ! the outgoing amplitude matrix on the particle surface
@@ -603,7 +622,7 @@ module diff_mod
             call karczewski(diff_ampl,m,k,prop2,x3(i,j), y3(i,j),z3(i,j))
 
             ! get the vector perpendicular to the scattering plane as viewed in the aperture system
-            if(abs(dot_product(incidence2,k)) .lt. 0.999) then ! if bin is not in direct forwards
+            if(abs(dot_product(incidence2,k)) .lt. 0.9) then ! if bin is not in direct forwards
                 call cross(incidence2,k,hc)
             else ! rotate vector perp to scattering plane (y-z) into aperture system
                 ! call random_rotation(cos_rot,sin_rot)
@@ -653,7 +672,7 @@ module diff_mod
             ! apply rotation matrices
             ampl_temp2 = matmul(rot4,matmul(diff_ampl,matmul(ampl,temp_rot1)))
             ! ampl_temp2 = matmul(diff_ampl,matmul(ampl,temp_rot1))
-            ! ampl_temp2 = ampl
+            ! ampl_temp2 = ampl ! disable this!!
 
             amplC11s(i,j) = ampl_temp2(1,1)
             amplC12s(i,j) = ampl_temp2(1,2)
@@ -814,6 +833,7 @@ module diff_mod
         ! print*,'multithreading: disabled'
 
         do j = 1, beam_outbeam_tree_counter
+        ! do j = 1, 0 ! disable beam diffraction
 
             ! progressReal = j*100/beam_outbeam_tree_counter          ! percent completion
             ! if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
@@ -878,9 +898,12 @@ module diff_mod
         
         ! print*,'start ext diff loop...'
         
+        ! print*,'size(ext_diff_outbeam_tree,1)',size(ext_diff_outbeam_tree,1)
+
         ! progressInt = 0
         do j = 1, size(ext_diff_outbeam_tree,1)
         ! do j = 1, 0 ! disable external diff
+        ! do j = 90, 90 ! test
 
             ! progressReal = j*100/size(ext_diff_outbeam_tree,1)        ! percent completion
             ! if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
