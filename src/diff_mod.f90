@@ -381,6 +381,7 @@ module diff_mod
     real(8) v1(1:3,1:3) ! vertices of facet after rotating
     integer(8) j, i1, i2
     real(8), dimension(:,:), allocatable, intent(in) :: x3, y3, z3
+    real(8), dimension(:,:), allocatable :: kxxs, kyys, bin_vec_size_ks
     real(8), intent(in) :: prop2(1:3)
     real(8) kInc(1:3) ! incoming propagation vector * wavenumber
     real(8) x(1:3), y(1:3) ! x and y coordinates of aperture after rotating into x-y plane
@@ -391,6 +392,11 @@ module diff_mod
     real(8) sumre, sumim
     real(8) delta1, delta2
     real(8) nf
+
+    ! allocate
+    allocate(kxxs(1:size(x3,2),1:size(x3,1)))
+    allocate(kyys(1:size(x3,2),1:size(x3,1)))
+    allocate(bin_vec_size_ks(1:size(x3,2),1:size(x3,1)))
 
     waveno = 2.0*pi/lambda
     
@@ -418,6 +424,18 @@ module diff_mod
     n = 1/m ! get  inverse gradient
     area_facs2 = 0
     
+    do i2 = 1, size(x3,2)
+        do i1 = 1, size(x3,1)
+            bin_vec_size_ks(i2,i1) = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
+            kxxs(i2,i1) = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_ks(i2,i1) ! kx' in derivation
+            kyys(i2,i1) = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_ks(i2,i1) ! ky' in derivation
+
+            if (abs(kxxs(i2,i1)) .lt. 1e-6) kxxs(i2,i1) = 1e-6
+            if (abs(kyys(i2,i1)) .lt. 1e-6) kyys(i2,i1) = 1e-6
+
+        end do
+    end do
+
     ! omp stuff below works but loop isnt big enough to give a speedup
     !!$OMP PARALLEL DEFAULT(private) num_threads(1) SHARED(xfar,x3,y3,z3,kinc,waveno,m,n,area_facs2,x,y)
     !!$OMP DO
@@ -447,10 +465,13 @@ module diff_mod
 
                 ! 11/7/23 reduced number of flops here with some simplification and saving of values
 
-                bin_vec_size_k = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
+                ! bin_vec_size_k = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
+                bin_vec_size_k = bin_vec_size_ks(i2,i1) ! distance in k-space to far-field bin
+                ! kxx = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_k ! kx' in derivation
+                ! kyy = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_k ! ky' in derivation
 
-                kxx = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_k ! kx' in derivation
-                kyy = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_k ! ky' in derivation
+                kxx = kxxs(i2,i1) ! kx' in derivation
+                kyy = kyys(i2,i1) ! ky' in derivation
 
                 delta = kxx*xj+kyy*yj
                 delta1 = kyy*mj+kxx
@@ -480,14 +501,14 @@ module diff_mod
     ! this appears to just be a flaw in the theory -> merits further investigation
     ! abs(area_facs2) appears to take value in the range 0 to 1 (check this!)
     ! if it goes over this, rescale it
-    do i2 = 1, size(x3,2)
-        do i1 = 1, size(x3,1)
-            if (abs(area_facs2(i1,i2)) .gt. 100) then
-                nf = abs(area_facs2(i1,i2))
-                area_facs2(i1,i2) = area_facs2(i1,i2) / nf
-            end if
-        end do
-    end do
+    ! do i2 = 1, size(x3,2)
+    !     do i1 = 1, size(x3,1)
+    !         if (abs(area_facs2(i1,i2)) .gt. 10) then
+    !             nf = abs(area_facs2(i1,i2))
+    !             area_facs2(i1,i2) = area_facs2(i1,i2) / nf
+    !         end if
+    !     end do
+    ! end do
 
     end subroutine
     
