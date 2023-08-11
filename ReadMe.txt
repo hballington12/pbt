@@ -16,7 +16,9 @@ input.txt
 
     "ibi" <value> - Defines the imaginary component of the particle refractive index. Is required.
 
-    "cfn" <string> - Defines the particle filename. Is required. Currently, input file must be a wavefront geometry file. The particle should be triangulated.
+    "cfn" <string> - Defines the particle filename. Is required. The particle should be triangulated. See "cft" for defining the particle file type.
+
+    "cft" <obj or mrt> - Defines the particle file type. Is required. Use "obj" for wavefront geometry files or "mrt" for Macke ray tracing style files.
 
     "afn" <string> - Defines the apertures filename. Is required. The apertures file containes a single column defining which aperture each face belongs to. The number of lines in the apertures file must match the total number of faces in the particle file.
 
