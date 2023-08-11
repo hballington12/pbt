@@ -7,6 +7,9 @@ This file contains a summary of the aperture beam tracer (ABT), a physical optic
 abt.f90
     Main source file. It contains the program entry point.
 
+beam_loop_mod.f90
+    Beam loop module. Contains subroutines for computing the amplitude matrix on the particle surface via geometric optics.
+
 input.txt
     Input file. The ABT reads input parameters from this file. There are a few required input parameters, as well as a few optional ones. The code will stop if a mandatory argument is missing from the input file. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of lines in the input file is not important and the ABT will search through lines from top to bottom in an attempt to find each argument. If the same keyphrase is specified on multiple lines, the ABT will take the first one that appears. A summary of input file arguments:
 
