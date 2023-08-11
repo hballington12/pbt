@@ -8,7 +8,7 @@ rec 8
 
 ! optional arguments
 rot off 30 30
-cft mrt
+cft obj
 mt
 
 ! #############################################
