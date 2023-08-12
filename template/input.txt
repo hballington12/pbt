@@ -7,8 +7,6 @@ cfn grc1sc_CL1_2.00_SD1_.00hr3.5nfhr4pfl10.0nfpl8pher1pper2L10.0.cry
 afn grc1sc_CL1_2.00_SD1_.00hr3.5nfhr4pfl10.0nfpl8pher1pper2L10.0_apertures.dat
 rec 6
 
-
-
 ! optional arguments
 rot off 30 30
 cft mrt
