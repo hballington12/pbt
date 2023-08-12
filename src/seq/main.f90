@@ -90,6 +90,7 @@ real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 
 ! ############################################################################################################
+! start
 
 print*,'========== start main'
 start = omp_get_wtime()
