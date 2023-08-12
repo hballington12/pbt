@@ -102,7 +102,7 @@ do i = 1, num_verts
     ! my_string = "v "//trim(my_string2)//" "//trim(my_string3)//" "//trim(my_string4)
     ! write(10,*) trim(my_string)
 
-    write(10,'(A1,f12.8,f12.8,f12.8)') "v ", verts(i,1), verts(i,2), verts(i,3)
+    write(10,'(A1,f16.8,f16.8,f16.8)') "v ", verts(i,1), verts(i,2), verts(i,3)
 end do
 do i = 1, num_faces
     write(10,'(A1,I6,I6,I6)') 'f', face_ids(i,1), face_ids(i,2), face_ids(i,3)

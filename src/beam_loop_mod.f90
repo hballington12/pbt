@@ -87,7 +87,7 @@ subroutine energy_checks(   beam_outbeam_tree,beam_outbeam_tree_counter,&
 
 end subroutine
 
-subroutine beam_loop(Face1, verts, la, rbi, ibi, afn, rec, &
+subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     beamV, beamF1, beamN, beamF2, beamMidpoints, ampl_beam, &
     beam_outbeam_tree, beam_outbeam_tree_counter, ext_diff_outbeam_tree, &
     energy_out_beam, energy_out_ext_diff)
@@ -99,7 +99,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, afn, rec, &
     real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
     real(8), intent(in) :: la ! wavelength
     real(8), intent(in) :: rbi, ibi ! real part of the refractive index
-    character(100), intent(in) :: afn ! apertures filename
+    ! character(100), intent(in) :: afn ! apertures filename
     real(8), allocatable, dimension(:,:), intent(in) :: beamV ! beam vertices
     real(8), allocatable, dimension(:,:), intent(in) :: beamN ! beam normals
     real(8), allocatable, dimension(:,:), intent(in) :: beamMidpoints ! beam  midpoints
@@ -152,7 +152,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, afn, rec, &
     ! sr findVisibleFacets
     
     ! sr readApertures
-    integer(8), dimension(:), allocatable :: apertures ! the aperture which each facet belongs to
+    integer(8), dimension(:), allocatable, intent(in)  :: apertures ! the aperture which each facet belongs to
     
     ! sr initApertures
     real(8), dimension(:,:), allocatable :: apertureNormals ! the normal of each aperture
@@ -196,7 +196,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, afn, rec, &
     
     ! ############# beam_loop_mod #############
     
-    call readApertures(afn, apertures, Face1) ! read aperture assignments from file (temporary fix)
+    ! call readApertures(afn, apertures, Face1) ! read aperture assignments from file (now moved to pdal2 and passed into beam_loop)
     
     call initApertures(apertures, Norm, Face2, Midpoints, apertureNormals, apertureMidpoints, apertureAreas, illuminatedApertureAreas, sufficientlyIlluminated, &
                              aperturePropagationVectors) ! initialise the aperture variables

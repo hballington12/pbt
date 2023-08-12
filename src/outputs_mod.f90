@@ -49,7 +49,7 @@ module outputs_mod
    real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext
    real(8) waveno
 
-   waveno = 2*pi/la
+   waveno = 2d0*pi/la
 
    ! allocate total amplitude matrix (beam - ext diff)
    allocate(ampl_far11(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
@@ -372,11 +372,19 @@ module outputs_mod
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_ext_diff) ! p11*sin(theta)
    write(101,'(A40,f16.8,A2,f10.6,A3)'),'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
-
+   
    ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
+   ! ext = abs(4*pi/waveno*imag(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
+   ! ext = abs(pi/2*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
+   ext = abs(2*pi/waveno*real(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
 
-   write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem:',ext 
-   print'(A40,f16.8)','ext. cross (opt. theorem):',ext 
+   write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (real):',ext 
+   print'(A40,f16.8)','ext. cross (opt. theorem) real:',ext 
+
+   ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
+
+   write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (imag):',ext 
+   print'(A40,f16.8)','ext. cross (opt. theorem) imag:',ext 
 
    write(101,'(A40,f16.8)'),'single-scattering albedo:',1-(ext-scatt)/ext 
    print'(A40,f16.8)','single-scatt. albedo:',1-(ext-scatt)/ext 
