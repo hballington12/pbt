@@ -1,5 +1,5 @@
 ! diff_mod.f90
-! module containing various subroutines used for diffraction
+! module containing various subroutines used for diffraction :)
 
 module diff_mod
 
