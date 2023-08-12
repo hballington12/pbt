@@ -1,15 +1,17 @@
 ! required arguments
 lambda 0.532
-rbi 1.31 
+rbi 1.31
 ibi 0
-cfn smooth4.obj
-afn smooth4_apertures.dat
+cmethod cc_hex
+cfn grc1sc_CL1_2.00_SD1_.00hr3.5nfhr4pfl10.0nfpl8pher1pper2L10.0.cry
+afn grc1sc_CL1_2.00_SD1_.00hr3.5nfhr4pfl10.0nfpl8pher1pper2L10.0_apertures.dat
 rec 8
 
 ! optional arguments
 rot off 30 30
-cft obj
-mt
+cft mrt
+! mt
+! intellirot
 
 ! #############################################
 
@@ -22,6 +24,9 @@ mt
 ! rec <max beam recursions>
 ! rot <rot method> <args>
 ! mt (optional, enables multithreading in diffraction subroutine)
+! cmethod <"read" or "cc_hex"> read uses filename defined by cfn and filetype defined by cft to
+    ! read the particle. afn is used to read the apertures. cc_hex makes gaussian rough hexagonal
+    ! columns/plates, reading the input parameters from vals.in
 
 ! #############################################
 
@@ -38,3 +43,7 @@ mt
 ! mt
 ! cfn smooth4.obj
 ! afn smooth4_apertures.dat
+! cfn plate1.obj
+! afn plate1_apertures.dat
+! cfn column_rough1.obj
+! afn column_rough1_apertures.dat

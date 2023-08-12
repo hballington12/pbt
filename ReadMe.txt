@@ -7,9 +7,6 @@ This file contains a summary of the aperture beam tracer (ABT), a physical optic
 abt.f90
     Main source file. It contains the program entry point.
 
-beam_loop_mod.f90
-    Beam loop module. Contains various subroutines for computing the amplitude matrix on the particle surface via geometric optics.
-
 input.txt
     Input file. The ABT reads input parameters from this file. There are a few required input parameters, as well as a few optional ones. The code will stop if a mandatory argument is missing from the input file. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of lines in the input file is not important and the ABT will search through lines from top to bottom in an attempt to find each argument. If the same keyphrase is specified on multiple lines, the ABT will take the first one that appears. A summary of input file arguments:
 
@@ -19,11 +16,21 @@ input.txt
 
     "ibi" <value> - Defines the imaginary component of the particle refractive index. Is required.
 
-    "cfn" <string> - Defines the particle filename. Is required. The particle should be triangulated. See "cft" for defining the particle file type.
+    "cmethod" <string> - Defines the method of particle input. Is required. Current supported methods are:
 
-    "cft" <obj or mrt> - Defines the particle file type. Is required. Use "obj" for wavefront geometry files or "mrt" for Macke ray tracing style files.
+        "read" - attempts to read the particle from the current directory. If "read" is specified, the following arguments must also be specified:
 
-    "afn" <string> - Defines the apertures filename. Is required. The apertures file containes a single column defining which aperture each face belongs to. The number of lines in the apertures file must match the total number of faces in the particle file.
+            "cft" <string> - Defines the particle input filetype. The supported particle file input types are:
+
+                "obj" - wavefront style geometry file
+
+                "mrt" - Macke ray-tracing style
+
+            "cfn" <string> - Defines the particle filename. Is required. Currently, input file must be a wavefront geometry file. The particle should be triangulated.
+
+            "afn" <string> - Defines the apertures filename. Is required. The apertures file containes a single column defining which aperture each face belongs to. The number of lines in the apertures file must match the total number of faces in the particle file.
+
+        "cc_hex" - attempts to make gaussian rough hexagonal column/plate. Input parameters should be included in "vals.in" file placed in the current directory. Uses method developed by C. Collier, based on Muinonen & Saarinen 2000
 
     "rec" <value> - Defines the total number of beam recursions per orientation. Is required.
 
