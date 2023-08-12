@@ -50,6 +50,10 @@ subroutine energy_checks(   beam_outbeam_tree,beam_outbeam_tree_counter,&
                                 ampl(1,2)*conjg(ampl(1,2)) + &
                                 ampl(2,1)*conjg(ampl(2,1)) + &
                                 ampl(2,2)*conjg(ampl(2,2)))
+                                
+        if (intensity_out .gt. 1e5) print*,'i_beam: ',i,' intensity out: ',intensity_out
+        
+        
         energy_out_beam = energy_out_beam + intensity_out*area*cos_theta
     end do
 
@@ -227,11 +231,11 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
                                     vk71, vk72, vk73, vk91, vk92, vk93) ! get reflection vectors based on facet normals (WILL NOT WORK FOR RE-ENTRY)
     
     call getRotationMatrices(rot_ampl, vk71, vk72, vk73, 1D0, 0D0, 0D0, 0D0, 0D0, -1D0) ! get rotation matrix for rotating into new scattering plane
-    
+
     call rotateAmplitudeMatrices(rot_ampl,ampl_in,new_in_ampl) ! rotate amplitude matrices into new scattering plane
-    
+
     call rotateAmplitudeMatrices(rot_ampl,ampl_in_ps,new_in_ampl_ps) ! rotate amplitude matrices, including shadowed facets, into new scattering plane
-    
+
     call applyFresnelMatrices(new_in_ampl, rperp, rpar, tperp, tpar, refl_ampl, trans_ampl) ! apply fresnel matrices
     
     call applyFresnelMatrices(new_in_ampl_ps, rperp, rpar, tperp, tpar, refl_ampl_ps, trans_ampl_ps) ! apply fresnel matrices, including shadow facets
@@ -249,6 +253,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     
     ! main loop
     do i = 1, rec ! for each beam recursion
+       print*,'internal recursion #',i
        call internal_recursion_outer(   F1Mapping, &
                                         propagationVectors, &
                                         verts, Norm, midPoints, Face1, Face2, &
@@ -851,6 +856,11 @@ do i = 1, size(Face2,1) ! for each facet
         beamFaceAreas(counter) = faceAreas(i)
         beam_ampl(1:2,1:2,counter) = ampl(1:2,1:2,i)
 
+        if (real(ampl(1,1,i)) .gt. 1e5) then
+            print*,'oh dear inside beam scan'
+            stop
+        end if
+
         ! if(counter .eq. 49) print*,'counter was 49 -> face ID = ',i
 
     end if
@@ -960,7 +970,7 @@ do i = 1, size(apertureMidpoints,1) ! for each aperture
     ! end if
     if(counter2 .gt. 0) then
         if(prescan) then
-            !print'(A,I5,A,I5,A40,I5,A,f10.6)','aperture ',aperture_id,' illuminated ',counter2,' facets (shadow) in aperture ',i,' with a total area of ',illuminatedApertureAreas2_ps(i)
+            ! print'(A,I5,A,I5,A40,I5,A,f10.6)','aperture ',aperture_id,' illuminated ',counter2,' facets (shadow) in aperture ',i,' with a total area of ',illuminatedApertureAreas2_ps(i)
         end if
         totalIlluminated_ps = totalIlluminated_ps + counter2
     end if    
@@ -1379,6 +1389,17 @@ do i = 1, num_sufficiently_illuminated_apertures
             refl_ampl_out12_2(k,l) = refl_ampl(1,2)
             refl_ampl_out21_2(k,l) = refl_ampl(2,1)
             refl_ampl_out22_2(k,l) = refl_ampl(2,2)
+
+            if(real(0.5*(refl_ampl(1,1)*conjg(refl_ampl(1,1)) + refl_ampl(1,2)*conjg(refl_ampl(1,2)) + refl_ampl(2,1)*conjg(refl_ampl(2,1)) + refl_ampl(2,2)*conjg(refl_ampl(2,2)))) .gt. 1e5) then
+
+                print*,'oh dear'
+
+                print*,'beam_ampl(1:2,1:2,beamIDs_ps(j))',beam_ampl(1:2,1:2,beamIDs_ps(j))
+
+                print*,'rot(1:2,1:2)',rot(1:2,1:2)
+
+                stop
+            end if
 
             ! calc transmission propagation vector for vector diffraction
             if(tir) then
@@ -2225,6 +2246,7 @@ do i = 1, size(Face1,1) ! for each face
         blockingID = beamIDs(i)
         ! ampl_in(1:2,1:2,i) = ampl_beam(1:2,1:2,blockingID)*exp(1i*waveno*distances(i))
         ampl_in(1:2,1:2,i) = ampl_beam(1:2,1:2,blockingID)*exp2cmplx(waveno*distances(i))
+        ampl_in_ps(1:2,1:2,i) = ampl_beam(1:2,1:2,blockingID)*exp2cmplx(waveno*distances(i)) ! fix 12/08/23
         ! ampl_in(1,1,i) = ampl_beam(1,1,blockingID)*exp2cmplx(waveno*distances(i))
         ! if (i .eq. 6282) print*,'distances(i)',distances(i)
         ! if (i .eq. 6282) print*,'exp2cmplx(waveno*distances(i))',exp2cmplx(waveno*distances(i))
@@ -2234,6 +2256,7 @@ do i = 1, size(Face1,1) ! for each face
         ! ampl_in_ps(1:2,1:2,i) = ampl_beam(1:2,1:2,blockingID)*exp(1i*waveno*distances_ps(i))
         ampl_in_ps(1:2,1:2,i) = ampl_beam(1:2,1:2,blockingID)*exp2cmplx(waveno*distances_ps(i))
     end if
+    
 end do
 
 end subroutine

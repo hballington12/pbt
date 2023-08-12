@@ -118,9 +118,11 @@ subroutine init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
         ! end do
 
     else
-        call random_number(alpha_vals)
-        call random_number(beta_vals)
-        call random_number(gamma_vals)
+        do i = 1, size(alpha_vals,1) ! loop here so that the angles are reproducable regardless of number of orientations
+            call random_number(alpha_vals(i))
+            call random_number(beta_vals(i))
+            call random_number(gamma_vals(i))
+        end do
     end if
 
     end subroutine
@@ -338,22 +340,22 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
 
         rot1(1,1) = hilf1
         rot1(1,2) = cos(pi/2-atan(hilf0))
-        rot1(1,3) = 0
+        rot1(1,3) = 0.0
         rot1(2,1) = cos(pi/2+atan(hilf0))
         rot1(2,2) = hilf1
-        rot1(2,3) = 0
-        rot1(3,1) = 0
-        rot1(3,2) = 0
-        rot1(3,3) = 1
+        rot1(2,3) = 0.0
+        rot1(3,1) = 0.0
+        rot1(3,2) = 0.0
+        rot1(3,3) = 1.0
 
         rot2(1,1) = cos(pi-acos(vec(3)))
-        rot2(1,2) = 0
+        rot2(1,2) = 0.0
         rot2(1,3) = cos(pi/2+acos(vec(3)))
-        rot2(2,1) = 0
-        rot2(2,2) = 1
-        rot2(2,3) = 0
+        rot2(2,1) = 0.0
+        rot2(2,2) = 1.0
+        rot2(2,3) = 0.0
         rot2(3,1) = cos(pi/2-acos(vec(3)))
-        rot2(3,2) = 0
+        rot2(3,2) = 0.0
         rot2(3,3) = cos(pi-acos(vec(3)))
 
         rot = matmul(rot2,rot1)
@@ -373,7 +375,7 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
         print*,'gamma:',eulers(3)
         write(101,*),'gamma:',eulers(3)
 
-        eulers = eulers*pi/180 ! convert to rad
+        eulers = eulers*pi/180.0 ! convert to rad
 
         ! mishchenko rotation
         s1 = sin(eulers(1))
@@ -399,6 +401,9 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
         end do
         
     else if(rot_method(1:len(trim(rot_method))) .eq. 'multi') then
+
+        ! print*,'rot method was multi'
+
         rand = alpha_vals(loop_index)    
         eulers(1) = 2*pi*(rand)
 
@@ -408,12 +413,12 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
         rand = gamma_vals(loop_index) 
         eulers(3) = 2*pi*(rand)
 
-        print*,'alpha:',eulers(1)*180/pi
-        write(101,*),'alpha:',eulers(1)*180/pi
-        print*,'beta: ',eulers(2)*180/pi
-        write(101,*),'beta: ',eulers(2)*180/pi
-        print*,'gamma:',eulers(3)*180/pi
-        write(101,*),'gamma:',eulers(3)*180/pi
+        print*,'alpha:',eulers(1)*180.0/pi
+        write(101,*),'alpha:',eulers(1)*180.0/pi
+        print*,'beta: ',eulers(2)*180.0/pi
+        write(101,*),'beta: ',eulers(2)*180.0/pi
+        print*,'gamma:',eulers(3)*180.0/pi
+        write(101,*),'gamma:',eulers(3)*180.0/pi
 
         ! mishchenko rotation
         s1 = sin(eulers(1))
@@ -680,11 +685,41 @@ allocate(trans_ampl_ps(1:2,1:2,1:size(face_ids,1)))
 allocate(trans_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(beam_outbeam_tree(1:100000)) ! set to 100000 as guess for max outbeams
+allocate(beam_outbeam_tree(1:200000)) ! set to 100000 as guess for max outbeams
 
 waveno = 2*pi/la
 beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
 interactionCounter = 0 ! counts the current number of interactions
+ampl_in_ps = 0
+ampl_in = 0
+isVisible = .false.
+isVisiblePlusShadows = .false.
+isWithinBeam = .false.
+isWithinBeam_ps = .false.
+distances = 0
+distances_ps = 0
+beamIDs = 0
+beamIDs_ps = 0
+isShadow = .false.
+ampl_in = 0
+ampl_in_ps = 0
+rperp = 0
+rpar = 0
+tperp = 0
+tpar = 0
+vk71 = 0
+vk72 = 0
+vk73 = 0
+vk91 = 0
+vk92 = 0
+vk93 = 0
+rot_ampl = 0
+new_in_ampl = 0
+new_in_ampl_ps = 0
+trans_ampl_ps = 0
+trans_ampl = 0
+refl_ampl = 0
+refl_ampl_ps = 0
 
 ! print*,'========== end sr init'
 
