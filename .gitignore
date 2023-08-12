@@ -4,6 +4,7 @@ theta_vals.txt
 vals.in
 abt.sh
 abtMPI.sh
+log
 **.obj
 **.mod
 **.exe
