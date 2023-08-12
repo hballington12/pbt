@@ -19,12 +19,11 @@ implicit none
 
 ! to do:
 ! add vector re-normalisation checks after rotations (ie. sr rotate_into_aperture_system)
-! single scat albedo
 ! add quad support
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
-! fix theta = 0 error for 30 x 30 at lambda = 0.532
+! get extinction cross section from beam tracing
 
 ! ############################################################################################################
 
@@ -50,6 +49,7 @@ character(100) rot_method ! rotation method
 logical is_multithreaded ! whether or not code should use multithreading
 integer num_orients ! number of orientations
 logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+character(100) c_method ! method of particle file input
 
 ! sr PDAL2
 integer(8) num_vert ! number of unique vertices
@@ -61,6 +61,7 @@ real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
 real(8), dimension(:,:), allocatable :: norm ! face normals
 integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
 integer(8), dimension(:), allocatable :: norm_ids ! face normal ID of each face
+integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
 
 ! sr makeIncidentBeam
 real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
@@ -102,26 +103,26 @@ open(101,file=trim(output_dir)//"/"//"log") ! open global non-standard log file 
 
 ! read input parameters
 call SDATIN(ifn,            & ! <-  input filename
-            cfn,            & !  -> crystal filename
-            cft,            & !  -> crystal file type
             la,             & !  -> wavelength
             rbi,            & !  -> real part of the refractive index
             ibi,            & !  -> imaginary part of the refractive index
-            afn,            & !  -> apertures filename
             rec,            & !  -> max number of internal beam recursions
             rot_method,     & !  -> particle rotation method
             is_multithreaded, & !  -> whether ot not code should use multithreading) 
             num_orients, &
-            intellirot)
+            intellirot,  &
+            c_method)
 
-! read particle file
-call PDAL2( cfn,            & ! <-  crystal filename
-            cft,            & ! <-  crystal file type
+! get input particle information
+call PDAL2( ifn,            & ! <-  input filename
+            c_method,       & ! <-  method of particle file input
             num_vert,       & !  -> number of unique vertices
             num_face,       & !  -> number of faces
             face_ids,       & !  -> face vertex IDs
             vert_in,        & !  -> unique vertices
-            num_face_vert)    !  -> number of vertices in each face
+            num_face_vert,  & !  -> number of vertices in each face
+            afn,            & ! <-  apertures filename
+            apertures)
 
 call init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
 
@@ -159,7 +160,7 @@ do i = 1, num_orients
                     la,                        & ! <-  wavelength
                     rbi,                       & ! <-  real part of the refractive index
                     ibi,                       & ! <-  imaginary part of the refractive index
-                    afn,                       & ! <-  apertures filename
+                    apertures,                 & ! <-  apertures
                     rec,                       & ! <-  max number of internal beam recursions
                     beamV,                     & ! <-  beam vertices
                     beamF1,                    & ! <-  beam face vertex indices
