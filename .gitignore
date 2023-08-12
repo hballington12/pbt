@@ -2,6 +2,8 @@ input.txt
 phi_vals.txt
 theta_vals.txt
 vals.in
+abt.sh
+abtMPI.sh
 **.obj
 **.mod
 **.exe
