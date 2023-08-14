@@ -685,7 +685,7 @@ allocate(trans_ampl_ps(1:2,1:2,1:size(face_ids,1)))
 allocate(trans_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(beam_outbeam_tree(1:200000)) ! set to 100000 as guess for max outbeams
+allocate(beam_outbeam_tree(1:1000000)) ! set to 100000 as guess for max outbeams
 
 waveno = 2*pi/la
 beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
