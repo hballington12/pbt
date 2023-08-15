@@ -685,7 +685,7 @@ allocate(trans_ampl_ps(1:2,1:2,1:size(face_ids,1)))
 allocate(trans_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(beam_outbeam_tree(1:200000)) ! set to 100000 as guess for max outbeams
+allocate(beam_outbeam_tree(1:500000)) ! set to 100000 as guess for max outbeams
 
 waveno = 2*pi/la
 beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
@@ -1426,6 +1426,51 @@ character(100) function read_string(ifn,var)
     end if
 
     read_string = output
+
+end function
+
+character(100) function read_optional_string(ifn,var)
+
+! function read_optional_string(ifn,var) reads the input file and looks for an optional flag
+! if the flag is found, the flag is read and the output is a string contained in the variable var
+! if the flag is not found, the output is a string: "#flagnotfound#" with trailing spaces in the variable var
+
+    character(len=*), intent(in) :: ifn ! input filename
+    character(len=*), intent(in) :: var ! variable to read
+    character(100) output ! output variable
+    character(100) line
+    integer num_lines, io, i
+    logical success
+
+    open(10,file = ifn, status = 'old')
+
+    num_lines = 0  ! initialise line counter
+    success = .false.
+
+    do
+        read(10,*,iostat=io)
+        if (io/=0) exit
+        num_lines = num_lines + 1
+    end do
+
+    rewind(10) ! back to top of file
+
+    do i = 1,num_lines
+        read(10,"(a)",iostat=io)line
+        if (line(1:len(var)+1) .eq. var//' ') then
+            output = line(len(var)+1:len(line))
+            success = .true.
+        end if
+
+    end do
+
+    close(10)
+
+    if (.not. success) then
+        output = "#flagnotfound#"
+    end if
+
+    read_optional_string = output
 
 end function
 

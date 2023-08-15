@@ -12,6 +12,7 @@ rot off 30 30
 cft mrt
 ! mt
 ! intellirot
+jobname my_job_name
 
 ! #############################################
 

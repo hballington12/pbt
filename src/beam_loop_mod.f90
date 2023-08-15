@@ -1710,6 +1710,9 @@ do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previo
     !print*,'adding to outbeam tree, starting at:',beam_outbeam_tree_counter,' outbeams'
     do j = 1, size(FInt1,1)
         beam_outbeam_tree_counter = beam_outbeam_tree_counter + 1
+        if(beam_outbeam_tree_counter .gt. size(beam_outbeam_tree,1)) then
+            print*,'error: need more space in outbeam_tree. please increase in sr init'
+        end if
         ! print*,j,FInt1(j)
         beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(1,1) = trans_ampl_out11_1(j)
         beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(1,2) = trans_ampl_out12_1(j)
