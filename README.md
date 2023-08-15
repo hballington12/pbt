@@ -54,6 +54,8 @@ input.txt
 
     "mt" - Defines whether the code should attempt to use multithreading, where appropriate. Is optional. If omitted, multithreading is disabled by default. If enabled, the user should ensure that the relevant omp environment variables are set up for their system. ie. OMP_STACKSIZE, OMP_NUM_THREADS, etc. If the code throws a segmentation fault at the diffraction subroutine, the user will likely need to increase their OMP_STACKSIZE.
 
+    "jobname" - Specifies the name of the directory within which the output files should be place. Is optional. If omitted, "my_job#" is used, where # is an integer. If the directory already exists, an integer is appended to the directory name so that no files are overwritten.
+
 /////////////////////////////////////////////////////////////////////////////
 Other notes:
 
