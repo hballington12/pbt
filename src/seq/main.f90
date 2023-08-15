@@ -50,6 +50,7 @@ logical is_multithreaded ! whether or not code should use multithreading
 integer num_orients ! number of orientations
 logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
 character(100) c_method ! method of particle file input
+character(100) job_name ! name of job
 
 ! sr PDAL2
 integer(8) num_vert ! number of unique vertices
@@ -91,16 +92,25 @@ real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 
 ! ############################################################################################################
 ! start
-
 print*,'========== start main'
 start = omp_get_wtime()
 call seed(99)
-call make_dir("my_job",output_dir)
+
+job_name = read_optional_string(ifn,"jobname") ! get crystal filename
+call StripSpaces(job_name) ! remove leading spaces
+if(job_name(1:len(trim(job_name))) .eq. "#flagnotfound#") then
+    ! print*,'jobname flag was not found, setting as my_job'
+    job_name = "my_job"
+end if
+print*,'job name: "',job_name(1:len(trim(job_name))),'"'
+call make_dir(job_name,output_dir)
 call StripSpaces(output_dir)
 print*,'output directory is "',trim(output_dir),'"'
 open(101,file=trim(output_dir)//"/"//"log") ! open global non-standard log file for important records
 
 ! ############# input_mod #############
+
+! stop
 
 ! read input parameters
 call SDATIN(ifn,            & ! <-  input filename
