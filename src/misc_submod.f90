@@ -27,30 +27,44 @@ subroutine make_dir(dir_path_in,cwd_out)
     job_num = 1
     result = .false.
 
-    do while (result .eq. .false.) ! while a new directory has not been made
+    ! attempt to make job with specified name
+    write(dir_path,*) trim(dir_path_in)
+    call StripSpaces(dir_path)
+    ! print*,'enquiring at: "',trim(dir_path),'"'
+    inquire(directory = trim(dir_path), exist = exists)
+    if(exists .eq. .false.) then ! if job name is available
+        ! print*,'Creating job directory at "',trim(dir_path),'"'
+        write(cwd_out,*) trim(dir_path)
+        result = makedirqq(trim(dir_path))
+    else ! if job name is not available, append numbers until an available name is found
+        do while (result .eq. .false.) ! while a new directory has not been made
 
-        ! append job_num to directory name
-        write(job_num_string,"(I)") job_num
-        call StripSpaces(job_num_string)
-        ! print*,'job_num_string:',trim(job_num_string)
-        ! print*,'dir_path: ',trim(dir_path_in)//trim(job_num_string)
-        write(dir_path,*) trim(dir_path_in)//trim(job_num_string)
-        call StripSpaces(dir_path)
-        ! print*,'attempting to make directory with name "',trim(dir_path),'"'
+            ! append job_num to directory name
+            write(job_num_string,"(I)") job_num
+            call StripSpaces(job_num_string)
+            ! print*,'job_num_string:',trim(job_num_string)
+            ! print*,'dir_path: ',trim(dir_path_in)//trim(job_num_string)
+            write(dir_path,*) trim(dir_path_in)//"_"//trim(job_num_string)
+            call StripSpaces(dir_path)
+            ! print*,'attempting to make directory with name "',trim(dir_path),'"'
+    
+            inquire(directory = trim(dir_path), exist = exists)
+            if(exists .eq. .false.) then 
+                ! print*,'Creating job directory at "',trim(dir_path),'"'
+                write(cwd_out,*) trim(dir_path)
+                result = makedirqq(trim(dir_path))
+            else
+                ! if already exists, add 1 to job number and try again
+                job_num = job_num + 1
+                ! print*,'error: job directory already exists'
+                ! stop
+            end if
+    
+        end do
 
-        inquire(directory = trim(dir_path), exist = exists)
-        if(exists .eq. .false.) then 
-            ! print*,'Creating job directory at "',trim(dir_path),'"'
-            write(cwd_out,*) trim(dir_path)
-            result = makedirqq(trim(dir_path))
-        else
-            ! if already exists, add 1 to job number and try again
-            job_num = job_num + 1
-            ! print*,'error: job directory already exists'
-            ! stop
-        end if
+    end if
 
-    end do
+    
 
 end subroutine
 
