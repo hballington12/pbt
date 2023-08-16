@@ -1390,17 +1390,6 @@ do i = 1, num_sufficiently_illuminated_apertures
             refl_ampl_out21_2(k,l) = refl_ampl(2,1)
             refl_ampl_out22_2(k,l) = refl_ampl(2,2)
 
-            if(real(0.5*(refl_ampl(1,1)*conjg(refl_ampl(1,1)) + refl_ampl(1,2)*conjg(refl_ampl(1,2)) + refl_ampl(2,1)*conjg(refl_ampl(2,1)) + refl_ampl(2,2)*conjg(refl_ampl(2,2)))) .gt. 1e5) then
-
-                print*,'oh dear'
-
-                print*,'beam_ampl(1:2,1:2,beamIDs_ps(j))',beam_ampl(1:2,1:2,beamIDs_ps(j))
-
-                print*,'rot(1:2,1:2)',rot(1:2,1:2)
-
-                stop
-            end if
-
             ! calc transmission propagation vector for vector diffraction
             if(tir) then
                 vk121Int(k,l) = 0

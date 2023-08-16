@@ -734,7 +734,8 @@ module diff_mod
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     real(8), intent(in) :: lambda ! wavelength
-    real(8), dimension(:), allocatable, intent(out) :: theta_vals, phi_vals
+    real(8), dimension(:), allocatable, intent(in) :: theta_vals
+    real(8), dimension(:), allocatable, intent(in) :: phi_vals
     real(8), dimension(:,:), allocatable :: xfar, yfar, zfar ! far-field bin positions
     logical, intent(in) :: is_multithreaded
     integer j
@@ -1009,14 +1010,15 @@ module diff_mod
     real(8), optional, intent(in) :: theta_start_in, theta_end_in, phi_start_in, phi_end_in ! 
     
     real(8) r ! distance to far-field
-    real(8), dimension(:), allocatable, intent(out) :: theta_vals, phi_vals
+    real(8), dimension(:), allocatable, intent(in) :: theta_vals
+    real(8), dimension(:), allocatable, intent(in) :: phi_vals
     real(8), dimension(:,:), allocatable :: theta_vals_mesh, phi_vals_mesh
     real(8) theta_start, theta_end, phi_start, phi_end ! 
     integer i
 
-    call read_theta_vals(theta_vals)
-    ! stop
-    call read_phi_vals(phi_vals)
+    ! call read_theta_vals(theta_vals)
+
+    ! call read_phi_vals(phi_vals)
 
     phi_dim = size(phi_vals,1)
     theta_dim = size(theta_vals,1)
@@ -1030,17 +1032,14 @@ module diff_mod
 
     ! stop
     
-    ! convert theta vals to rad
-    theta_vals = theta_vals*pi/180d0
     ! stop
-    ! convert phi vals to rad
-    phi_vals = phi_vals*pi/180d0
+
 
     ! numerical fixes due to divide by 0 in contour integral
-    do i = 1, size(phi_vals)
-        if(abs(phi_vals(i)*180/pi) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180
-        if(abs(phi_vals(i)*180/pi - 360.0) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180
-    end do
+    ! do i = 1, size(phi_vals)
+    !     if(abs(phi_vals(i)*180/pi) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180
+    !     if(abs(phi_vals(i)*180/pi - 360.0) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180
+    ! end do
 
     ! stop
     

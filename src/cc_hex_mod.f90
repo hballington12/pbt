@@ -3,17 +3,20 @@
 !written by Chris Collier (except subroutine RNDG)
 module cc_hex_mod
 
+use types_mod
+
 IMPLICIT NONE
 
 CONTAINS
 
 ! ################ START MAIN #################
 
-SUBROUTINE CC_HEX_MAIN(face_ids,vertices,apertures)
+SUBROUTINE CC_HEX_MAIN(cc_hex_params,face_ids,vertices,apertures)
 	REAL(8) :: L, hradius, pflength
 	INTEGER :: nfhr, nfpl, pfhfer, pfpfer, nscales
 	REAL(8), DIMENSION(:), ALLOCATABLE :: clen, stdev
-	
+	type(cc_hex_params_type), intent(in) :: cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+
 	!output
 	INTEGER :: nf
 	INTEGER, DIMENSION(:), ALLOCATABLE :: nv
@@ -37,22 +40,33 @@ SUBROUTINE CC_HEX_MAIN(face_ids,vertices,apertures)
 	integer k1
 
 	!read in input values
-	OPEN(UNIT=3, FILE='vals.in', STATUS='OLD')
+	! OPEN(UNIT=3, FILE='vals.in', STATUS='OLD')
 	!READ(UNIT=3, FMT=*) filename
-	READ(UNIT=3, FMT=*) L
-	READ(UNIT=3, FMT=*) hradius
-	READ(UNIT=3, FMT=*) nfhr
-	READ(UNIT=3, FMT=*) pflength
-	READ(UNIT=3, FMT=*) nfpl
-	READ(UNIT=3, FMT=*) pfhfer
-	READ(UNIT=3, FMT=*) pfpfer
-	READ(UNIT=3, FMT=*) nscales
+	! READ(UNIT=3, FMT=*) L
+	L = cc_hex_params%l
+	! READ(UNIT=3, FMT=*) hradius
+	hradius = cc_hex_params%hr
+	! READ(UNIT=3, FMT=*) nfhr
+	nfhr = cc_hex_params%nfhr
+	! READ(UNIT=3, FMT=*) pflength
+	pflength = cc_hex_params%pfl
+	! READ(UNIT=3, FMT=*) nfpl
+	nfpl = cc_hex_params%nfpl
+	! READ(UNIT=3, FMT=*) pfhfer
+	pfhfer = cc_hex_params%pher
+	! READ(UNIT=3, FMT=*) pfpfer
+	pfpfer = cc_hex_params%pper
+	! READ(UNIT=3, FMT=*) nscales
+	nscales = cc_hex_params%nscales
 	ALLOCATE(clen(nscales), stdev(nscales))
 	DO j1=1,nscales
-		READ(UNIT=3, FMT=*) clen(j1)
-		READ(UNIT=3, FMT=*) stdev(j1)
+		! READ(UNIT=3, FMT=*) clen(j1)
+		clen(j1) = cc_hex_params%cls(j1)
+		! READ(UNIT=3, FMT=*) stdev(j1)
+		stdev(j1) = cc_hex_params%sds(j1)
+
 	END DO
-	CLOSE(UNIT=3)
+	! CLOSE(UNIT=3)
 	
 	!check nfpl has a value divisible by 4
 	IF (MOD(nfpl,4) .NE. 0) THEN

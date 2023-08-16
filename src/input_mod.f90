@@ -12,6 +12,675 @@ implicit none
 
 contains
 
+subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter,theta_splits_counter)
+
+    ! sr read_theta,vals reads and makes the phi values
+    ! taken from sr anglesplit
+
+    ! important values:
+    !   k is the total number of bins
+    !   anglesout are the centres of each angular bin - size (1:k)
+    !   anglesteps are the sizes of each angular bin - size (1:k)
+    real(8), dimension(:), allocatable, intent(out) :: theta_vals
+    real(8), dimension(:), intent(in) :: theta_vals_in(1:10000)
+    real(8), dimension(:), intent(in) :: theta_splits_in(1:10000)
+    integer, intent(in) ::  theta_vals_counter, theta_splits_counter
+
+    integer nlines, i, io, j, jmax
+    real(8), dimension(:) ,allocatable :: anglesint ,splitsint
+    real(8), dimension(:) ,allocatable :: anglesout, anglesteps
+    integer kint
+
+    if(allocated(anglesout)) deallocate(anglesout)
+    if(allocated(anglesteps)) deallocate(anglesteps)
+    allocate( anglesout(10000), anglesteps(10000) )    ! set up arrays for anglesint and splitsint
+    nlines = 0  ! initialise line counter
+    
+    open(119, file = "theta_vals.txt", status = 'old', action = 'read')  ! open input file
+    
+    ! do  ! read in number of lines in input file
+    !     read(119,*,iostat=io)
+    !     if (io/=0) exit
+    !     nlines = nlines + 1
+    ! end do
+
+    nlines = theta_vals_counter
+
+    ! print*,'nlines = ',nlines
+    allocate( anglesint(nlines) ,splitsint(nlines-1) )    ! set up arrays for anglesint and splitsint
+    ! rewind(119)  ! rewind to top of input file
+    
+
+    do i = 1,nlines     ! read in anglesint and splitsint
+        if(i .lt. nlines) then
+            anglesint(i) = theta_vals_in(i)
+            splitsint(i) = theta_splits_in(i)
+            ! read(119,*) anglesint(i),splitsint(i)
+        else
+            anglesint(i) = theta_vals_in(i)
+            ! read(119,*) anglesint(i)
+        end if
+    end do
+    
+    kint = 0
+    do i = 1,nlines-1   ! for each line in the input file
+        jmax = nint((anglesint(i+1)-anglesint(i))/splitsint(i))    ! compute the number of angle steps between one line and the next
+        if(mod((anglesint(i+1)-anglesint(i))/splitsint(i),real(1)) .gt. 1e-3 .and. mod((anglesint(i+1)-anglesint(i))/splitsint(i),real(1)) .lt. 1-1e-3) then 
+          print*,'bad angle choice, line:',i
+          print*,'this should be close to integer:',(anglesint(i+1)-anglesint(i))/splitsint(i)
+          print*,'should be less than 0.001',mod((anglesint(i+1)-anglesint(i))/splitsint(i),real(1))
+          error stop     ! please check choice of bin splitting
+        end if
+        do j = 0,jmax
+            if (i .ne. nlines-1 .and. j .eq. jmax) then
+                ! do nothign
+            else
+            ! if (j .eq. 0. .and. i .ne. 1 .and. i .ne. nlines-1) then ! skip duplicates where 2 lines meet
+            ! else if (i .ne. nlines-1 .and. j .eq. jmax) then ! bodge
+            ! else
+                kint = kint + 1
+                anglesout(kint) = anglesint(i) + j*splitsint(i)    ! central angle of each angular bin
+            end if
+        end do
+    end do
+
+    close(119)
+
+    allocate(theta_vals(1:kint))
+
+    do i = 1, kint
+        theta_vals(i) = anglesout(i)
+        ! print*,'i',i,' theta:', theta_vals(i)
+    end do
+    ! stop
+    end subroutine
+
+subroutine parse_command_line(  cfn,                & ! particle filename
+                                cft,                & ! particle file type
+                                afn,                & ! apertures filename
+                                la,                 & ! wavelength
+                                rbi,                & ! real refractive index
+                                ibi,                & ! imaginary refractive index
+                                rec,                & ! number of beam recursions
+                                rot_method,         & ! rotation method
+                                is_multithreaded,   & ! is multithreaded?
+                                num_orients,        & ! number of orientations
+                                intellirot,         & ! intelligent rotation angles
+                                c_method,           & ! particle input method
+                                job_name,           & ! job name
+                                eulers,             & ! euler angles, used if euler rotation method
+                                offs,               & ! off values, used if off rotation method
+                                cc_hex_params,      & ! parameters for C. Collier hexagons
+                                theta_vals,         & ! far-field theta values to evaluate at
+                                phi_vals)           ! far-field theta values to evaluate at
+
+integer i, j
+character(len=255) :: arg ! a command line argument
+integer my_status ! success code
+integer ierror ! error status
+logical finished
+real(8), dimension(:) :: theta_vals_in(1:10000), phi_vals_in(1:10000)
+real(8), dimension(:) :: theta_splits_in(1:10000), phi_splits_in(1:10000)
+integer theta_vals_counter, theta_splits_counter
+integer phi_vals_counter, phi_splits_counter
+
+! output variables
+character(100), intent(out) :: cfn ! crystal filename
+character(100), intent(out) :: cft ! crystal file type
+character(100), intent(out) :: afn ! apertures filename
+real(8), intent(out) :: la ! wavelength
+real(8), intent(out) :: rbi ! real part of the refractive index
+real(8), intent(out) :: ibi ! imaginary part of the refractive index
+integer, intent(out) :: rec ! max number of internal beam recursions
+character(100), intent(out) :: rot_method ! rotation method
+logical, intent(out) :: is_multithreaded ! whether or not code should use multithreading
+integer, intent(out) :: num_orients ! number of orientations
+logical, intent(out) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+character(100), intent(out) :: c_method ! method of particle file input
+character(100), intent(out) :: job_name ! name of job
+integer(8), intent(out) ::  offs(1:2)
+real(8), intent(out) ::  eulers(1:3)
+type(cc_hex_params_type), intent(out) :: cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+real(8), dimension(:), allocatable, intent(out) :: theta_vals, phi_vals
+
+! logicals to track required inputs
+logical found_la
+logical found_rbi
+logical found_ibi
+logical found_rec
+logical found_c_method
+logical found_cfn ! only required if c_method is read
+logical found_afn ! only required if c_method is read
+logical found_cft ! only required if c_method is read
+
+! init
+found_la = .false.
+found_rbi = .false.
+found_ibi = .false.
+found_rec = .false.
+found_c_method = .false.
+found_cfn = .false.
+found_afn = .false.
+found_cft = .false.
+num_orients = 1
+is_multithreaded = .false.
+intellirot = .false.
+job_name = 'my_job'
+
+! print*,'command_argument_count(): ',command_argument_count()
+print*,'parsing command line...'
+i = 0
+do while (i .lt. command_argument_count()) ! looping over command line args
+    i = i + 1 ! update counter
+
+    ! print*,'parsing arg #',i
+
+    call get_command_argument(i,arg)
+    ! print*,'command line argument #',i,': ','"',trim(arg),'"'
+    ! print*,'"',trim(arg),'"'
+
+    select case (arg) ! parse argument
+        case ('-rot') ! if rotation specifier "rot" was included in command line
+            ! print*,'found command line specifier "rot"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "rot"'
+                stop
+            else ! else, parse the rot specifier
+                select case (arg) ! parse rot specifier
+                case('none')
+                    read(arg,*) rot_method
+                    print*,'rot_method: ', trim(rot_method)
+                case('euler')
+                    read(arg,*) rot_method
+                    print*,'rot_method: ', trim(rot_method)
+
+                    i = i + 1 ! update counter to read the first euler angle
+                    call get_command_argument(i,arg,status=my_status)
+                    if (my_status .eq. 1) then ! if no argument found
+                        print*,'error: failed to find first angle for "rot euler"'
+                        stop
+                    else
+                        read(arg,*) eulers(1)
+                        print*,'alpha: ',eulers(1)
+                        ! do something
+                    end if
+
+                    i = i + 1 ! update counter to read the second euler angle
+                    call get_command_argument(i,arg,status=my_status)
+                    if (my_status .eq. 1) then ! if no argument found
+                        print*,'error: failed to find second angle for "rot euler"'
+                        stop
+                    else
+                        read(arg,*) eulers(2)
+                        print*,'beta: ',eulers(2)
+                    end if
+
+                    i = i + 1 ! update counter to read the second euler angle
+                    call get_command_argument(i,arg,status=my_status)
+                    if (my_status .eq. 1) then ! if no argument found
+                        print*,'error: failed to find third angle for "rot euler"'
+                        stop
+                    else
+                        read(arg,*) eulers(3)
+                        print*,'gamma: ',eulers(3)
+                    end if
+                
+                case('off')
+                    read(arg,*) rot_method
+                    print*,'rot_method: ', trim(rot_method)
+                    i = i + 1 ! update counter to read the first off value
+                    call get_command_argument(i,arg,status=my_status)
+                    if (my_status .eq. 1) then ! if no argument found
+                        print*,'error: failed to find first value for "rot off"'
+                        stop
+                    else
+                        read(arg,*) offs(1)
+                        print*,'off(1): ',offs(1)
+                    end if
+
+                    i = i + 1 ! update counter to read the second off value
+                    call get_command_argument(i,arg,status=my_status)
+                    if (my_status .eq. 1) then ! if no argument found
+                        print*,'error: failed to find second value for "rot off"'
+                        stop
+                    else
+                        read(arg,*) offs(2)
+                        print*,'off(2): ',offs(2)
+                    end if
+                    
+                case('multi')
+                    read(arg,*) rot_method
+                    print*,'rot_method: ', trim(rot_method)
+                    i = i + 1 ! update counter to read the number of orientations
+                    call get_command_argument(i,arg,status=my_status)
+                    if (my_status .eq. 1) then ! if no argument found
+                        print*,'error: failed to find value for "rot multi"'
+                        stop
+                    else
+                        read(arg,*) num_orients ! do something
+                        print*,'number of orientations: ',num_orients
+                    end if
+
+                case default
+                    print*,'error: "',trim(arg),'" is an invalid specifier for command line speicifer "rot"'
+                    stop
+                end select
+            end if
+
+        case ('-lambda')
+            ! print*,'found command line specifier "lambda"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "lambda"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) la
+                print*,'lambda: ',la
+                found_la = .true.
+            end if
+
+        case ('-rbi')
+            ! print*,'found command line specifier "rbi"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "rbi"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) rbi
+                print*,'rbi: ',rbi
+                found_rbi = .true.
+            end if
+
+        case ('-ibi')
+            ! print*,'found command line specifier "ibi"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "ibi"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) ibi
+                print*,'ibi: ',ibi
+                found_ibi = .true.
+            end if
+
+        case ('-cmethod')
+            ! print*,'found command line specifier "cmethod"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cmethod"'
+                stop
+            else ! else, parse the specifier
+                select case (arg)
+                    case('read')
+                        read(arg,*) c_method
+                        print*,'c_method: ', trim(c_method)
+                    case('cc_hex')
+                        read(arg,*) c_method
+                        print*,'c_method: ', trim(c_method)
+                    case default
+                        print*,'invalid cmethod'
+                        stop
+                end select
+                found_c_method = .true.
+            end if            
+
+        case ('-cc_hex_l')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_l"'
+                stop
+            else
+                read(arg,*) cc_hex_params%l
+                print*,'cc_hex_params%l: ', cc_hex_params%l
+            end if
+
+        case ('-cc_hex_hr')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_hr"'
+                stop
+            else
+                read(arg,*) cc_hex_params%hr
+                print*,'cc_hex_params%hr: ', cc_hex_params%hr
+            end if            
+
+        case ('-cc_hex_nfhr')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_nfhr"'
+                stop
+            else
+                read(arg,*) cc_hex_params%nfhr
+                print*,'cc_hex_params%nfhr: ', cc_hex_params%nfhr
+            end if  
+
+        case ('-cc_hex_pfl')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_pfl"'
+                stop
+            else
+                read(arg,*) cc_hex_params%pfl
+                print*,'cc_hex_params%pfl: ', cc_hex_params%pfl
+            end if  
+
+        case ('-cc_hex_nfpl')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_nfpl"'
+                stop
+            else
+                read(arg,*) cc_hex_params%nfpl
+                print*,'cc_hex_params%nfpl: ', cc_hex_params%nfpl
+            end if  
+
+        case ('-cc_hex_pher')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_pher"'
+                stop
+            else
+                read(arg,*) cc_hex_params%pher
+                print*,'cc_hex_params%pher: ', cc_hex_params%pher
+            end if  
+
+        case ('-cc_hex_pper')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_pper"'
+                stop
+            else
+                read(arg,*) cc_hex_params%pper
+                print*,'cc_hex_params%pper: ', cc_hex_params%pper
+            end if  
+
+        case ('-cc_hex_nscales')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cc_hex_nscales"'
+                stop
+            else
+                read(arg,*) cc_hex_params%nscales
+                print*,'cc_hex_params%nscales: ', cc_hex_params%nscales
+                allocate(cc_hex_params%cls(1:cc_hex_params%nscales))
+                allocate(cc_hex_params%sds(1:cc_hex_params%nscales))
+            end if  
+
+        case ('-cc_hex_cls')
+
+                if (.not. allocated(cc_hex_params%cls)) then
+                    print*,'error, cc_hex_nscales must be specified before cc_hex_cls'
+                    stop
+                end if
+                do j = 1, cc_hex_params%nscales ! for each roughness scale
+                    i = i + 1 ! update counter to read the rotation method
+                    call get_command_argument(i,arg,status=my_status)
+                    if (my_status .eq. 1) then ! if no argument found
+                        print*,'error: no option found for "cc_hex_cls"'
+                        stop
+                    else
+                        read(arg,*) cc_hex_params%cls(j)
+                        print*,'cc_hex_params%cls(',j,'): ', cc_hex_params%cls(j)
+                    end if
+                end do
+
+        case ('-cc_hex_sds')
+
+            if (.not. allocated(cc_hex_params%sds)) then
+                print*,'error, cc_hex_nscales must be specified before cc_hex_sds'
+                stop
+            end if
+            do j = 1, cc_hex_params%nscales ! for each roughness scale
+                i = i + 1 ! update counter to read the rotation method
+                call get_command_argument(i,arg,status=my_status)
+                if (my_status .eq. 1) then ! if no argument found
+                    print*,'error: no option found for "cc_hex_sds"'
+                    stop
+                else
+                    read(arg,*) cc_hex_params%sds(j)
+                    print*,'cc_hex_params%sds(',j,'): ', cc_hex_params%sds(j)
+                end if
+            end do
+
+
+
+        case ('-cft')
+            ! print*,'found command line specifier "cft"'
+            i = i + 1 ! update counter to read the next arg
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cft"'
+                stop
+            else ! else, parse the specifier
+                select case (arg)
+                case('obj')
+                    read(arg,*) cft
+                    print*,'cft: ', trim(cft)
+                    found_cft = .true.
+                case('mrt')
+                    read(arg,*) cft
+                    print*,'cft: ', trim(cft)
+                    found_cft = .true.
+                case default
+                    print*,'error: invalid particle file type'
+                    stop
+                end select
+            end if
+
+        case ('-cfn')
+            ! print*,'found command line specifier "cfn"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cfn"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) cfn
+                print*,'cfn: ', trim(cfn)
+                found_cfn = .true.
+            end if
+
+        case ('-afn')
+            ! print*,'found command line specifier "afn"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "afn"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) afn
+                print*,'afn: ', trim(afn)
+                found_afn = .true.
+            end if
+
+        case ('-rec')
+            ! print*,'found command line specifier "rec"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "rec"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) rec
+                print*,'rec: ', rec
+                found_rec = .true.
+            end if
+
+        case ('-jobname')
+            ! print*,'found command line specifier "jobname"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "jobname"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) job_name
+                print*,'job name: ', trim(job_name)
+            end if
+
+        case ('-theta')
+            finished = .false. ! init
+            theta_vals_counter = 0 ! number of theta values read
+            theta_splits_counter = 0 ! number of theta splits read
+            j = 0 ! counts the number of values read
+            print*,'theta values:'
+            do while (.not. finished) ! while we havent reached
+                i = i + 1 ! update counter to read the rotation method
+                j = j + 1
+                call get_command_argument(i,arg,status=my_status) ! try to get the next value
+                if (my_status .eq. 1 .and. j .le. 3) then ! if no argument found and we havent yet read enough values
+                    print*,'error: not enough values specified for theta"'
+                    stop
+                else ! else, parse the specifier
+                    ! print*,'found an arg: "',trim(arg),'"'
+                    ! print*,'len(trim(arg))',len(trim(arg))
+                    if(arg(1:1) .eq. '-' .or. len(trim(arg)) .eq. 0) then ! if we found another flag or nothing else, try to finish
+                        if (mod(j,2) .eq. 1) then ! if we found an even number of theta values
+                            print*,'error: an odd number of theta values is required'
+                            stop
+                        else
+                            i = i - 1 ! move counter back so we can parse the next argument properly
+                            ! print*,'finished reading theta'
+                            finished = .true.
+                        end if
+                    else ! else, if we found a value
+                        ! print*,'j',j
+                        if (mod(j,2) .eq. 1) then
+                            theta_vals_counter = theta_vals_counter + 1
+                            ! print*,'found a theta value: ',trim(arg)
+                            read(arg,*) theta_vals_in(theta_vals_counter)
+                        else
+                            theta_splits_counter = theta_splits_counter + 1
+                            ! print*,'found a theta split: ',trim(arg)
+                            read(arg,*) theta_splits_in(theta_splits_counter)
+                        end if
+                    end if
+                end if 
+            end do
+            print*,'theta values read: ',theta_vals_in(1:theta_vals_counter)
+            print*,'theta splits read: ',theta_splits_in(1:theta_splits_counter)
+
+            call make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter,theta_splits_counter)
+            ! convert theta vals to rad
+            theta_vals = theta_vals*pi/180d0
+
+        case ('-phi')
+            finished = .false. ! init
+            phi_vals_counter = 0 ! number of phi values read
+            phi_splits_counter = 0 ! number of phi splits read
+            j = 0 ! counts the number of values read
+            print*,'phi values:'
+            do while (.not. finished) ! while we havent reached
+                i = i + 1 ! update counter to read the rotation method
+                j = j + 1
+                call get_command_argument(i,arg,status=my_status) ! try to get the next value
+                if (my_status .eq. 1 .and. j .le. 3) then ! if no argument found and we havent yet read enough values
+                    print*,'error: not enough values specified for phi"'
+                    stop
+                else ! else, parse the specifier
+                    ! print*,'found an arg: "',trim(arg),'"'
+                    ! print*,'len(trim(arg))',len(trim(arg))
+                    if(arg(1:1) .eq. '-' .or. len(trim(arg)) .eq. 0) then ! if we found another flag or nothing else, try to finish
+                        if (mod(j,2) .eq. 1) then ! if we found an even number of theta values
+                            print*,'error: an odd number of phi values is required'
+                            stop
+                        else
+                            i = i - 1 ! move counter back so we can parse the next argument properly
+                            ! print*,'finished reading theta'
+                            finished = .true.
+                        end if
+                    else ! else, if we found a value
+                        ! print*,'j',j
+                        if (mod(j,2) .eq. 1) then
+                            phi_vals_counter = phi_vals_counter + 1
+                            ! print*,'found a phi value: ',trim(arg)
+                            read(arg,*) phi_vals_in(phi_vals_counter)
+                        else
+                            phi_splits_counter = phi_splits_counter + 1
+                            ! print*,'found a phi split: ',trim(arg)
+                            read(arg,*) phi_splits_in(phi_splits_counter)
+                        end if
+                    end if
+                end if 
+            end do
+            print*,'phi values read: ',phi_vals_in(1:phi_vals_counter)
+            print*,'phi splits read: ',phi_splits_in(1:phi_splits_counter)
+            ! stop
+            call make_angles(phi_vals,phi_vals_in,phi_splits_in,phi_vals_counter,phi_splits_counter)
+            ! convert phi vals to rad
+            phi_vals = phi_vals*pi/180d0
+
+            ! numerical fixes due to divide by 0 in contour integral
+            ! do i = 1, size(phi_vals)
+            !     if(abs(phi_vals(i)*180.0/pi) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180.0
+            !     if(abs(phi_vals(i)*180.0/pi - 360.0) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180.0
+            ! end do
+
+        case ('-mt')
+            ! print*,'found command line specifier "mt"'
+            print*,'multithreading: enabled'
+            is_multithreaded = .true.
+            ! do something
+
+        case ('-intellirot')
+            ! print*,'found command line specifier "intellirot"'
+            intellirot = .true.
+            ! do something
+
+        case default ! if argument was unrecognised
+            print '(2a, /)', 'unrecognised command-line option: ', arg
+            stop
+    end select
+    ! print*,'i:',i
+end do ! end loop over command line args
+
+! check for missing required arguments
+if (found_la .eq. .false.) then
+    print*,'error: missing required argument "lambda"'
+    stop
+else if (found_rbi .eq. .false.) then
+    print*,'error: missing required argument "rbi"'
+    stop
+else if (found_ibi .eq. .false.) then
+    print*,'error: missing required argument "ibi"'
+    stop
+else if (found_rec .eq. .false.) then
+    print*,'error: missing required argument "rec"'
+    stop
+else if (found_c_method .eq. .false.) then
+    print*,'error: missing required argument "cmethod"'
+    stop
+else if (found_c_method .eq. .true.) then
+    if (c_method .eq. "read") then
+        if (found_cfn .eq. .false.) then
+            print*,'error: missing required argument "cfn"'
+            stop
+        else if (found_afn .eq. .false.) then
+            print*,'error: missing required argument "afn"'
+            stop
+        else if (found_cft .eq. .false.) then
+            print*,'error: missing required argument "cft"'
+            stop
+        end if
+    end if
+end if
+
+    end subroutine
+
 subroutine area_stats(face_areas)
 
 real(8), dimension(:), allocatable, intent(in) :: face_areas ! area of each facet
@@ -281,7 +950,9 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
                     beta_vals,          & ! list of values for beta alpha angle in range 0 to 1 (for multirot only)
                     gamma_vals,         & ! list of values for gamma alpha angle in range 0 to 1 (for multirot only)
                     loop_index,         & ! current loop index that each process is on
-                    num_orients)          ! total number of orientations for this process
+                    num_orients,        & ! total number of orientations for this process
+                    eulers,             &
+                    offs)
 
     ! rotates particle
     ! modified to ensure different mpi processes have different 
@@ -291,8 +962,8 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
     real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
     real(8), dimension(:,:), allocatable, intent(out) :: verts_rot ! unique vertices    
     real(8), dimension(:), allocatable, intent(in) :: alpha_vals, beta_vals, gamma_vals
-    integer(8) offs(1:2)
-    real(8) eulers(1:3)
+    integer(8), intent(inout) :: offs(1:2)
+    real(8), intent(inout) :: eulers(1:3)
     real(8) vec(1:3) ! off rotation vector
     real(8) hilf0, hilf1
     real(8) rot1(1:3,1:3), rot2(1:3,1:3), rot(1:3,1:3)
@@ -314,7 +985,7 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
     if(rot_method(1:len(trim(rot_method))) .eq. 'none') then
         ! do nothing
     else if(rot_method(1:len(trim(rot_method))) .eq. 'off') then
-        call read_input_vals(ifn,"rot off",offs,2)
+        ! call read_input_vals(ifn,"rot off",offs,2)
         ! print*,'off values: ', offs(1:2)
 
         if(offs(1) .eq. 30 .and. offs(2) .eq. 0) then
@@ -367,7 +1038,7 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
         ! print*,'verts(2,1:3)',verts(2,1:3)
 
     else if(rot_method(1:len(trim(rot_method))) .eq. 'euler') then
-        call read_input_vals_real(ifn,"rot euler",eulers,3)
+        ! call read_input_vals_real(ifn,"rot euler",eulers,3)
         print*,'alpha:',eulers(1)
         write(101,*),'alpha:',eulers(1)
         print*,'beta: ',eulers(2)
@@ -685,7 +1356,7 @@ allocate(trans_ampl_ps(1:2,1:2,1:size(face_ids,1)))
 allocate(trans_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl(1:2,1:2,1:size(face_ids,1)))
 allocate(refl_ampl_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(beam_outbeam_tree(1:500000)) ! set to 100000 as guess for max outbeams
+allocate(beam_outbeam_tree(1:1000000)) ! set to 100000 as guess for max outbeams
 
 waveno = 2*pi/la
 beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
@@ -989,9 +1660,9 @@ subroutine SDATIN(  ifn,                & ! input filename
  
     rot_method = readString2(ifn,"rot") ! get rotation method
     if( rot_method(1:len(trim(rot_method))) .eq. 'off' .or. &
-    rot_method(1:len(trim(rot_method))) .eq. 'euler' .or. &
-    rot_method(1:len(trim(rot_method))) .eq. 'multi' .or. &
-    rot_method(1:len(trim(rot_method))) .eq. 'none') then
+        rot_method(1:len(trim(rot_method))) .eq. 'euler' .or. &
+        rot_method(1:len(trim(rot_method))) .eq. 'multi' .or. &
+        rot_method(1:len(trim(rot_method))) .eq. 'none') then
         ! print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
     else
         print*,'Error, "',rot_method(1:len(trim(rot_method))),'" is not a valid option for rotation method'
@@ -1035,7 +1706,18 @@ subroutine SDATIN(  ifn,                & ! input filename
     
 end subroutine
 
-subroutine PDAL2(ifn, c_method, num_vert, num_face, face_ids, verts, num_face_vert, afn, apertures)
+subroutine PDAL2(   ifn,            &
+                    c_method,       &
+                    num_vert,       &
+                    num_face,       &
+                    face_ids,       &
+                    verts,          &
+                    num_face_vert,  &
+                    afn,            &
+                    apertures,      &
+                    cc_hex_params,  &
+                    cft,            &
+                    cfn)
 
 ! subroutine PDAL2 reads a file containing the particle geometry
 ! accepted file types: "obj" - .obj files, "mrt" - macke ray-tracing style
@@ -1054,9 +1736,9 @@ subroutine PDAL2(ifn, c_method, num_vert, num_face, face_ids, verts, num_face_ve
 !   where each row corresponds to each face and each column corresponds to the vertices in the face.
 !   A vertex ID is used to point to the row of the vertex in verts
         
-    character(len=255) cfn ! particle filename
-    character(len=255) cft ! particle filetype
-    character(100), intent(out) ::  afn ! apertures filename
+    character(len=100), intent(in) ::   cfn ! particle filename
+    character(len=100), intent(in) ::   cft ! particle filetype
+    character(100), intent(in) ::  afn ! apertures filename
     integer(8), intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
     ! integer(8), intent(out) :: num_norm ! number of face normals
     integer(8), dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
@@ -1068,6 +1750,7 @@ subroutine PDAL2(ifn, c_method, num_vert, num_face, face_ids, verts, num_face_ve
     character(100), intent(in) :: c_method ! method of particle file input
     character(len=*), intent(in) :: ifn
 	integer(8), dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
+    type(cc_hex_params_type), intent(in) :: cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 
     integer(8), parameter :: num_face_vert_max_in = 20 ! max number of vertices per face
     integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
@@ -1090,19 +1773,19 @@ subroutine PDAL2(ifn, c_method, num_vert, num_face, face_ids, verts, num_face_ve
 
     if(c_method(1:len(trim(c_method))) .eq. "read") then ! if particle is to be read from file
 
-        cfn = read_string(ifn,"cfn") ! get crystal filename
-        call StripSpaces(cfn) ! remove leading spaces
-        print*,'particle filename: "',cfn(1:len(trim(cfn))),'"'
+        ! cfn = read_string(ifn,"cfn") ! get crystal filename
+        ! call StripSpaces(cfn) ! remove leading spaces
+        ! print*,'particle filename: "',cfn(1:len(trim(cfn))),'"'
         write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'
 
-        cft = read_string(ifn,"cft") ! get crystal filename
-        call StripSpaces(cft) ! remove leading spaces
-        print*,'particle file type: "',cft(1:len(trim(cft))),'"'  
+        ! cft = read_string(ifn,"cft") ! get crystal filename
+        ! call StripSpaces(cft) ! remove leading spaces
+        ! print*,'particle file type: "',cft(1:len(trim(cft))),'"'  
         write(101,*),'particle file type:     "',cft(1:len(trim(cft))),'"'
 
-        afn = read_string(ifn,"afn") ! get crystal filename
-        call StripSpaces(afn) ! remove leading spaces
-        print*,'apertures filename: "',afn(1:len(trim(afn))),'"'    
+        ! afn = read_string(ifn,"afn") ! get crystal filename
+        ! call StripSpaces(afn) ! remove leading spaces
+        ! print*,'apertures filename: "',afn(1:len(trim(afn))),'"'    
         write(101,*),'apertures filename:     "',afn(1:len(trim(afn))),'"'
 
         print*,'crystal file type: "',trim(cft),'"'
@@ -1361,7 +2044,7 @@ subroutine PDAL2(ifn, c_method, num_vert, num_face, face_ids, verts, num_face_ve
     
     else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
         print*,'attempting to make cc crystal'
-        call CC_HEX_MAIN(face_ids,verts,apertures)
+        call CC_HEX_MAIN(cc_hex_params,face_ids,verts,apertures)
         num_vert = size(verts,1)
         num_face = size(face_ids,1)
         num_face_vert_max = 3

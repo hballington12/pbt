@@ -1,9 +1,4 @@
-input.txt
-phi_vals.txt
-theta_vals.txt
-vals.in
-abt.sh
-abtMPI.sh
+abt.cmd
 log
 **.obj
 **.mod
