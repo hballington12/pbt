@@ -12,6 +12,27 @@ real(8), parameter, public :: pi = 3.14159265358979
 
 contains
 
+subroutine write_outbins(output_dir,theta_vals,phi_vals)
+
+! writes the far-field angular bins to a file
+
+real(8), dimension(:), allocatable, intent(in) :: theta_vals, phi_vals
+character(len=*), intent(in) :: output_dir
+
+integer i, j
+
+open(10,file=trim(output_dir)//"/"//"outbins")
+
+do i = 1, size(theta_vals,1)
+    do j = 1, size(phi_vals,1)
+        write(10,'(f12.4,f12.4)') theta_vals(i)*180.0/pi, phi_vals(j)*180.0/pi
+    end do
+end do
+
+close(10)
+
+    end subroutine
+
 subroutine make_dir(dir_path_in,cwd_out)
 
     ! makes job directory - quick and dirty method
@@ -64,11 +85,13 @@ subroutine make_dir(dir_path_in,cwd_out)
 
     end if
 
+    call StripSpaces(cwd_out)
+
     
 
 end subroutine
 
-subroutine PDAS(verts,face_ids,output_dir)
+subroutine PDAS(verts,face_ids,output_dir,filename)
 
     ! writes rotated particle to file
     ! to do: add Macke-style output
@@ -76,6 +99,7 @@ subroutine PDAS(verts,face_ids,output_dir)
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 integer(8), dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
 character(len=*), intent(in) :: output_dir
+character(len=*), intent(in) :: filename
 
 integer num_verts, num_faces, i, j
 character(100) my_string, my_string2
@@ -102,8 +126,8 @@ my_string = "v "//trim(my_string2)//" "//trim(my_string2)//" "//trim(my_string2)
 ! print*,'my_string: ',my_string
 ! print*,'output dir: "',trim(output_dir),'"'
 
-open(10,file=trim(output_dir)//"/"//"rotated_particle.obj")
-write(10,*) '# rotated particle'
+open(10,file=trim(output_dir)//"/"//trim(filename)//".obj") ! wavefront format
+! write(10,*) '# rotated particle'
 do i = 1, num_verts
     ! ! make string for line in file
     ! my_string = "v "
@@ -120,6 +144,19 @@ do i = 1, num_verts
 end do
 do i = 1, num_faces
     write(10,'(A1,I6,I6,I6)') 'f', face_ids(i,1), face_ids(i,2), face_ids(i,3)
+end do
+close(10)
+
+open(10,file=trim(output_dir)//"/"//trim(filename)//".cry") ! macke format (only for triangulated at the moment)
+! write(10,*) '# rotated particle'
+write(10,'(I8)') num_faces
+do i = 1, num_faces
+    write(10,*) 3
+end do
+do i = 1, num_faces
+    do j = 1, 3
+        write(10,'(f16.8,f16.8,f16.8)') verts(face_ids(i,j),1), verts(face_ids(i,j),2), verts(face_ids(i,j),3)
+    end do
 end do
 close(10)
 

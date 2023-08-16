@@ -1,6 +1,6 @@
 #!/bin/sh
-#PBS -l walltime=12:00:00
-#PBS -l nodes=1:ppn=32
+#PBS -l walltime=24:00:00
+#PBS -l nodes=1:ppn=1
 #PBS -k oe
 #PBS -o /Multirot/test
 #PBS -e /Multirot/test
@@ -29,4 +29,26 @@ ulimit -s unlimited
 
 cd /home/hballington/abt
 
-/soft/intel/impi/2019.8.254/intel64/bin/mpiexec /home/hballington/abt/src/mpi/abt.o > log
+/soft/intel/impi/2019.8.254/intel64/bin/mpiexec \
+/home/hballington/abt/src/mpi/abt \
+-lambda 0.532 \
+-rbi 1.3117 \
+-ibi 0 \
+-rec 8 \
+-cmethod cc_hex \
+-rot off 30 30 \
+-jobname test_30x30 \
+-cc_hex_l 10 \
+-cc_hex_hr 5 \
+-cc_hex_nfhr 4 \
+-cc_hex_pfl 10 \
+-cc_hex_nfpl 8 \
+-cc_hex_pher 1 \
+-cc_hex_pper 2 \
+-cc_hex_nscales 1 \
+-cc_hex_cls 1 \
+-cc_hex_sds 0 \
+-theta 0 1 180 \
+-phi 0 2 360 \
+-mt \
+> log2

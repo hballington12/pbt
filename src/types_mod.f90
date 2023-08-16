@@ -15,20 +15,18 @@ type outbeamtype ! type for outbeam trees (used for diffraction)
 	integer(8) interactionOut ! interaction counter
 end type outbeamtype
 
-type beamtype ! type for beam trees (used for beam tracing)
-! needs to contain:
-! facet IDs, and at each facet ID, must contain:
-	! perp-field direction
-	! propagation direction
-	! amplitude matrix
-	! thats it???
-	! maybe an interaction counter
-	! complex(8) ampl(1:2,1:2) ! amplitude matrix
-	! integer(8), dimension(:), allocatable :: FOut ! Illuminated face IDs
-	! integer(8) interactionOut
-	! real(8) prop
-	! real(8) perp
-end type beamtype
+type cc_hex_params_type ! type for holding parameters needed for C. Collier Gaussian Random hexagonal columns/plates
+	real(8) l ! L from Muinonen & Saarinen - needs to be large compared to correlation length(s)
+	real(8) hr ! hexagon radius hr
+	integer nfhr ! number of subfacets along each hexagon edge - should be large enough to correctly plot the correlation length     nfhr
+	real(8) pfl ! length of prism surfaces   pfl
+	integer nfpl ! number of subfacets along prism facet length - should be even and large enough to correctly plot the correlation length nfpl
+	integer pher ! number of rotations to perform at prism facet-basal facet edges (10% of #subfacets along prism edge) pher
+	integer pper ! number of rotations to perform at prism facet-prism facet edges (10% of #subfacets along hexagon edge) pper
+	integer nscales ! number of roughness scales sc required - supply correlation length and standard deviation for each below in pairs
+	real(8), dimension(:), allocatable :: cls ! correlation lengths
+	real(8), dimension(:), allocatable :: sds ! standard deviations
+end type cc_hex_params_type
 
 contains
 
