@@ -36,7 +36,7 @@ subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_count
     allocate( anglesout(10000), anglesteps(10000) )    ! set up arrays for anglesint and splitsint
     nlines = 0  ! initialise line counter
     
-    open(119, file = "theta_vals.txt", status = 'old', action = 'read')  ! open input file
+    ! open(119, file = "theta_vals.txt", status = 'old', action = 'read')  ! open input file
     
     ! do  ! read in number of lines in input file
     !     read(119,*,iostat=io)
@@ -84,7 +84,7 @@ subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_count
         end do
     end do
 
-    close(119)
+    ! close(119)
 
     allocate(theta_vals(1:kint))
 
