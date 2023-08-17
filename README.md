@@ -66,7 +66,7 @@ Main source file. It contains the program entry point. The ABT now reads input p
 
 - `-theta` `values` - Specifies the polar angles at which the far-field should be evaluated. See below for example usage:
     - `-theta 0 1 180` - Evaluate the far-field from 0 in 1 degree steps to 180.
-    - `-theta 6 0.1 25 150 175 0.25 180` - Evaluate the far-field from 6 in 0.1 degree steps to 25, then in a 150 degree step to 175, then in 0.25 degree steps to 180.
+    - `-theta 6 0.1 25 150 175 0.25 180` - Evaluate the far-field from 6 in 0.1 degree steps to 25, then step to 175, then in 0.25 degree steps to 180.
 
 - `-phi` `values` - Specifies the azimuthal angles at which the far-field should be evaluated. See below for example usage:
     - `-phi 0 2 360` - Evaluate the far-field from 0 in 2 degree steps to 360.
