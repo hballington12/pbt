@@ -107,7 +107,7 @@ end subroutine
 subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     beamV, beamF1, beamN, beamF2, beamMidpoints, ampl_beam, &
     beam_outbeam_tree, beam_outbeam_tree_counter, ext_diff_outbeam_tree, &
-    energy_out_beam, energy_out_ext_diff,energy_abs_beam)
+    energy_out_beam, energy_out_ext_diff,energy_abs_beam,output_parameters)
 
     ! main beam loop
 
@@ -127,6 +127,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
     integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+    type(output_parameters_type), intent(inout) :: output_parameters 
 
     real(8), dimension(:,:), allocatable :: Norm ! face normals
     integer(8), dimension(:), allocatable :: Face2 ! face normal ID of each face
@@ -230,7 +231,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     call getApertureAreas(apertures, isWithinBeam, apertureAreas, illuminatedApertureAreas, apertureNormals, faceAreas)
     
     call getIlluminatedGeoCrossSection(faceAreas, isWithinBeam, Norm, Face2, illuminatedGeoCrossSection) ! get illuminated geometric cross section using particle in current orientation
-    
+
     call getThreshold(la,threshold) ! get minimum illuminatino required to create a new beam
     
     call getSufficientlyIlluminated(illuminatedApertureAreas,threshold,sufficientlyIlluminated) ! get logical array containing which apertures were sufficiently illuminated
@@ -298,6 +299,8 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
                         ext_diff_outbeam_tree, &
                         energy_out_ext_diff, &
                         energy_abs_beam)
+
+    output_parameters%geo_cross_sec = illuminatedGeoCrossSection
 
 end subroutine
 

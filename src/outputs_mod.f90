@@ -414,6 +414,10 @@ module outputs_mod
    output_parameters%ext = ext
    output_parameters%albedo = albedo
    output_parameters%asymmetry = asymmetry
+   output_parameters%abs_eff = abs / output_parameters%geo_cross_sec
+   output_parameters%scatt_eff = scatt / output_parameters%geo_cross_sec
+   output_parameters%ext_eff = ext / output_parameters%geo_cross_sec
+
 
    ! open(10,file="mueller_scatgrid")
    ! do i = 1, size(ampl_far_beam11,2)
@@ -489,11 +493,17 @@ module outputs_mod
    close(10)
 
    open(10,file=trim(output_dir)//"/"//"params")
+      write(10,*) 'scattering parameters (orientation averaged)...'
+      write(10,'(A30,f16.8)') 'geo. cross section: ',output_parameters_total%geo_cross_sec
       write(10,'(A30,f16.8)') 'abs. cross section: ',output_parameters_total%abs
       write(10,'(A30,f16.8)') 'scatt. cross section: ',output_parameters_total%scatt
       write(10,'(A30,f16.8)') 'ext. cross section: ',output_parameters_total%ext
       write(10,'(A30,f16.8)') 'single scattering albedo: ',output_parameters_total%albedo
       write(10,'(A30,f16.8)') 'asymmetry parameter: ',output_parameters_total%asymmetry
+      write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs / output_parameters_total%geo_cross_sec
+      write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt / output_parameters_total%geo_cross_sec
+      write(10,'(A30,f16.8)') 'ext. efficiency: ',output_parameters_total%ext / output_parameters_total%geo_cross_sec
+      ! below is commented because: different orientations have dif. geo. cross sections, so the efficiencies dont add linearly
       ! write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs_eff
       ! write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt_eff
       ! write(10,'(A30,f16.8)') 'ext. efficiency: ',output_parameters_total%ext_eff
@@ -530,6 +540,7 @@ module outputs_mod
          output_parameters_total%abs_eff = 0 ! init
          output_parameters_total%scatt_eff = 0 ! init
          output_parameters_total%ext_eff = 0 ! init
+         output_parameters_total%geo_cross_sec = 0 ! init
       end if
       if(.not. allocated(mueller_1d_total)) then
          allocate(mueller_1d_total(1:size(mueller_1d,1),1:size(mueller_1d,2)))
@@ -547,6 +558,7 @@ module outputs_mod
       output_parameters_total%abs_eff = output_parameters_total%abs_eff + output_parameters%abs_eff
       output_parameters_total%scatt_eff = output_parameters_total%scatt_eff + output_parameters%scatt_eff
       output_parameters_total%ext_eff = output_parameters_total%ext_eff + output_parameters%ext_eff
+      output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec + output_parameters%geo_cross_sec
 
    end subroutine
 

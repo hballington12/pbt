@@ -21,15 +21,11 @@ include 'mpif.h'
 
 ! to do:
 ! add vector re-normalisation checks after rotations (ie. sr rotate_into_aperture_system)
-! fix direct forward scattering
-! mpi support
-! asymmetry parameter, single scat albedo
 ! add absorption
 ! add quad support
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
-! fix phi = 0 numerical error
 
 ! ############################################################################################################
 
@@ -276,7 +272,8 @@ do i = my_start, my_end
                     ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
                     energy_out_beam,           & !  -> total energy out from beams (before diffraction)
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
-                    energy_abs_beam)             !  -> total energy absorbed from beams (before diffraction)
+                    energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
+                    output_parameters)           !  -> adds illuminated geometric cross section to output parameters
 
     ! if(num_orients .gt. 1) then
     !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'
@@ -345,6 +342,7 @@ if (my_rank .ne. 0) then ! if not rank 0 process, send mueller to rank 0
     call MPI_SEND(output_parameters_total%abs_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
     call MPI_SEND(output_parameters_total%scatt_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
     call MPI_SEND(output_parameters_total%ext_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%geo_cross_sec,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
     print*,'sent to rank 0. my rank = ',my_rank
 else ! if rank 0 process, receieve from all other ranks
     ! allocate some arrays to hold the received values
@@ -372,6 +370,8 @@ else ! if rank 0 process, receieve from all other ranks
         output_parameters_total%scatt_eff = output_parameters_total%scatt_eff + output_parameters_recv%scatt_eff ! sum  
         call MPI_RECV(output_parameters_recv%ext_eff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
         output_parameters_total%ext_eff = output_parameters_total%ext_eff + output_parameters_recv%ext_eff ! sum  
+        call MPI_RECV(output_parameters_recv%geo_cross_sec,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec + output_parameters_recv%geo_cross_sec ! sum  
         print*,'received from ',source,' my rank = ',my_rank
     end do
 end if
@@ -389,6 +389,7 @@ if (my_rank .eq. 0) then
     output_parameters_total%abs_eff = output_parameters_total%abs_eff / num_orients
     output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / num_orients
     output_parameters_total%ext_eff = output_parameters_total%ext_eff / num_orients
+    output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / num_orients
 
     ! writing to file
     call write_outbins(output_dir,theta_vals,phi_vals)

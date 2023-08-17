@@ -216,7 +216,8 @@ do i = 1, num_orients
                     ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
                     energy_out_beam,           & !  -> total energy out from beams (before diffraction)
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
-                    energy_abs_beam)             !  -> total energy absorbed from beams (before diffraction)
+                    energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
+                    output_parameters)           !  -> adds illuminated geometric cross section to output parameters
     ! stop
     if(num_orients .gt. 1) then
         print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'
@@ -280,6 +281,7 @@ output_parameters_total%asymmetry = output_parameters_total%asymmetry / num_orie
 output_parameters_total%abs_eff = output_parameters_total%abs_eff / num_orients
 output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / num_orients
 output_parameters_total%ext_eff = output_parameters_total%ext_eff / num_orients
+output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / num_orients
 
 ! writing to file
 call write_outbins(output_dir,theta_vals,phi_vals)

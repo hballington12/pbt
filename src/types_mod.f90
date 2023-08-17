@@ -37,6 +37,7 @@ type output_parameters_type ! type for hold various output paramters
 	real(8) abs_eff ! absorption efficiency
 	real(8) scatt_eff ! scattering efficiency
 	real(8) ext_eff ! extinction efficiency
+	real(8) geo_cross_sec ! illuminated geometric cross section
 end type output_parameters_type 
 
 contains
