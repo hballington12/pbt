@@ -28,6 +28,17 @@ type cc_hex_params_type ! type for holding parameters needed for C. Collier Gaus
 	real(8), dimension(:), allocatable :: sds ! standard deviations
 end type cc_hex_params_type
 
+type output_parameters_type ! type for hold various output paramters
+	real(8) abs ! absorption cross section
+	real(8) scatt ! scattering cross section
+	real(8) ext ! extinction cross section
+	real(8) albedo ! single scattering albdeo
+	real(8) asymmetry ! asymmetry parameter
+	real(8) abs_eff ! absorption efficiency
+	real(8) scatt_eff ! scattering efficiency
+	real(8) ext_eff ! extinction efficiency
+end type output_parameters_type 
+
 contains
 
 end module types_mod

@@ -153,7 +153,7 @@ logical found_cfn ! only required if c_method is read
 logical found_afn ! only required if c_method is read
 logical found_cft ! only required if c_method is read
 
-! init
+! init and set default values
 found_la = .false.
 found_rbi = .false.
 found_ibi = .false.
@@ -166,6 +166,7 @@ num_orients = 1
 is_multithreaded = .false.
 intellirot = .false.
 job_name = 'my_job'
+rot_method = "none"
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -1290,112 +1291,6 @@ close(10)
 
 end subroutine
 
-subroutine init(face_ids, isVisible, isVisiblePlusShadows, isWithinBeam, distances, beamIDs, &
-                isWithinBeam_ps, distances_ps, beamIDs_ps, isShadow, ampl_in, ampl_in_ps, la, waveno, &
-                rperp, rpar, tperp, tpar, vk71, vk72, vk73, vk91, vk92, vk93, rot_ampl, new_in_ampl, &
-                new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, ampl_diff, &
-                beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter)
-
-! subroutine init initialises many variables for the beam tracing loop
-
-logical, dimension(:), allocatable, intent(out) :: isVisible, isVisiblePlusShadows, isWithinBeam, isWithinBeam_ps, isShadow
-integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
-real(8), dimension(:), allocatable, intent(out) :: distances
-real(8), dimension(:), allocatable, intent(out) :: distances_ps
-integer(8), dimension(:), allocatable, intent(out) :: beamIDs, beamIDs_ps
-complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_in
-complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_in_ps
-real(8), intent(out) :: waveno
-real(8), intent(in) :: la
-complex(8), dimension(:), allocatable, intent(out) :: rperp ! Fresnel coefficient
-complex(8), dimension(:), allocatable, intent(out) :: rpar ! Fresnel coefficient
-complex(8), dimension(:), allocatable, intent(out) :: tperp ! Fresnel coefficient
-complex(8), dimension(:), allocatable, intent(out) :: tpar ! Fresnel coefficient
-real(8), dimension(:), allocatable, intent(out) :: vk71, vk72, vk73 ! reflected e-perp vector
-real(8), dimension(:), allocatable, intent(out) :: vk91, vk92, vk93 ! reflected prop vector
-real(8), dimension(:,:,:), allocatable, intent(out) :: rot_ampl ! rotation matrix for beams incident on eahc facet
-complex(8), dimension(:,:,:), allocatable, intent(out) :: new_in_ampl
-complex(8), dimension(:,:,:), allocatable, intent(out) :: new_in_ampl_ps
-complex(8), dimension(:,:,:), allocatable, intent(out) :: trans_ampl_ps ! transmitted amplitude matrices, including shadowed facets
-complex(8), dimension(:,:,:), allocatable, intent(out) :: trans_ampl ! transmitted amplitude matrices
-complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl ! reflected amplitude matrices
-complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl_ps ! reflected amplitude matrices
-complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_diff ! external diffraction amplitude matrices
-type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
-integer(8), intent(out) :: interactionCounter ! counts the current number of interactions
-
-! print*,'========== start sr init'
-
-! allocate arrays
-allocate(isVisible(size(face_ids,1)))
-allocate(isVisiblePlusShadows(size(face_ids,1)))
-allocate(isWithinBeam(size(face_ids,1)))
-allocate(isWithinBeam_ps(size(face_ids,1)))
-allocate(distances(size(face_ids,1)))
-allocate(distances_ps(size(face_ids,1)))
-allocate(beamIDs(size(face_ids,1)))
-allocate(beamIDs_ps(size(face_ids,1)))
-allocate(isShadow(size(face_ids,1)))
-allocate(ampl_in(1:2,1:2,1:size(face_ids,1)))
-allocate(ampl_in_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(rperp(size(face_ids,1)))
-allocate(rpar(size(face_ids,1)))
-allocate(tperp(size(face_ids,1)))
-allocate(tpar(size(face_ids,1)))
-allocate(vk71(size(face_ids,1)))
-allocate(vk72(size(face_ids,1)))
-allocate(vk73(size(face_ids,1)))
-allocate(vk91(size(face_ids,1)))
-allocate(vk92(size(face_ids,1)))
-allocate(vk93(size(face_ids,1)))
-allocate(rot_ampl(1:2,1:2,1:size(face_ids,1)))
-allocate(new_in_ampl(1:2,1:2,1:size(face_ids,1)))
-allocate(new_in_ampl_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(trans_ampl_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(trans_ampl(1:2,1:2,1:size(face_ids,1)))
-allocate(refl_ampl(1:2,1:2,1:size(face_ids,1)))
-allocate(refl_ampl_ps(1:2,1:2,1:size(face_ids,1)))
-allocate(beam_outbeam_tree(1:1000000)) ! set to 100000 as guess for max outbeams
-
-waveno = 2*pi/la
-beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
-interactionCounter = 0 ! counts the current number of interactions
-ampl_in_ps = 0
-ampl_in = 0
-isVisible = .false.
-isVisiblePlusShadows = .false.
-isWithinBeam = .false.
-isWithinBeam_ps = .false.
-distances = 0
-distances_ps = 0
-beamIDs = 0
-beamIDs_ps = 0
-isShadow = .false.
-ampl_in = 0
-ampl_in_ps = 0
-rperp = 0
-rpar = 0
-tperp = 0
-tpar = 0
-vk71 = 0
-vk72 = 0
-vk73 = 0
-vk91 = 0
-vk92 = 0
-vk93 = 0
-rot_ampl = 0
-new_in_ampl = 0
-new_in_ampl_ps = 0
-trans_ampl_ps = 0
-trans_ampl = 0
-refl_ampl = 0
-refl_ampl_ps = 0
-
-! print*,'========== end sr init'
-
-end subroutine
-
 subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, verts, face_ids, beamMidpoints, ampl_beam)
 
 ! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle (currently set to 1000)
@@ -1789,8 +1684,8 @@ subroutine PDAL2(   ifn,            &
         write(101,*),'apertures filename:     "',afn(1:len(trim(afn))),'"'
 
         print*,'crystal file type: "',trim(cft),'"'
-        write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'    
-        write(101,*),'particle file type:     "',trim(cft),'"'
+        ! write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'    
+        ! write(101,*),'particle file type:     "',trim(cft),'"'
 
         if (trim(cft) .eq. 'obj') then
 
@@ -2054,9 +1949,14 @@ subroutine PDAL2(   ifn,            &
         stop
     end if
 
-    write(101,*),'number of vertices: ',num_vert
-    write(101,*),'number of faces:    ',num_face
-    write(101,*),'max vertices per face:     ',num_face_vert_max
+    write(101,*),'number of vertices:   ',num_vert
+    write(101,*),'number of faces:      ',num_face
+    write(101,*),'max vertices per face:',num_face_vert_max
+
+    if (num_face_vert_max .gt. 3) then
+        print*,'error: max vertices per facet greater than 3 is currently not supported.'
+        stop
+    end if
 
     call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas) ! calculate particle facet areas (for doing some checks in the following sr)
 

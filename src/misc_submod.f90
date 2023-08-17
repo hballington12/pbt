@@ -5,12 +5,88 @@
 module misc_submod
 
 use ifport
+use types_mod
 
 implicit none
 
 real(8), parameter, public :: pi = 3.14159265358979 
 
 contains
+
+subroutine write_job_params(cfn,                & ! particle filename
+                            cft,                & ! particle file type
+                            afn,                & ! apertures filename
+                            la,                 & ! wavelength
+                            rbi,                & ! real refractive index
+                            ibi,                & ! imaginary refractive index
+                            rec,                & ! number of beam recursions
+                            rot_method,         & ! rotation method
+                            is_multithreaded,   & ! is multithreaded?
+                            num_orients,        & ! number of orientations
+                            intellirot,         & ! intelligent rotation angles
+                            c_method,           & ! particle input method
+                            job_name,           & ! job name
+                            cc_hex_params)        ! parameters for C. Collier hexagons
+
+character(100), intent(in) :: cfn ! crystal filename
+character(100), intent(in) :: cft ! crystal file type
+character(100), intent(in) :: afn ! apertures filename
+real(8), intent(in) :: la ! wavelength
+real(8), intent(in) :: rbi ! real part of the refractive index
+real(8), intent(in) :: ibi ! imaginary part of the refractive index
+integer, intent(in) :: rec ! max number of internal beam recursions
+character(100), intent(in) :: rot_method ! rotation method
+logical, intent(in) :: is_multithreaded ! whether or not code should use multithreading
+integer, intent(in) :: num_orients ! number of orientations
+logical, intent(in) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+character(100), intent(in) :: c_method ! method of particle file input
+character(255), intent(in) :: job_name ! name of job / output directory
+type(cc_hex_params_type), intent(in) :: cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+    
+integer i
+
+    write(101,*),'======================================================'
+    write(101,*),'=====================JOB SETTINGS====================='
+    write(101,*),'======================================================'
+    write(101,*),'job_name:                      "',trim(job_name),'"'
+    write(101,*),'lambda:                      ',la
+    write(101,*),'refractive index real:      ',rbi
+    write(101,*),'refractive index imag:       ',ibi
+    write(101,*),'max beam recursions:',rec
+    write(101,*),'rotation method:               "',rot_method(1:len(trim(rot_method))),'"'
+    write(101,*),'no. of orientations:',num_orients
+    if (is_multithreaded) then
+        write(101,*),'multithreading:                ','enabled'
+    else
+        write(101,*),'multithreading:                ','disabled'
+    end if
+    write(101,*),'particle input method:         "',c_method(1:len(trim(c_method))),'"'
+    if (intellirot .and. num_orients .gt. 1) then
+        write(101,*),'multirot method:        intelligent'
+    else if (.not. intellirot .and. num_orients .gt. 1) then
+        write(101,*),'multirot method:        random'
+    end if
+    if(c_method(1:len(trim(c_method))) .eq. "read") then ! if particle is to be read from file
+        write(101,*),'particle filename:             "',cfn(1:len(trim(cfn))),'"'
+        write(101,*),'particle file type:            "',cft(1:len(trim(cft))),'"'
+        write(101,*),'apertures filename:            "',afn(1:len(trim(afn))),'"'
+    else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
+        write(101,*),'gaussian random particle parameters...'
+        write(101,*),'L:                                ',cc_hex_params%l
+        write(101,*),'hexagon edge length:              ',cc_hex_params%hr
+        write(101,*),'no. facets per hex. edge: ',cc_hex_params%nfhr
+        write(101,*),'prism edge length:                ',cc_hex_params%pfl
+        write(101,*),'no. facets per prism edge:',cc_hex_params%nfpl
+        write(101,*),'no. rotations at p-b:     ',cc_hex_params%pher
+        write(101,*),'no. rotations at p-p:     ',cc_hex_params%pper
+        write(101,*),'no. roughness scales:     ',cc_hex_params%nscales
+        do i = 1, cc_hex_params%nscales
+            write(101,'(A,I1,A,f16.8)'),' corr. length ',i,':                ',cc_hex_params%cls(i)
+            write(101,'(A,I1,A,f16.8)'),' std. deviation ',i,':              ',cc_hex_params%sds(i)
+        end do
+    end if
+
+    end subroutine
 
 subroutine write_outbins(output_dir,theta_vals,phi_vals)
 
@@ -143,7 +219,7 @@ do i = 1, num_verts
     write(10,'(A1,f16.8,f16.8,f16.8)') "v ", verts(i,1), verts(i,2), verts(i,3)
 end do
 do i = 1, num_faces
-    write(10,'(A1,I6,I6,I6)') 'f', face_ids(i,1), face_ids(i,2), face_ids(i,3)
+    write(10,'(A1,I10,I10,I10)') 'f', face_ids(i,1), face_ids(i,2), face_ids(i,3)
 end do
 close(10)
 

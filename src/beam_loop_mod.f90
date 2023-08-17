@@ -10,11 +10,20 @@ use omp_lib
 
 implicit none
 
+real(8) ext_cross_section ! extinction cross section
+
 contains
 
-subroutine energy_checks(   beam_outbeam_tree,beam_outbeam_tree_counter,&
-                            norm,face2,faceAreas,energy_out_beam,energy_in, &
-                            ext_diff_outbeam_tree,energy_out_ext_diff)
+subroutine energy_checks(   beam_outbeam_tree, &
+                            beam_outbeam_tree_counter, &
+                            norm, &
+                            face2, &
+                            faceAreas, &
+                            energy_out_beam, &
+                            energy_in, &
+                            ext_diff_outbeam_tree, &
+                            energy_out_ext_diff, &
+                            energy_abs_beam)
 
     type(outbeamtype), dimension(:), allocatable, intent(in) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
@@ -23,6 +32,7 @@ subroutine energy_checks(   beam_outbeam_tree,beam_outbeam_tree_counter,&
     real(8), dimension(:), allocatable :: faceAreas ! area of each facet
     real(8), intent(in) :: energy_in
     real(8), intent(out) :: energy_out_beam
+    real(8), intent(out) :: energy_abs_beam
     real(8), intent(out) :: energy_out_ext_diff
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
 
@@ -38,6 +48,7 @@ subroutine energy_checks(   beam_outbeam_tree,beam_outbeam_tree_counter,&
     print*,'========== start sr energy_checks'
 
     energy_out_beam = 0
+    energy_abs_beam = ext_cross_section
 
     do i = 1, beam_outbeam_tree_counter
         prop = beam_outbeam_tree(i)%prop_out
@@ -76,14 +87,16 @@ subroutine energy_checks(   beam_outbeam_tree,beam_outbeam_tree_counter,&
     write(101,*),'------------------------------------------------------'
     write(101,'(A41,f16.8)'),'energy in (ill. geom. cross sec.): ', energy_in
     write(101,'(A41,f16.8)'),'beam energy out: ',energy_out_beam
+    write(101,'(A41,f16.8)'),'absorbed beam energy: ',ext_cross_section
     write(101,'(A41,f16.8)'),'ext diff energy out: ',energy_out_ext_diff
-    write(101,'(A41,f16.8,A2)'),'beam energy conservation: ',energy_out_beam/energy_in*100,' %'
+    write(101,'(A41,f16.8,A2)'),'beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
     write(101,'(A41,f16.8,A2)'),'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
 
     print'(A40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
     print'(A40,f16.8)','beam energy out: ',energy_out_beam
+    print'(A40,f16.8)','absorbed beam energy: ',ext_cross_section
     print'(A40,f16.8)','ext diff energy out: ',energy_out_ext_diff
-    print'(A40,f16.8,A2)','beam energy conservation: ',energy_out_beam/energy_in*100,' %'
+    print'(A40,f16.8,A2)','beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
     print'(A40,f16.8,A2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
 
     print*,'========== end sr energy_checks'
@@ -94,7 +107,7 @@ end subroutine
 subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     beamV, beamF1, beamN, beamF2, beamMidpoints, ampl_beam, &
     beam_outbeam_tree, beam_outbeam_tree_counter, ext_diff_outbeam_tree, &
-    energy_out_beam, energy_out_ext_diff)
+    energy_out_beam, energy_out_ext_diff,energy_abs_beam)
 
     ! main beam loop
 
@@ -185,6 +198,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     
     ! energy_checks
     real(8), intent(out) :: energy_out_beam
+    real(8), intent(out) :: energy_abs_beam
     real(8), intent(out) :: energy_out_ext_diff
 
     call make_normals(Face1, verts, Face2, Norm) ! recalculate normals
@@ -274,9 +288,16 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
 
     call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, verts, Face1)    
 
-    call energy_checks( beam_outbeam_tree,beam_outbeam_tree_counter,&
-                        norm,face2,faceAreas,energy_out_beam,illuminatedGeoCrossSection, &
-                        ext_diff_outbeam_tree,energy_out_ext_diff)
+    call energy_checks( beam_outbeam_tree, &
+                        beam_outbeam_tree_counter, &
+                        norm, &
+                        face2, &
+                        faceAreas, &
+                        energy_out_beam, &
+                        illuminatedGeoCrossSection, &
+                        ext_diff_outbeam_tree, &
+                        energy_out_ext_diff, &
+                        energy_abs_beam)
 
 end subroutine
 
@@ -1090,6 +1111,7 @@ complex(8) fresnel_matrix_refl(1:2,1:2), fresnel_matrix_trans(1:2,1:2)
 complex(8) refl_ampl(1:2,1:2), trans_ampl(1:2,1:2)
 real(8) alpha, A, B
 real(8) a_vec(1:3), b_vec(1:3), c_vec(1:3)
+real(8) intensity_in, intensity_abs, intensity_out
 
 ! allocations
 allocate(sufficientlyIlluminated2(1:size(sufficientlyIlluminated,1)))
@@ -1290,25 +1312,6 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! print*,'aperturePropagationVectors',aperturePropagationVectors(i,1),aperturePropagationVectors(i,2),aperturePropagationVectors(i,3)
             ! print*,'rot',rot(1,1),rot(1,2),rot(2,1),rot(2,2)
 
-            ! if(i .eq. 3) then
-            !     print*,'vk7a',vk7a
-            !     print*,'beamvk71',beamvk71(beamIDs_ps(j)),beamvk72(beamIDs_ps(j)),beamvk73(beamIDs_ps(j))
-            !     print*,'aperturePropagationVectors',aperturePropagationVectors(i,1),aperturePropagationVectors(i,2),aperturePropagationVectors(i,3)
-            !     print*,'rot',rot(1,1),rot(1,2),rot(2,1),rot(2,2)
-            !     stop
-            ! end if
-
-            ! if(j .eq. 739) then
-
-            !     ! print*,rot(1:2,1:2) ! test
-            !     ! print*,vk7a(1),vk7a(2),vk7a(3)
-            !     ! print*,beamvk71(beamIDs_ps(j)),beamvk72(beamIDs_ps(j)),beamvk73(beamIDs_ps(j))
-            !     ! print*,aperturePropagationVectors(aperture_id,1),aperturePropagationVectors(aperture_id,2),aperturePropagationVectors(aperture_id,3)
-
-            !     print*,beamvk71
-
-            ! end if
-
             rot_ampl(1:2,1:2) = matmul(rot(1:2,1:2),beam_ampl(1:2,1:2,beamIDs_ps(j)))
 
             ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)',' beam ampl in: (',real(rot_ampl(1,1)),' + ',imag(rot_ampl(1,1)),'i, ',real(rot_ampl(1,2)),' + ',imag(rot_ampl(1,2)),'i)'
@@ -1316,9 +1319,34 @@ do i = 1, num_sufficiently_illuminated_apertures
 
             ! rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) ! no absorption
 
+            intensity_in = real(0.5*(   rot_ampl(1,1)*conjg(rot_ampl(1,1)) + &
+                                        rot_ampl(1,2)*conjg(rot_ampl(1,2)) + &
+                                        rot_ampl(2,1)*conjg(rot_ampl(2,1)) + &
+                                        rot_ampl(2,2)*conjg(rot_ampl(2,2))))
+
+            ! print*,'intensity in: ',real(0.5*(  beam_ampl(1,1,beamIDs_ps(j))*conjg(beam_ampl(1,1,beamIDs_ps(j))) + &
+            !                                     beam_ampl(1,2,beamIDs_ps(j))*conjg(beam_ampl(1,2,beamIDs_ps(j))) + &
+            !                                     beam_ampl(2,1,beamIDs_ps(j))*conjg(beam_ampl(2,1,beamIDs_ps(j))) + &
+            !                                     beam_ampl(2,2,beamIDs_ps(j))*conjg(beam_ampl(2,2,beamIDs_ps(j)))))                                                
+
             rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) * exp(-2*waveno*ibi*distances_ps(j)) ! absorption
 
+            ! print*,'absorption factor: ',exp(-2*waveno*ibi*distances_ps(j))**2
+            ! print*,'1 - absorption factor: ',(1 - exp(-2*waveno*ibi*distances_ps(j))**2)
 
+
+
+            intensity_out = real(0.5*(rot_ampl(1,1)*conjg(rot_ampl(1,1)) + &
+                                                            rot_ampl(1,2)*conjg(rot_ampl(1,2)) + &
+                                                            rot_ampl(2,1)*conjg(rot_ampl(2,1)) + &
+                                                            rot_ampl(2,2)*conjg(rot_ampl(2,2))))
+
+            intensity_abs = real(0.5*(  beam_ampl(1,1,beamIDs_ps(j))*conjg(beam_ampl(1,1,beamIDs_ps(j))) + &
+                                        beam_ampl(1,2,beamIDs_ps(j))*conjg(beam_ampl(1,2,beamIDs_ps(j))) + &
+                                        beam_ampl(2,1,beamIDs_ps(j))*conjg(beam_ampl(2,1,beamIDs_ps(j))) + &
+                                        beam_ampl(2,2,beamIDs_ps(j))*conjg(beam_ampl(2,2,beamIDs_ps(j)))))*(1-exp(-2*waveno*ibi*distances_ps(j))**2)
+
+            ! print*,'intensity conservation: ',(intensity_out + intensity_abs)/intensity_in * 100,'%'
 
             ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)','     rot ampl: (',real(rot_ampl(1,1)),' + ',imag(rot_ampl(1,1)),'i, ',real(rot_ampl(1,2)),' + ',imag(rot_ampl(1,2)),'i)'
             ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)','               (',real(rot_ampl(2,1)),' + ',imag(rot_ampl(2,1)),'i, ',real(rot_ampl(2,2)),' + ',imag(rot_ampl(2,2)),'i)'
@@ -1366,12 +1394,28 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! remove transmission for shadowed facets (probably doesnt matter)
             if(isShadow(j)) trans_ampl = trans_ampl*0
 
-            ! print*,'illuminating propagqation vectors'
+            ! print*,'illuminating propagation vectors'
             ! do m = 1, 8
             !     print*,aperturePropagationVectors(m,1), aperturePropagationVectors(m,2), aperturePropagationVectors(m,3)
             ! end do
 
-            ! stop
+            ! print*,'illuminated facet ID: ',j
+            ! print*,'illuminated facet cos(theta_i): ',cos(theta_i)
+            ! print*,'illuminated face area: ',faceAreas(j)
+            ! print*,'illuminated projected face area: ',cos(theta_i)*faceAreas(j)
+            ! ! print*,'illuminating facet ID: ',beamIDs_ps(j)
+            ! ! print*,'illuminating facet area: ',faceAreas(beamIDs_ps(j))
+            ! print*,'illuminating facet cos(theta_i)',-rotatedNorm(Face2(beamIDs_ps(j)),3)
+            ! ! print*,'illuminating projected face area: ',-rotatedNorm(Face2(beamIDs_ps(j)),3)*faceAreas(beamIDs_ps(j))
+            ! print*,'absorption factor: ',(1-exp(-2*waveno*ibi*distances_ps(j)))
+            ! print*,'illuminated extinction cross section: ',(1-exp(-2*waveno*ibi*distances_ps(j)))*cos(theta_i)*faceAreas(j)
+
+            ! ext_cross_section = ext_cross_section + sqrt(1-exp(-2*waveno*ibi*distances_ps(j)))*cos(theta_i)*faceAreas(j)*intensity_in*rbi ! this might need a check
+            
+            ext_cross_section = ext_cross_section + intensity_abs*cos(theta_i)*faceAreas(j)*rbi ! this might need a check, rbi because energy is more concentrated inside particle
+
+            ! ext_cross_section = ext_cross_section + intensity_abs*cos(theta_i)*faceAreas(j)*rbi/(-rotatedNorm(Face2(beamIDs_ps(j)),3)) ! this might need a check
+                                        ! stop
 
             ! output variables
             vk91Int(k,l) = aperturePropagationVectors(aperture_id,1)
@@ -3450,6 +3494,113 @@ print'(A,f12.8,A)',"facets within beam found in: ",finish-start," secs"
 ! print*,'========== end sr findWithinBeam'
 
 !stop
+
+end subroutine
+
+subroutine init(face_ids, isVisible, isVisiblePlusShadows, isWithinBeam, distances, beamIDs, &
+    isWithinBeam_ps, distances_ps, beamIDs_ps, isShadow, ampl_in, ampl_in_ps, la, waveno, &
+    rperp, rpar, tperp, tpar, vk71, vk72, vk73, vk91, vk92, vk93, rot_ampl, new_in_ampl, &
+    new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, ampl_diff, &
+    beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter)
+
+! subroutine init initialises many variables for the beam tracing loop
+
+logical, dimension(:), allocatable, intent(out) :: isVisible, isVisiblePlusShadows, isWithinBeam, isWithinBeam_ps, isShadow
+integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
+real(8), dimension(:), allocatable, intent(out) :: distances
+real(8), dimension(:), allocatable, intent(out) :: distances_ps
+integer(8), dimension(:), allocatable, intent(out) :: beamIDs, beamIDs_ps
+complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_in
+complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_in_ps
+real(8), intent(out) :: waveno
+real(8), intent(in) :: la
+complex(8), dimension(:), allocatable, intent(out) :: rperp ! Fresnel coefficient
+complex(8), dimension(:), allocatable, intent(out) :: rpar ! Fresnel coefficient
+complex(8), dimension(:), allocatable, intent(out) :: tperp ! Fresnel coefficient
+complex(8), dimension(:), allocatable, intent(out) :: tpar ! Fresnel coefficient
+real(8), dimension(:), allocatable, intent(out) :: vk71, vk72, vk73 ! reflected e-perp vector
+real(8), dimension(:), allocatable, intent(out) :: vk91, vk92, vk93 ! reflected prop vector
+real(8), dimension(:,:,:), allocatable, intent(out) :: rot_ampl ! rotation matrix for beams incident on eahc facet
+complex(8), dimension(:,:,:), allocatable, intent(out) :: new_in_ampl
+complex(8), dimension(:,:,:), allocatable, intent(out) :: new_in_ampl_ps
+complex(8), dimension(:,:,:), allocatable, intent(out) :: trans_ampl_ps ! transmitted amplitude matrices, including shadowed facets
+complex(8), dimension(:,:,:), allocatable, intent(out) :: trans_ampl ! transmitted amplitude matrices
+complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl ! reflected amplitude matrices
+complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl_ps ! reflected amplitude matrices
+complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_diff ! external diffraction amplitude matrices
+type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
+integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer(8), intent(out) :: interactionCounter ! counts the current number of interactions
+
+! print*,'========== start sr init'
+
+! allocate arrays
+allocate(isVisible(size(face_ids,1)))
+allocate(isVisiblePlusShadows(size(face_ids,1)))
+allocate(isWithinBeam(size(face_ids,1)))
+allocate(isWithinBeam_ps(size(face_ids,1)))
+allocate(distances(size(face_ids,1)))
+allocate(distances_ps(size(face_ids,1)))
+allocate(beamIDs(size(face_ids,1)))
+allocate(beamIDs_ps(size(face_ids,1)))
+allocate(isShadow(size(face_ids,1)))
+allocate(ampl_in(1:2,1:2,1:size(face_ids,1)))
+allocate(ampl_in_ps(1:2,1:2,1:size(face_ids,1)))
+allocate(rperp(size(face_ids,1)))
+allocate(rpar(size(face_ids,1)))
+allocate(tperp(size(face_ids,1)))
+allocate(tpar(size(face_ids,1)))
+allocate(vk71(size(face_ids,1)))
+allocate(vk72(size(face_ids,1)))
+allocate(vk73(size(face_ids,1)))
+allocate(vk91(size(face_ids,1)))
+allocate(vk92(size(face_ids,1)))
+allocate(vk93(size(face_ids,1)))
+allocate(rot_ampl(1:2,1:2,1:size(face_ids,1)))
+allocate(new_in_ampl(1:2,1:2,1:size(face_ids,1)))
+allocate(new_in_ampl_ps(1:2,1:2,1:size(face_ids,1)))
+allocate(trans_ampl_ps(1:2,1:2,1:size(face_ids,1)))
+allocate(trans_ampl(1:2,1:2,1:size(face_ids,1)))
+allocate(refl_ampl(1:2,1:2,1:size(face_ids,1)))
+allocate(refl_ampl_ps(1:2,1:2,1:size(face_ids,1)))
+allocate(beam_outbeam_tree(1:1000000)) ! set to 100000 as guess for max outbeams
+
+waveno = 2*pi/la
+beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
+interactionCounter = 0 ! counts the current number of interactions
+ampl_in_ps = 0
+ampl_in = 0
+isVisible = .false.
+isVisiblePlusShadows = .false.
+isWithinBeam = .false.
+isWithinBeam_ps = .false.
+distances = 0
+distances_ps = 0
+beamIDs = 0
+beamIDs_ps = 0
+isShadow = .false.
+ampl_in = 0
+ampl_in_ps = 0
+rperp = 0
+rpar = 0
+tperp = 0
+tpar = 0
+vk71 = 0
+vk72 = 0
+vk73 = 0
+vk91 = 0
+vk92 = 0
+vk93 = 0
+rot_ampl = 0
+new_in_ampl = 0
+new_in_ampl_ps = 0
+trans_ampl_ps = 0
+trans_ampl = 0
+refl_ampl = 0
+refl_ampl_ps = 0
+
+ext_cross_section = 0 ! test
+! print*,'========== end sr init'
 
 end subroutine
 

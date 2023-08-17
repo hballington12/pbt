@@ -24,7 +24,9 @@ module outputs_mod
                            energy_out_ext_diff, & ! external diffraction energy remaining before diffraction
                            mueller,             & ! 2d mueller matrix
                            mueller_1d,          & ! 1d mueller matrix
-                           la)                    ! wavelength
+                           la,                  & ! wavelength
+                           energy_abs_beam,     & ! energy absorbed inside the particle
+                           output_parameters)     ! output parameters
 
       ! sr finalise is called at the end of each rotation
       ! it combines the beam and external diffraction far-field amplitude matrices to yield the total far-field
@@ -41,12 +43,14 @@ module outputs_mod
    real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
    real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
    real(8), intent(in) :: la ! wavelength
+   real(8), intent(in) :: energy_abs_beam
+   type(output_parameters_type), intent(out) :: output_parameters 
 
    complex(8), dimension(:,:), allocatable :: ampl_far11, ampl_far12, ampl_far21, ampl_far22 ! total
    real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
    real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
    integer i, j
-   real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext
+   real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext, abs, albedo
    real(8) waveno
 
    waveno = 2d0*pi/la
@@ -373,21 +377,25 @@ module outputs_mod
    write(101,'(A40,f16.8,A2,f10.6,A3)'),'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
    
-   ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
-   ! ext = abs(4*pi/waveno*imag(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
-   ! ext = abs(pi/2*imag(ampl_far11(1,1) + ampl_far22(1,1))) ! extinction cross section, Jackson 10.137
-   ext = abs(2*pi/waveno*real(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
+   ! ext = abs(2*pi/waveno*real(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
+   ! write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (real):',ext 
+   ! print'(A40,f16.8)','ext. cross (opt. theorem) real:',ext 
 
-   write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (real):',ext 
-   print'(A40,f16.8)','ext. cross (opt. theorem) real:',ext 
+   ! ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
+   ! write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (imag):',ext 
+   ! print'(A40,f16.8)','ext. cross (opt. theorem) imag:',ext 
 
-   ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
+   abs = energy_abs_beam
+   write(101,'(A40,f16.8)'),'abs. cross section:',abs
+   print'(A40,f16.8)','abs. cross:',abs 
 
-   write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (imag):',ext 
-   print'(A40,f16.8)','ext. cross (opt. theorem) imag:',ext 
+   ext = abs + scatt
+   write(101,'(A40,f16.8)'),'ext. cross section:',ext
+   print'(A40,f16.8)','ext. cross:',ext 
 
-   write(101,'(A40,f16.8)'),'single-scattering albedo:',1-(ext-scatt)/ext 
-   print'(A40,f16.8)','single-scatt. albedo:',1-(ext-scatt)/ext 
+   albedo = 1-(ext-scatt)/ext 
+   write(101,'(A40,f16.8)'),'single-scattering albedo:',albedo
+   print'(A40,f16.8)','single-scatt. albedo:',albedo
 
    call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt,asymmetry) ! p11*sin(theta)
    write(101,'(A40,f16.8)'),'asymmetry parameter (total):',asymmetry
@@ -401,6 +409,11 @@ module outputs_mod
    write(101,'(A40,f16.8)'),'asymmetry parameter (ext diff):',asymmetry_ext_diff  
    print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
 
+   output_parameters%scatt = scatt
+   output_parameters%abs = abs
+   output_parameters%ext = ext
+   output_parameters%albedo = albedo
+   output_parameters%asymmetry = asymmetry
 
    ! open(10,file="mueller_scatgrid")
    ! do i = 1, size(ampl_far_beam11,2)
@@ -436,7 +449,8 @@ module outputs_mod
                         mueller_1d, &
                         theta_vals, &
                         phi_vals,   &
-                        output_dir)
+                        output_dir, &
+                        output_parameters_total)
 
    ! sr writeup writes the 1d and 2d mueller matrices to the job directory
 
@@ -444,6 +458,7 @@ module outputs_mod
    real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
    real(8), dimension(:), allocatable, intent(in) :: theta_vals, phi_vals
    character(len=*), intent(in) :: output_dir
+   type(output_parameters_type), intent(inout) :: output_parameters_total
 
    integer i, j
 
@@ -473,12 +488,26 @@ module outputs_mod
    end do
    close(10)
 
+   open(10,file=trim(output_dir)//"/"//"params")
+      write(10,'(A30,f16.8)') 'abs. cross section: ',output_parameters_total%abs
+      write(10,'(A30,f16.8)') 'scatt. cross section: ',output_parameters_total%scatt
+      write(10,'(A30,f16.8)') 'ext. cross section: ',output_parameters_total%ext
+      write(10,'(A30,f16.8)') 'single scattering albedo: ',output_parameters_total%albedo
+      write(10,'(A30,f16.8)') 'asymmetry parameter: ',output_parameters_total%asymmetry
+      ! write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs_eff
+      ! write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt_eff
+      ! write(10,'(A30,f16.8)') 'ext. efficiency: ',output_parameters_total%ext_eff
+   close(10)
+
+
    end subroutine
 
-   subroutine summation(mueller,          & ! current 2d mueller
-                        mueller_total,    & ! total 2d mueller
-                        mueller_1d,       & ! current 1d mueller
-                        mueller_1d_total)   ! total 1d mueller
+   subroutine summation(mueller,                & ! current 2d mueller
+                        mueller_total,          & ! total 2d mueller
+                        mueller_1d,             & ! current 1d mueller
+                        mueller_1d_total,       & ! total 1d mueller
+                        output_parameters,      & 
+                        output_parameters_total)
 
       ! sr summation adds the current mueller matrices to the total
 
@@ -486,11 +515,21 @@ module outputs_mod
       real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller_total ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
       real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d_total ! phi-integrated mueller matrices
+      type(output_parameters_type), intent(in) :: output_parameters 
+      type(output_parameters_type), intent(inout) :: output_parameters_total
 
       ! if its the first call to summation, allocate the total mueller 1d and 2d arrays
       if(.not. allocated(mueller_total)) then
          allocate(mueller_total(1:size(mueller,1),1:size(mueller,2),1:size(mueller,3)))
          mueller_total = 0 ! init
+         output_parameters_total%abs = 0 ! init
+         output_parameters_total%scatt = 0 ! init
+         output_parameters_total%ext = 0 ! init
+         output_parameters_total%albedo = 0 ! init
+         output_parameters_total%asymmetry = 0 ! init
+         output_parameters_total%abs_eff = 0 ! init
+         output_parameters_total%scatt_eff = 0 ! init
+         output_parameters_total%ext_eff = 0 ! init
       end if
       if(.not. allocated(mueller_1d_total)) then
          allocate(mueller_1d_total(1:size(mueller_1d,1),1:size(mueller_1d,2)))
@@ -500,6 +539,14 @@ module outputs_mod
       ! sum
       mueller_total = mueller_total + mueller
       mueller_1d_total = mueller_1d_total + mueller_1d
+      output_parameters_total%abs = output_parameters_total%abs + output_parameters%abs
+      output_parameters_total%scatt = output_parameters_total%scatt + output_parameters%scatt
+      output_parameters_total%ext = output_parameters_total%ext + output_parameters%ext
+      output_parameters_total%albedo = output_parameters_total%albedo + output_parameters%albedo
+      output_parameters_total%asymmetry = output_parameters_total%asymmetry + output_parameters%asymmetry
+      output_parameters_total%abs_eff = output_parameters_total%abs_eff + output_parameters%abs_eff
+      output_parameters_total%scatt_eff = output_parameters_total%scatt_eff + output_parameters%scatt_eff
+      output_parameters_total%ext_eff = output_parameters_total%ext_eff + output_parameters%ext_eff
 
    end subroutine
 

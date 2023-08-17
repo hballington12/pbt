@@ -89,6 +89,7 @@ type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing
 integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
 real(8) energy_out_beam
 real(8) energy_out_ext_diff
+real(8) energy_abs_beam
 
 ! sr diff_main
 complex(8), dimension(:,:), allocatable:: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! total
@@ -98,6 +99,11 @@ complex(8), dimension(:,:), allocatable :: ampl_far_ext_diff11, ampl_far_ext_dif
 ! sr make_mueller
 real(8), dimension(:,:,:), allocatable :: mueller, mueller_total, mueller_recv ! mueller matrices
 real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d_recv ! phi-integrated mueller matrices
+
+! sr finalise
+type(output_parameters_type) output_parameters 
+type(output_parameters_type) output_parameters_total
+type(output_parameters_type) output_parameters_recv
 
 ! mpi
 integer ierr
@@ -160,18 +166,22 @@ write(my_log_dir,*) trim(output_dir)//"/logs/log",trim(my_rank_str)
 open(101,file=trim(my_log_dir)) ! open global non-standard log file for important records
 
 ! ############# input_mod #############
+! write job parameters to log file
+call write_job_params(  cfn,                & ! particle filename
+                        cft,                & ! particle file type
+                        afn,                & ! apertures filename
+                        la,                 & ! wavelength
+                        rbi,                & ! real refractive index
+                        ibi,                & ! imaginary refractive index
+                        rec,                & ! number of beam recursions
+                        rot_method,         & ! rotation method
+                        is_multithreaded,   & ! is multithreaded?
+                        num_orients,        & ! number of orientations
+                        intellirot,         & ! intelligent rotation angles
+                        c_method,           & ! particle input method
+                        my_log_dir,         & ! output directory
+                        cc_hex_params)        ! parameters for C. Collier hexagons
 
-! read input parameters
-! call SDATIN(ifn,            & ! <-  input filename
-!             la,             & !  -> wavelength
-!             rbi,            & !  -> real part of the refractive index
-!             ibi,            & !  -> imaginary part of the refractive index
-!             rec,            & !  -> max number of internal beam recursions
-!             rot_method,     & !  -> particle rotation method
-!             is_multithreaded, & !  -> whether ot not code should use multithreading) 
-!             num_orients, &
-!             intellirot,  &
-!             c_method)
 
 ! get input particle information
 call PDAL2( ifn,            & ! <-  input filename
@@ -265,7 +275,8 @@ do i = my_start, my_end
                     beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
                     ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
                     energy_out_beam,           & !  -> total energy out from beams (before diffraction)
-                    energy_out_ext_diff)         !  -> total energy out from external diffraction (before diffraction)
+                    energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
+                    energy_abs_beam)             !  -> total energy absorbed from beams (before diffraction)
 
     ! if(num_orients .gt. 1) then
     !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'
@@ -309,21 +320,31 @@ do i = my_start, my_end
                     energy_out_ext_diff, & ! <-  total energy out from external diffraction (before diffraction)
                     mueller,             & !  -> 2d mueller matrix
                     mueller_1d,          & !  -> 1d mueller matrix
-                    la)                    ! <-  wavelength (for optical theorem)
+                    la,                  & ! <-  wavelength (for optical theorem)
+                    energy_abs_beam,     & ! <-  energy absorbed within the particle
+                    output_parameters)     !  -> some output parameters
 
     ! call writeup(mueller, mueller_1d, theta_vals, phi_vals) ! write current mueller to file
 
-    call summation(mueller, mueller_total, mueller_1d, mueller_1d_total)
+                    call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
 end do
 
 print*,'my rank:',my_rank,'finished'
 
-! sum up mueller 2d and 1d across all mpi processes
+! sum up across all mpi processes
 print*,'i have finished. my rank = ',my_rank
 if (my_rank .ne. 0) then ! if not rank 0 process, send mueller to rank 0
     call MPI_SEND(mueller_1d_total,size(mueller_1d_total,1)*size(mueller_1d_total,2),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
     call MPI_SEND(mueller_total,size(mueller_total,1)*size(mueller_total,2)*size(mueller_total,3),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%abs,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%scatt,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%ext,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%albedo,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%asymmetry,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%abs_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%scatt_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+    call MPI_SEND(output_parameters_total%ext_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
     print*,'sent to rank 0. my rank = ',my_rank
 else ! if rank 0 process, receieve from all other ranks
     ! allocate some arrays to hold the received values
@@ -335,6 +356,22 @@ else ! if rank 0 process, receieve from all other ranks
         mueller_1d_total = mueller_1d_total + mueller_1d_recv ! sum
         call MPI_RECV(mueller_recv,size(mueller_recv,1)*size(mueller_recv,2)*size(mueller_recv,3),MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
         mueller_total = mueller_total + mueller_recv ! sum        
+        call MPI_RECV(output_parameters_recv%abs,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%abs = output_parameters_total%abs + output_parameters_recv%abs ! sum  
+        call MPI_RECV(output_parameters_recv%scatt,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%scatt = output_parameters_total%scatt + output_parameters_recv%scatt ! sum  
+        call MPI_RECV(output_parameters_recv%ext,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%ext = output_parameters_total%ext + output_parameters_recv%ext ! sum  
+        call MPI_RECV(output_parameters_recv%albedo,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%albedo = output_parameters_total%albedo + output_parameters_recv%albedo ! sum  
+        call MPI_RECV(output_parameters_recv%asymmetry,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%asymmetry = output_parameters_total%asymmetry + output_parameters_recv%asymmetry ! sum  
+        call MPI_RECV(output_parameters_recv%abs_eff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%abs_eff = output_parameters_total%abs_eff + output_parameters_recv%abs_eff ! sum  
+        call MPI_RECV(output_parameters_recv%scatt_eff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%scatt_eff = output_parameters_total%scatt_eff + output_parameters_recv%scatt_eff ! sum  
+        call MPI_RECV(output_parameters_recv%ext_eff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+        output_parameters_total%ext_eff = output_parameters_total%ext_eff + output_parameters_recv%ext_eff ! sum  
         print*,'received from ',source,' my rank = ',my_rank
     end do
 end if
@@ -344,10 +381,18 @@ if (my_rank .eq. 0) then
 
     mueller_total = mueller_total / num_orients
     mueller_1d_total = mueller_1d_total / num_orients
+    output_parameters_total%abs = output_parameters_total%abs / num_orients
+    output_parameters_total%scatt = output_parameters_total%scatt / num_orients
+    output_parameters_total%ext = output_parameters_total%ext / num_orients
+    output_parameters_total%albedo = output_parameters_total%albedo / num_orients
+    output_parameters_total%asymmetry = output_parameters_total%asymmetry / num_orients
+    output_parameters_total%abs_eff = output_parameters_total%abs_eff / num_orients
+    output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / num_orients
+    output_parameters_total%ext_eff = output_parameters_total%ext_eff / num_orients
 
     ! writing to file
     call write_outbins(output_dir,theta_vals,phi_vals)
-    call writeup(mueller_total, mueller_1d_total, theta_vals, phi_vals, output_dir) ! write total mueller to file
+    call writeup(mueller_total, mueller_1d_total, theta_vals, phi_vals, output_dir, output_parameters_total) ! write to file
 
     finish = omp_get_wtime()
     print*,'=========='
