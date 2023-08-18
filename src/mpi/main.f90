@@ -242,7 +242,19 @@ do i = my_start, my_end
                     num_orients,&
                     eulers,     &
                     offs)
-
+ 
+    if(my_end-my_start .gt. 1) then ! num_orients -> my_end-my_start+1, i -> i-my_start+1
+        print'(A15,I8,A3,I8,A20,f8.4,A3)','my orientation: ',i-my_start+1,' / ',my_end-my_start+1,' (my progress: ',dble(i-my_start)/dble(my_end-my_start+1)*100,' %)'
+        write(101,'(A15,I8,A3,I8,A20,f8.4,A3)'),'my orientation: ',i-my_start+1,' / ',my_end-my_start+1,' (my progress: ',dble(i-my_start)/dble(my_end-my_start+1)*100,' %)'
+        ! print*,'total time elapsed: ',omp_get_wtime()-start
+        ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
+        if (i-my_start+1 .gt. 1) then
+            print'(A20,F12.4,A5)','est. time remaining: '
+            write(101,'(A20,F12.4,A5)'),'est. time remaining: '
+            call PROUST(nint(dble(my_end-i+1)*(omp_get_wtime()-start) / dble(i-my_start+1)))
+        end if
+    end if
+                
     ! fast implementation of the incident beam
     call makeIncidentBeam(  beamV,         & ! ->  beam vertices
                             beamF1,        & ! ->  beam face vertex indices
@@ -274,17 +286,6 @@ do i = my_start, my_end
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters)           !  -> adds illuminated geometric cross section to output parameters
-
-    ! if(num_orients .gt. 1) then
-    !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'
-    !     ! print*,'total time elapsed: ',omp_get_wtime()-start
-    !     ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
-    !     if (i .gt. 1) then
-    !         print'(A20,F12.4,A5)','est. time remaining: '
-    !         call PROUST(nint(dble(num_orients-i+1)*(omp_get_wtime()-start) / dble(i)))
-    !     end if
-    ! end if
-    
 
     ! diffraction
     call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing

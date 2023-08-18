@@ -1182,6 +1182,7 @@ subroutine simpne ( ntab, x, y, result )
          END DO			!On to the next unit.
 !  Cast forth the result.
          print*, ">> ",TEXT(1:L)," <<"	!With annotation.
+         write(101,*), ">> ",TEXT(1:L)," <<"	!With annotation.
         END			!Simple enough with integers.
  
 
