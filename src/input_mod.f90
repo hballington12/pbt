@@ -529,7 +529,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 print*,'error: no option found for "jobname"'
                 stop
             else ! else, parse the specifier
-                read(arg,*) job_name
+                read(arg,'(A)') job_name
                 print*,'job name: ', trim(job_name)
             end if
 

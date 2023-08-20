@@ -217,7 +217,8 @@ do i = 1, num_orients
                     energy_out_beam,           & !  -> total energy out from beams (before diffraction)
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
-                    output_parameters)           !  -> adds illuminated geometric cross section to output parameters
+                    output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
+                    is_multithreaded)            ! <-  enable or disable multithreading
     ! stop
     if(num_orients .gt. 1) then
         print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'

@@ -285,7 +285,8 @@ do i = my_start, my_end
                     energy_out_beam,           & !  -> total energy out from beams (before diffraction)
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
-                    output_parameters)           !  -> adds illuminated geometric cross section to output parameters
+                    output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
+                    is_multithreaded)            ! <-  enable or disable multithreading
 
     ! diffraction
     call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing

@@ -62,7 +62,7 @@ subroutine energy_checks(   beam_outbeam_tree, &
                                 ampl(2,1)*conjg(ampl(2,1)) + &
                                 ampl(2,2)*conjg(ampl(2,2)))
                                 
-        if (intensity_out .gt. 1e5) print*,'i_beam: ',i,' intensity out: ',intensity_out
+        if (intensity_out .gt. 1e5) print*,'i_beam:',i,' intensity out: ',intensity_out
         
         
         energy_out_beam = energy_out_beam + intensity_out*area*cos_theta
@@ -107,7 +107,8 @@ end subroutine
 subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     beamV, beamF1, beamN, beamF2, beamMidpoints, ampl_beam, &
     beam_outbeam_tree, beam_outbeam_tree_counter, ext_diff_outbeam_tree, &
-    energy_out_beam, energy_out_ext_diff,energy_abs_beam,output_parameters)
+    energy_out_beam, energy_out_ext_diff,energy_abs_beam,output_parameters, &
+    is_multithreaded)
 
     ! main beam loop
 
@@ -128,6 +129,7 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
     integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     type(output_parameters_type), intent(inout) :: output_parameters 
+    logical, intent(in) :: is_multithreaded ! whether or not code should use multithreading
 
     real(8), dimension(:,:), allocatable :: Norm ! face normals
     integer(8), dimension(:), allocatable :: Face2 ! face normal ID of each face
@@ -201,6 +203,8 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     real(8), intent(out) :: energy_out_beam
     real(8), intent(out) :: energy_abs_beam
     real(8), intent(out) :: energy_out_ext_diff
+
+    start = omp_get_wtime()
 
     call make_normals(Face1, verts, Face2, Norm) ! recalculate normals
 
@@ -279,13 +283,17 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
                                         vk71Int, vk72Int, vk73Int, &
                                         beam_outbeam_tree, beam_outbeam_tree_counter, &
                                         refl_ampl_out11Int, refl_ampl_out12Int, refl_ampl_out21Int, refl_ampl_out22Int, &
-                                        interactionCounter)
+                                        interactionCounter, &
+                                        is_multithreaded)
     end do
 
-    ! finish = omp_get_wtime()
-    ! print*,'=========='
-    ! print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"
-    ! print*,'=========='
+    finish = omp_get_wtime()
+    print*,'=========='
+    print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"
+    print*,'=========='
+    write(101,*),'=========='
+    write(101,'(A,f16.8,A)'),"end beam loop - time elapsed: ",finish-start," secs"
+    write(101,*),'=========='    
 
     call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, verts, Face1)    
 
@@ -326,7 +334,8 @@ subroutine find_vis(aperture_id, rotatedVert, Face1, Face2, &
                     isWithinBeam, apertures, &
                     rotatedMidpoints, rotatedNorm, &
                     in_beam, dist_beam, id_beam, is_shad, &
-                    beamV, beamF1, rotatedapertureNormals)
+                    beamV, beamF1, rotatedapertureNormals, &
+                    is_multithreaded)
 
     ! for subroutine beam_scan
     ! for a given particle orientation with assumed propagation along the -z axis,
@@ -348,6 +357,7 @@ logical, dimension(:), allocatable, intent(out) :: is_shad
 real(8), dimension(:,:), allocatable, intent(in) :: beamV
 integer(8), dimension(:,:), allocatable, intent(in) :: beamF1 ! face vertex IDs
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
+logical, intent(in) :: is_multithreaded
 
 integer i, j, k, m
 logical, dimension(:), allocatable :: is_beam
@@ -388,14 +398,33 @@ allocate(distanceToBB(1:boundingBoxFSize)) ! array to hold the distance of a giv
 allocate(distanceToFuzzyBB(1:boundingBoxFSize)) ! array to hold the distance of a given vertex to each bounding box
 
 ! find which bounding box each vertex belongs to
-do i = 1, size(Face1,1) ! for each face
-    distanceToBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - rotatedMidpoints(i,1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - rotatedMidpoints(i,2))**2) ! distance to each bb
-    F3(i) = minloc(distanceToBB,1) ! record which bounding box midpoint this facet was closest to
-    do j = 1, 3 ! for each vertex
-        distanceToFuzzyBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - rotatedVert(Face1(i,j),1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - rotatedVert(Face1(i,j),2))**2) ! distance to each bb
-        F4(i,j) = minloc(distanceToFuzzyBB,1) ! record which bounding box midpoint this facet vertex was closest to
-    end do 
-end do
+if(is_multithreaded) then
+    !$OMP PARALLEL DEFAULT(SHARED) num_threads(omp_get_max_threads()) PRIVATE(i,j,distanceToBB,distanceToFuzzyBB)
+    !$OMP DO
+    do i = 1, size(Face1,1) ! for each face
+        distanceToBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - rotatedMidpoints(i,1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - rotatedMidpoints(i,2))**2) ! distance to each bb
+        F3(i) = minloc(distanceToBB,1) ! record which bounding box midpoint this facet was closest to
+        do j = 1, 3 ! for each vertex
+            distanceToFuzzyBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - rotatedVert(Face1(i,j),1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - rotatedVert(Face1(i,j),2))**2) ! distance to each bb
+            F4(i,j) = minloc(distanceToFuzzyBB,1) ! record which bounding box midpoint this facet vertex was closest to
+        end do 
+    end do
+    !$OMP END PARALLEL
+else
+    do i = 1, size(Face1,1) ! for each face
+        distanceToBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - rotatedMidpoints(i,1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - rotatedMidpoints(i,2))**2) ! distance to each bb
+        F3(i) = minloc(distanceToBB,1) ! record which bounding box midpoint this facet was closest to
+        do j = 1, 3 ! for each vertex
+            distanceToFuzzyBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - rotatedVert(Face1(i,j),1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - rotatedVert(Face1(i,j),2))**2) ! distance to each bb
+            F4(i,j) = minloc(distanceToFuzzyBB,1) ! record which bounding box midpoint this facet vertex was closest to
+        end do 
+    end do
+end if
+
+! print*,'F3(500)',F3(500)
+! print*,'F4(500,3)',F4(500,3)
+
+! stop
 
 ! more optimisation
 allocate(F5(1:size(Face2,1),1:boundingBoxFSize))
@@ -461,76 +490,80 @@ do i = 1, size(Face2,1)
     end if
 end do
 
-do m = 1, size(Face2,1) ! for each facet m
-    if(is_vis(m) .eq. .false.) then ! if facet isnt visible
-        ! do nothing
-    else
-        if(rotatedapertureNormals(apertures(m),3) .gt. -0.01) then ! if aperture is downfacing
-            is_vis(m) = .false. ! set not visible
-        else ! if aperture was facing towards incidence
-            BB = F3(m) ! get bounding box ID
-            do j = 1, size(Face2,1) ! for each potentially blocking facet j
-                ! if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
-                ! if(F4(j,1) .eq. BB .or. F4(j,2) .eq. BB .or. F4(j,3) .eq. BB) then ! 
-                if(F5(j,BB)) then ! 
-                ! if(any(F4(j,1:3)) .eq. BB) then ! if blocker was in fuzzy bounding box
-                    if(j .ne. m) then ! ignore self-block and downfacing
-                        ! if(F4(j,1) .ne. BB .and. F4(j,2) .ne. BB .and. F4(j,3) .ne. BB) then ! 
-                        if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
-                        ! if(any((/F4(j,1) .eq. BB, F4(j,2) .eq. BB, F4(j,3) .eq. BB/))) then
-                            ! do nothing
-                        else
-                            if (rotatedMidpoints(m,3) .gt. rotatedMidpoints(j,3)) then ! if potential blocker was behind facet m
+if(is_multithreaded) then
+    !$OMP PARALLEL DEFAULT(SHARED) num_threads(omp_get_max_threads()) PRIVATE(j,k,m,BB,within_bounds,edge_norm1,edge_norm2,vecb1,vecb2,edge_check)
+    !$OMP DO
+    do m = 1, size(Face2,1) ! for each facet m
+        if(is_vis(m) .eq. .false.) then ! if facet isnt visible
+            ! do nothing
+        else
+            if(rotatedapertureNormals(apertures(m),3) .gt. -0.01) then ! if aperture is downfacing
+                is_vis(m) = .false. ! set not visible
+            else ! if aperture was facing towards incidence
+                BB = F3(m) ! get bounding box ID
+                do j = 1, size(Face2,1) ! for each potentially blocking facet j
+                    ! if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
+                    ! if(F4(j,1) .eq. BB .or. F4(j,2) .eq. BB .or. F4(j,3) .eq. BB) then ! 
+                    if(F5(j,BB)) then ! 
+                    ! if(any(F4(j,1:3)) .eq. BB) then ! if blocker was in fuzzy bounding box
+                        if(j .ne. m) then ! ignore self-block and downfacing
+                            ! if(F4(j,1) .ne. BB .and. F4(j,2) .ne. BB .and. F4(j,3) .ne. BB) then ! 
+                            if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
+                            ! if(any((/F4(j,1) .eq. BB, F4(j,2) .eq. BB, F4(j,3) .eq. BB/))) then
                                 ! do nothing
-                            else ! if potential blocker was in front of facet m
-                                ! do bounded surface edge check
-                                within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
-                                do k = 1, 3 ! looping over vertices of potentially blocking facet j
-                                    ! compute edge normal
-                                    if(k .eq. 3) then
-                                        edge_norm2 = -rotatedVert(Face1(j,1),1) + rotatedVert(Face1(j,3),1) ! cross product of edge vector with reverse beam direction
-                                        edge_norm1 = rotatedVert(Face1(j,1),2) - rotatedVert(Face1(j,3),2)
+                            else
+                                if (rotatedMidpoints(m,3) .gt. rotatedMidpoints(j,3)) then ! if potential blocker was behind facet m
+                                    ! do nothing
+                                else ! if potential blocker was in front of facet m
+                                    ! do bounded surface edge check
+                                    within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
+                                    do k = 1, 3 ! looping over vertices of potentially blocking facet j
+                                        ! compute edge normal
+                                        if(k .eq. 3) then
+                                            edge_norm2 = -rotatedVert(Face1(j,1),1) + rotatedVert(Face1(j,3),1) ! cross product of edge vector with reverse beam direction
+                                            edge_norm1 = rotatedVert(Face1(j,1),2) - rotatedVert(Face1(j,3),2)
+                                        else
+                                            edge_norm2 = -rotatedVert(Face1(j,k+1),1) + rotatedVert(Face1(j,k),1)
+                                            edge_norm1 = rotatedVert(Face1(j,k+1),2) - rotatedVert(Face1(j,k),2)
+                                        end if
+                                        vecb1 = rotatedMidpoints(m,1) - rotatedVert(Face1(j,k),1) ! vector from vertex k of potential blocker j to centroid of facet m
+                                        vecb2 = rotatedMidpoints(m,2) - rotatedVert(Face1(j,k),2)
+                                        ! edge_norm1 = edge_vec2
+                                        ! edge_norm2 = -edge_vec1
+                                        ! nf = sqrt(edge_norm1**2 + edge_norm2**2) ! probably dont even need this step
+                                        ! edge_norm1 = edge_norm1 / nf ! can confirm dont need this, saves 16% time of beam loop
+                                        ! edge_norm2 = edge_norm2 / nf
+                                        edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B
+                                        if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
+                                    end do
+                                    if(within_bounds .eq. .false.) then ! if facet m is not within bounded surface of facet j
+                                        !do nothing
                                     else
-                                        edge_norm2 = -rotatedVert(Face1(j,k+1),1) + rotatedVert(Face1(j,k),1)
-                                        edge_norm1 = rotatedVert(Face1(j,k+1),2) - rotatedVert(Face1(j,k),2)
-                                    end if
-                                    vecb1 = rotatedMidpoints(m,1) - rotatedVert(Face1(j,k),1) ! vector from vertex k of potential blocker j to centroid of facet m
-                                    vecb2 = rotatedMidpoints(m,2) - rotatedVert(Face1(j,k),2)
-                                    ! edge_norm1 = edge_vec2
-                                    ! edge_norm2 = -edge_vec1
-                                    ! nf = sqrt(edge_norm1**2 + edge_norm2**2) ! probably dont even need this step
-                                    ! edge_norm1 = edge_norm1 / nf ! can confirm dont need this, saves 16% time of beam loop
-                                    ! edge_norm2 = edge_norm2 / nf
-                                    edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B
-                                    if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
-                                end do
-                                if(within_bounds .eq. .false.) then ! if facet m is not within bounded surface of facet j
-                                    !do nothing
-                                else
-                                    if(is_beam(j)) then ! if facet j was part of the illuminating surface
-                                        if(in_beam(m)) then ! if a blocking beam facet had already been found
-                                            ! check to see which is the closest
-                                            if(rotatedMidpoints(j,3) .gt. rotatedMidpoints(id_beam(m),3)) then ! if facet j was closer than the previous blocker
+                                        if(is_beam(j)) then ! if facet j was part of the illuminating surface
+                                            if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                ! check to see which is the closest
+                                                if(rotatedMidpoints(j,3) .gt. rotatedMidpoints(id_beam(m),3)) then ! if facet j was closer than the previous blocker
+                                                    in_beam(m) = .true. ! set to be within beam
+                                                    id_beam(m) = j ! record the blocking facet
+                                                    dist_beam(m) = rotatedMidpoints(j,3) - rotatedMidpoints(m,3) ! record the distance from centroid of blocker to centroid of facet m
+                                                else
+                                                    ! do nothing                                     
+                                                end if
+                                            else ! if this is the first time finding a blocking beam facet
                                                 in_beam(m) = .true. ! set to be within beam
                                                 id_beam(m) = j ! record the blocking facet
                                                 dist_beam(m) = rotatedMidpoints(j,3) - rotatedMidpoints(m,3) ! record the distance from centroid of blocker to centroid of facet m
-                                            else
-                                                ! do nothing                                     
                                             end if
-                                        else ! if this is the first time finding a blocking beam facet
-                                            in_beam(m) = .true. ! set to be within beam
-                                            id_beam(m) = j ! record the blocking facet
-                                            dist_beam(m) = rotatedMidpoints(j,3) - rotatedMidpoints(m,3) ! record the distance from centroid of blocker to centroid of facet m
-                                        end if
-                                    else
-                                        if(apertures(m) .eq. apertures(j)) then ! if facet j and facet m belong to the same aperture
-                                            is_shad(m) = .true. ! set m as a shadow facet and continue to search Dfor blockers
-                                        else ! if facet j and facet m dont belong to the same aperture
-                                            if(in_beam(m)) then ! if a blocking beam facet had already been found
-                                                if(rotatedMidpoints(j,3) .gt. rotatedMidpoints(id_beam(m),3)) then ! if facet j was behind than the blocking beam
-                                                    ! do nothing
-                                                else
-                                                    is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                        else
+                                            if(apertures(m) .eq. apertures(j)) then ! if facet j and facet m belong to the same aperture
+                                                is_shad(m) = .true. ! set m as a shadow facet and continue to search Dfor blockers
+                                            else ! if facet j and facet m dont belong to the same aperture
+                                                if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                    if(rotatedMidpoints(j,3) .gt. rotatedMidpoints(id_beam(m),3)) then ! if facet j was behind than the blocking beam
+                                                        ! do nothing
+                                                    else
+                                                        is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                    end if
                                                 end if
                                             end if
                                         end if
@@ -539,11 +572,98 @@ do m = 1, size(Face2,1) ! for each facet m
                             end if
                         end if
                     end if
-                end if
-            end do
+                end do
+            end if
         end if
-    end if
-end do
+    end do
+    !$OMP END PARALLEL
+else
+    do m = 1, size(Face2,1) ! for each facet m
+        if(is_vis(m) .eq. .false.) then ! if facet isnt visible
+            ! do nothing
+        else
+            if(rotatedapertureNormals(apertures(m),3) .gt. -0.01) then ! if aperture is downfacing
+                is_vis(m) = .false. ! set not visible
+            else ! if aperture was facing towards incidence
+                BB = F3(m) ! get bounding box ID
+                do j = 1, size(Face2,1) ! for each potentially blocking facet j
+                    ! if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
+                    ! if(F4(j,1) .eq. BB .or. F4(j,2) .eq. BB .or. F4(j,3) .eq. BB) then ! 
+                    if(F5(j,BB)) then ! 
+                    ! if(any(F4(j,1:3)) .eq. BB) then ! if blocker was in fuzzy bounding box
+                        if(j .ne. m) then ! ignore self-block and downfacing
+                            ! if(F4(j,1) .ne. BB .and. F4(j,2) .ne. BB .and. F4(j,3) .ne. BB) then ! 
+                            if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
+                            ! if(any((/F4(j,1) .eq. BB, F4(j,2) .eq. BB, F4(j,3) .eq. BB/))) then
+                                ! do nothing
+                            else
+                                if (rotatedMidpoints(m,3) .gt. rotatedMidpoints(j,3)) then ! if potential blocker was behind facet m
+                                    ! do nothing
+                                else ! if potential blocker was in front of facet m
+                                    ! do bounded surface edge check
+                                    within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
+                                    do k = 1, 3 ! looping over vertices of potentially blocking facet j
+                                        ! compute edge normal
+                                        if(k .eq. 3) then
+                                            edge_norm2 = -rotatedVert(Face1(j,1),1) + rotatedVert(Face1(j,3),1) ! cross product of edge vector with reverse beam direction
+                                            edge_norm1 = rotatedVert(Face1(j,1),2) - rotatedVert(Face1(j,3),2)
+                                        else
+                                            edge_norm2 = -rotatedVert(Face1(j,k+1),1) + rotatedVert(Face1(j,k),1)
+                                            edge_norm1 = rotatedVert(Face1(j,k+1),2) - rotatedVert(Face1(j,k),2)
+                                        end if
+                                        vecb1 = rotatedMidpoints(m,1) - rotatedVert(Face1(j,k),1) ! vector from vertex k of potential blocker j to centroid of facet m
+                                        vecb2 = rotatedMidpoints(m,2) - rotatedVert(Face1(j,k),2)
+                                        ! edge_norm1 = edge_vec2
+                                        ! edge_norm2 = -edge_vec1
+                                        ! nf = sqrt(edge_norm1**2 + edge_norm2**2) ! probably dont even need this step
+                                        ! edge_norm1 = edge_norm1 / nf ! can confirm dont need this, saves 16% time of beam loop
+                                        ! edge_norm2 = edge_norm2 / nf
+                                        edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B
+                                        if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
+                                    end do
+                                    if(within_bounds .eq. .false.) then ! if facet m is not within bounded surface of facet j
+                                        !do nothing
+                                    else
+                                        if(is_beam(j)) then ! if facet j was part of the illuminating surface
+                                            if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                ! check to see which is the closest
+                                                if(rotatedMidpoints(j,3) .gt. rotatedMidpoints(id_beam(m),3)) then ! if facet j was closer than the previous blocker
+                                                    in_beam(m) = .true. ! set to be within beam
+                                                    id_beam(m) = j ! record the blocking facet
+                                                    dist_beam(m) = rotatedMidpoints(j,3) - rotatedMidpoints(m,3) ! record the distance from centroid of blocker to centroid of facet m
+                                                else
+                                                    ! do nothing                                     
+                                                end if
+                                            else ! if this is the first time finding a blocking beam facet
+                                                in_beam(m) = .true. ! set to be within beam
+                                                id_beam(m) = j ! record the blocking facet
+                                                dist_beam(m) = rotatedMidpoints(j,3) - rotatedMidpoints(m,3) ! record the distance from centroid of blocker to centroid of facet m
+                                            end if
+                                        else
+                                            if(apertures(m) .eq. apertures(j)) then ! if facet j and facet m belong to the same aperture
+                                                is_shad(m) = .true. ! set m as a shadow facet and continue to search Dfor blockers
+                                            else ! if facet j and facet m dont belong to the same aperture
+                                                if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                    if(rotatedMidpoints(j,3) .gt. rotatedMidpoints(id_beam(m),3)) then ! if facet j was behind than the blocking beam
+                                                        ! do nothing
+                                                    else
+                                                        is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                    end if
+                                                end if
+                                            end if
+                                        end if
+                                    end if
+                                end if
+                            end if
+                        end if
+                    end if
+                end do
+            end if
+        end if
+    end do
+end if
+
+
 
 ! counter = 0
 ! do j = 1, size(Face2,1)
@@ -745,7 +865,8 @@ subroutine beam_scan(   aperturePropagationVectors, apertureMidpoints, apertureN
                         beamIDs_ps, distances_ps, &
                         vk71, vk72, vk73, ampl, &
                         rotatedVert, rotatedNorm, &
-                        is_shad)
+                        is_shad, &
+                        is_multithreaded)
 
 real(8), dimension(:,:), allocatable, intent(in) :: aperturePropagationVectors
 real(8), dimension(:,:), allocatable, intent(in) :: apertureMidpoints ! the midpoint of each aperture
@@ -782,6 +903,7 @@ logical, dimension(:), allocatable, intent(out) :: is_shad
 logical, dimension(:), allocatable :: in_beam
 integer(8), dimension(:), allocatable :: id_beam
 real(8), dimension(:), allocatable :: dist_beam
+logical, intent(in) :: is_multithreaded
 
 integer k
 
@@ -944,7 +1066,8 @@ call find_vis(  aperture_id, rotatedVert, Face1, Face2, &
                 isWithinBeam, apertures, &
                 rotatedMidpoints, rotatedNorm, &
                 in_beam, dist_beam, id_beam, is_shad, &
-                beamV, beamF1, rotatedapertureNormals)
+                beamV, beamF1, rotatedapertureNormals, &
+                is_multithreaded)
 
 isWithinBeam2_ps = in_beam
 distances_ps = dist_beam
@@ -1053,7 +1176,8 @@ subroutine beam_recursion(  sufficientlyIlluminated, &
                             refl_ampl_out11_2, refl_ampl_out12_2, refl_ampl_out21_2, refl_ampl_out22_2, &
                             vk71Int2 ,vk72Int2, vk73Int2, &
                             vk121Int ,vk122Int, vk123Int, &
-                            FInt)
+                            FInt, &
+                            is_multithreaded)
 
 ! monster subroutine for the inner part of each beam recursion
 
@@ -1082,6 +1206,7 @@ complex(8), dimension(:,:), allocatable, intent(out) :: refl_ampl_out11_2, refl_
 real(8), dimension(:,:), allocatable, intent(out) :: vk71Int2, vk72Int2, vk73Int2
 real(8), dimension(:,:), allocatable, intent(out) :: vk121Int ,vk122Int, vk123Int
 integer(8), dimension(:,:), allocatable, intent(out) :: FInt
+logical, intent(in) :: is_multithreaded
 
 ! integer(8) maxIlluminatedFacets ! counts the maximum number of facets illuminated across all illuminating apertures
 integer(8) maxIlluminatedFacets_ps ! counts the maximum number of facets illuminated across all illuminating apertures (including shadow)
@@ -1168,7 +1293,8 @@ do i = 1, num_sufficiently_illuminated_apertures
                     beamIDs_ps, distances_ps, &
                     vk71, vk72, vk73, ampl, &
                     rotatedVert, rotatedNorm, &
-                    isShadow) 
+                    isShadow, &
+                    is_multithreaded) 
 end do
 
 ! print*,'total new illuminated apertures: ',totalIlluminatedApertures
@@ -1258,7 +1384,8 @@ do i = 1, num_sufficiently_illuminated_apertures
                     beamIDs_ps, distances_ps, &
                     vk71, vk72, vk73, ampl, &
                     rotatedVert, rotatedNorm, &
-                    isShadow)
+                    isShadow, &
+                    is_multithreaded)
 
     ! print*,'real(beam_ampl(1,1,1))',real(beam_ampl(1,1,1))
 
@@ -1498,7 +1625,8 @@ subroutine internal_recursion_outer(F1Mapping, &
                                     vk71Int, vk72Int, vk73Int, &
                                     beam_outbeam_tree, beam_outbeam_tree_counter, &
                                     refl_ampl_out11Int, refl_ampl_out12Int, refl_ampl_out21Int, refl_ampl_out22Int, &
-                                    interactionCounter)
+                                    interactionCounter, &
+                                    is_multithreaded)
 
 ! monster subroutine for the outer part of each beam recursion
 ! vk71, vk72, and vk73 appear to have errors and have been incorrectly implemented (also in Matlab code)
@@ -1526,6 +1654,7 @@ complex(8), dimension(:,:), allocatable, intent(inout) :: refl_ampl_out12Int ! n
 complex(8), dimension(:,:), allocatable, intent(inout) :: refl_ampl_out21Int ! needs renaming
 complex(8), dimension(:,:), allocatable, intent(inout) :: refl_ampl_out22Int ! needs renaming
 integer(8), intent(inout) :: interactionCounter ! counts the current number of interactions
+logical, intent(in) :: is_multithreaded
 
 real(8), dimension(:,:,:), allocatable :: propagationVectors2
 real(8), dimension(:,:,:), allocatable :: propagationVectors3
@@ -1616,7 +1745,8 @@ do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previo
                             refl_ampl_out11_2, refl_ampl_out12_2, refl_ampl_out21_2, refl_ampl_out22_2, &
                             vk71Int2 ,vk72Int2, vk73Int2, &
                             vk121Int2 ,vk122Int2, vk123Int2, &
-                            FInt2)   
+                            FInt2, &
+                            is_multithreaded)   
 
 
     ! sort interactionOut array - bit messy but seems to do the job
