@@ -357,7 +357,7 @@ logical, dimension(:), allocatable, intent(out) :: is_shad
 real(8), dimension(:,:), allocatable, intent(in) :: beamV
 integer(8), dimension(:,:), allocatable, intent(in) :: beamF1 ! face vertex IDs
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
-logical, intent(in) :: is_multithreaded
+logical, intent(inout) :: is_multithreaded
 
 integer i, j, k, m
 logical, dimension(:), allocatable :: is_beam
@@ -396,6 +396,8 @@ allocate(F4(1:size(Face1,1),1:3)) ! array to hold index of fuzzy bounding box th
 boundingBoxFSize = size(boundingBoxF,1) ! number of bounding box faces
 allocate(distanceToBB(1:boundingBoxFSize)) ! array to hold the distance of a given vertex to each bounding box
 allocate(distanceToFuzzyBB(1:boundingBoxFSize)) ! array to hold the distance of a given vertex to each bounding box
+
+is_multithreaded = .false. ! disable multithreading for now...
 
 ! find which bounding box each vertex belongs to
 if(is_multithreaded) then
