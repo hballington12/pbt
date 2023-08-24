@@ -357,7 +357,9 @@ logical, dimension(:), allocatable, intent(out) :: is_shad
 real(8), dimension(:,:), allocatable, intent(in) :: beamV
 integer(8), dimension(:,:), allocatable, intent(in) :: beamF1 ! face vertex IDs
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
-logical, intent(inout) :: is_multithreaded
+logical, intent(in) :: is_multithreaded
+
+logical, am_i_multithreaded
 
 integer i, j, k, m
 logical, dimension(:), allocatable :: is_beam
@@ -397,10 +399,11 @@ boundingBoxFSize = size(boundingBoxF,1) ! number of bounding box faces
 allocate(distanceToBB(1:boundingBoxFSize)) ! array to hold the distance of a given vertex to each bounding box
 allocate(distanceToFuzzyBB(1:boundingBoxFSize)) ! array to hold the distance of a given vertex to each bounding box
 
-is_multithreaded = .false. ! disable multithreading for now...
+am_i_multithreaded = is_multithreaded
+am_i_multithreaded = .false. ! disable multithreading for now...
 
 ! find which bounding box each vertex belongs to
-if(is_multithreaded) then
+if(am_i_multithreaded) then
     !$OMP PARALLEL DEFAULT(SHARED) num_threads(omp_get_max_threads()) PRIVATE(i,j,distanceToBB,distanceToFuzzyBB)
     !$OMP DO
     do i = 1, size(Face1,1) ! for each face
@@ -492,7 +495,7 @@ do i = 1, size(Face2,1)
     end if
 end do
 
-if(is_multithreaded) then
+if(am_i_multithreaded) then
     !$OMP PARALLEL DEFAULT(SHARED) num_threads(omp_get_max_threads()) PRIVATE(j,k,m,BB,within_bounds,edge_norm1,edge_norm2,vecb1,vecb2,edge_check)
     !$OMP DO
     do m = 1, size(Face2,1) ! for each facet m
