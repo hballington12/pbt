@@ -359,7 +359,7 @@ integer(8), dimension(:,:), allocatable, intent(in) :: beamF1 ! face vertex IDs
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
 logical, intent(in) :: is_multithreaded
 
-logical, am_i_multithreaded
+logical am_i_multithreaded
 
 integer i, j, k, m
 logical, dimension(:), allocatable :: is_beam
