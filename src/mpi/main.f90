@@ -57,7 +57,7 @@ character(100) job_name ! name of job
 integer(8) offs(1:2) ! off values, used if off rotation method
 real(8) eulers(1:3) ! euler angles, used if euler rotation method
 type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
-
+type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
 integer(8) num_vert ! number of unique vertices
@@ -122,29 +122,12 @@ print*,'========== start main'
 start = omp_get_wtime()
 call seed(99)
 
-call parse_command_line(cfn,                & ! particle filename
-                        cft,                & ! particle file type
-                        afn,                & ! apertures filename
-                        la,                 & ! wavelength
-                        rbi,                & ! real refractive index
-                        ibi,                & ! imaginary refractive index
-                        rec,                & ! number of beam recursions
-                        rot_method,         & ! rotation method
-                        is_multithreaded,   & ! is multithreaded?
-                        num_orients,        & ! number of orientations
-                        intellirot,         & ! intelligent rotation angles
-                        c_method,           & ! particle input method
-                        job_name,           & ! job name
-                        eulers,             & ! euler angles, used if euler rotation method
-                        offs,               & ! off values, used if off rotation method
-                        cc_hex_params,      & ! parameters for C. Collier hexagons
-                        theta_vals,         & ! far-field theta values to evaluate at
-                        phi_vals)           ! far-field theta values to evaluate at
+call parse_command_line(job_params)
 
 ! setting up job directory
 ! rank 0 process broadcasts job directory to other processes
 if (my_rank .eq. 0) then
-    call make_dir(job_name,output_dir)
+    call make_dir(job_params%job_name,output_dir)
     print*,'output directory is "',trim(output_dir),'"'
     result = makedirqq(trim(output_dir)//"/logs") ! make directory for logs
     ! print*,'sending...'
@@ -163,36 +146,19 @@ open(101,file=trim(my_log_dir)) ! open global non-standard log file for importan
 
 ! ############# input_mod #############
 ! write job parameters to log file
-call write_job_params(  cfn,                & ! particle filename
-                        cft,                & ! particle file type
-                        afn,                & ! apertures filename
-                        la,                 & ! wavelength
-                        rbi,                & ! real refractive index
-                        ibi,                & ! imaginary refractive index
-                        rec,                & ! number of beam recursions
-                        rot_method,         & ! rotation method
-                        is_multithreaded,   & ! is multithreaded?
-                        num_orients,        & ! number of orientations
-                        intellirot,         & ! intelligent rotation angles
-                        c_method,           & ! particle input method
-                        my_log_dir,         & ! output directory
-                        cc_hex_params)        ! parameters for C. Collier hexagons
-
+call write_job_params(job_params)
 
 ! get input particle information
-call PDAL2( ifn,            & ! <-  input filename
-            c_method,       & ! <-  method of particle file input
-            num_vert,       & !  -> number of unique vertices
+call PDAL2( num_vert,       & !  -> number of unique vertices
             num_face,       & !  -> number of faces
             face_ids,       & !  -> face vertex IDs
             vert_in,        & !  -> unique vertices
             num_face_vert,  & !  -> number of vertices in each face
             afn,            & !  ->  apertures filename
             apertures,      &
-            cc_hex_params,  &
-            cft,            &
-            cfn)
+            job_params)
 
+num_orients = job_params%num_orients 
 n1 = int(num_orients / p)
 n2 = mod(num_orients,  p)
 my_start = my_rank*(n1+1)+1
@@ -208,7 +174,10 @@ allocate(beta_vals(1:num_orients))
 allocate(gamma_vals(1:num_orients))
 
 if (my_rank .eq. 0) then
-    call init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
+    call init_loop( alpha_vals, &
+                    beta_vals, &
+                    gamma_vals, &
+                    job_params)
     do dest = 1, p-1
         call MPI_SEND(alpha_vals,size(alpha_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(beta_vals,size(beta_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
@@ -222,26 +191,22 @@ end if
 
 if (my_rank .eq. 0) then
     ! write unrotated particle to file (optional)            
-    call PDAS(  vert_in,       & ! <-  rotated vertices
-    face_ids,   & ! <-  face vertex IDs
-    output_dir, & ! <-  output directory
-    "unrotated")    ! <-  filename
+    call PDAS(  vert_in,        & ! <-  rotated vertices
+                face_ids,       & ! <-  face vertex IDs
+                output_dir,     & ! <-  output directory
+                "unrotated")      ! <-  filename
 end if
 
 do i = my_start, my_end  
 
     ! rotate particle
-    call PROT_MPI(  ifn,        & ! <-  input filename
-                    rot_method, & ! <-  particle rotation method
-                    vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
+    call PROT_MPI(  vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
                     vert,       &
                     alpha_vals, &
                     beta_vals,  &
                     gamma_vals, &
                     i,          &
-                    num_orients,&
-                    eulers,     &
-                    offs)
+                    job_params)
  
     if(my_end-my_start .gt. 1) then ! num_orients -> my_end-my_start+1, i -> i-my_start+1
         print'(A15,I8,A3,I8,A20,f8.4,A3)','my orientation: ',i-my_start+1,' / ',my_end-my_start+1,' (my progress: ',dble(i-my_start)/dble(my_end-my_start+1)*100,' %)'
@@ -268,11 +233,7 @@ do i = my_start, my_end
     ! beam loop
     call beam_loop( face_ids,                  & ! <-  face vertex IDs
                     vert,                      & ! <-  unique vertices
-                    la,                        & ! <-  wavelength
-                    rbi,                       & ! <-  real part of the refractive index
-                    ibi,                       & ! <-  imaginary part of the refractive index
                     apertures,                 & ! <-  apertures
-                    rec,                       & ! <-  max number of internal beam recursions
                     beamV,                     & ! <-  beam vertices
                     beamF1,                    & ! <-  beam face vertex indices
                     beamN,                     & ! <-  beam normals
@@ -286,24 +247,21 @@ do i = my_start, my_end
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
-                    is_multithreaded)            ! <-  enable or disable multithreading
+                    job_params)
 
     ! diffraction
     call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & ! <-  counts the current number of beam outbeams
-                    la,                        & ! <-  wavelength
                     ampl_far_beam11,           & !  -> amplitude matrix (1,1) due to beam diffraction
                     ampl_far_beam12,           & !  -> amplitude matrix (1,2) due to beam diffraction
                     ampl_far_beam21,           & !  -> amplitude matrix (2,1) due to beam diffraction
                     ampl_far_beam22,           & !  -> amplitude matrix (2,2) due to beam diffraction
-                    theta_vals,                & !  <- theta values
-                    phi_vals,                  & !  <- phi values
                     ext_diff_outbeam_tree,     & ! <-  outgoing beams from external diffraction
                     ampl_far_ext_diff11,       & !  -> amplitude matrix (1,1) due to external diffraction
                     ampl_far_ext_diff12,       & !  -> amplitude matrix (1,2) due to external diffraction
                     ampl_far_ext_diff21,       & !  -> amplitude matrix (2,1) due to external diffraction
                     ampl_far_ext_diff22,       & !  -> amplitude matrix (2,2) due to external diffraction
-                    is_multithreaded)            ! <-  enable or disable multithreading
+                    job_params)
 
     call finalise(  ampl_far_beam11,     & ! <-  amplitude matrix (1,1) due to beam diffraction
                     ampl_far_beam12,     & ! <-  amplitude matrix (1,2) due to beam diffraction
@@ -313,19 +271,17 @@ do i = my_start, my_end
                     ampl_far_ext_diff12, & ! <-  amplitude matrix (1,2) due to external diffraction
                     ampl_far_ext_diff21, & ! <-  amplitude matrix (2,1) due to external diffraction
                     ampl_far_ext_diff22, & ! <-  amplitude matrix (2,2) due to external diffraction
-                    theta_vals,          & ! <-  theta values
-                    phi_vals,            & ! <-  phi values
                     energy_out_beam,     & ! <-  total energy out from beams (before diffraction)
                     energy_out_ext_diff, & ! <-  total energy out from external diffraction (before diffraction)
                     mueller,             & !  -> 2d mueller matrix
                     mueller_1d,          & !  -> 1d mueller matrix
-                    la,                  & ! <-  wavelength (for optical theorem)
                     energy_abs_beam,     & ! <-  energy absorbed within the particle
-                    output_parameters)     !  -> some output parameters
+                    output_parameters,   & !  -> some output parameters
+                    job_params)
 
     ! call writeup(mueller, mueller_1d, theta_vals, phi_vals) ! write current mueller to file
 
-                    call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
+    call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
 end do
 
@@ -394,8 +350,8 @@ if (my_rank .eq. 0) then
     output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / num_orients
 
     ! writing to file
-    call write_outbins(output_dir,theta_vals,phi_vals)
-    call writeup(mueller_total, mueller_1d_total, theta_vals, phi_vals, output_dir, output_parameters_total) ! write to file
+    call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
+    call writeup(mueller_total, mueller_1d_total, job_params%theta_vals, job_params%phi_vals, output_dir, output_parameters_total) ! write to file
 
     finish = omp_get_wtime()
     print*,'=========='

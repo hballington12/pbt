@@ -40,6 +40,28 @@ type output_parameters_type ! type for hold various output paramters
 	real(8) geo_cross_sec ! illuminated geometric cross section
 end type output_parameters_type 
 
+type job_parameters_type
+	character(100) cfn ! crystal filename
+	character(100) cft ! crystal file type
+	character(100) afn ! apertures filename
+	real(8) la ! wavelength
+	real(8) rbi ! real part of the refractive index
+	real(8) ibi ! imaginary part of the refractive index
+	integer rec ! max number of internal beam recursions
+	character(100) rot_method ! rotation method
+	logical is_multithreaded ! whether or not code should use multithreading
+	integer num_orients ! number of orientations
+	logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+	character(100) c_method ! method of particle file input
+	character(100) job_name ! name of job
+	integer(8)  offs(1:2)
+	real(8)  eulers(1:3)
+	type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+	real(8), dimension(:), allocatable :: theta_vals
+	real(8), dimension(:), allocatable :: phi_vals
+
+end type job_parameters_type
+
 contains
 
 end module types_mod

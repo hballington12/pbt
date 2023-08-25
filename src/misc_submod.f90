@@ -13,37 +13,40 @@ real(8), parameter, public :: pi = 3.14159265358979
 
 contains
 
-subroutine write_job_params(cfn,                & ! particle filename
-                            cft,                & ! particle file type
-                            afn,                & ! apertures filename
-                            la,                 & ! wavelength
-                            rbi,                & ! real refractive index
-                            ibi,                & ! imaginary refractive index
-                            rec,                & ! number of beam recursions
-                            rot_method,         & ! rotation method
-                            is_multithreaded,   & ! is multithreaded?
-                            num_orients,        & ! number of orientations
-                            intellirot,         & ! intelligent rotation angles
-                            c_method,           & ! particle input method
-                            job_name,           & ! job name
-                            cc_hex_params)        ! parameters for C. Collier hexagons
+subroutine write_job_params(job_params)
 
-character(100), intent(in) :: cfn ! crystal filename
-character(100), intent(in) :: cft ! crystal file type
-character(100), intent(in) :: afn ! apertures filename
-real(8), intent(in) :: la ! wavelength
-real(8), intent(in) :: rbi ! real part of the refractive index
-real(8), intent(in) :: ibi ! imaginary part of the refractive index
-integer, intent(in) :: rec ! max number of internal beam recursions
-character(100), intent(in) :: rot_method ! rotation method
-logical, intent(in) :: is_multithreaded ! whether or not code should use multithreading
-integer, intent(in) :: num_orients ! number of orientations
-logical, intent(in) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
-character(100), intent(in) :: c_method ! method of particle file input
-character(255), intent(in) :: job_name ! name of job / output directory
-type(cc_hex_params_type), intent(in) :: cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+character(100) cfn ! crystal filename
+character(100) cft ! crystal file type
+character(100) afn ! apertures filename
+real(8) la ! wavelength
+real(8) rbi ! real part of the refractive index
+real(8) ibi ! imaginary part of the refractive index
+integer rec ! max number of internal beam recursions
+character(100) rot_method ! rotation method
+logical is_multithreaded ! whether or not code should use multithreading
+integer num_orients ! number of orientations
+logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+character(100) c_method ! method of particle file input
+character(255) job_name ! name of job / output directory
+type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
     
 integer i
+
+cfn = job_params%cfn
+cft = job_params%cft
+afn = job_params%afn
+la = job_params%la
+rbi = job_params%rbi
+ibi = job_params%ibi
+rec = job_params%rec
+rot_method = job_params%rot_method
+is_multithreaded = job_params%is_multithreaded
+num_orients = job_params%num_orients
+intellirot = job_params%intellirot
+c_method = job_params%c_method
+job_name = job_params%job_name
+cc_hex_params = job_params%cc_hex_params
 
     write(101,*),'======================================================'
     write(101,*),'=====================JOB SETTINGS====================='

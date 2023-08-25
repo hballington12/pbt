@@ -715,29 +715,27 @@ module diff_mod
     
     subroutine diff_main(   beam_outbeam_tree,          & ! tree of outgoing beams
                             beam_outbeam_tree_counter,  & ! total number of outoing beams in beam tree
-                            lambda,                     & ! wavelength
                             ampl_far_beam11,            & ! far-field diffracted beam amplitude matrix (1,1)
                             ampl_far_beam12,            & ! far-field diffracted beam amplitude matrix (1,2)
                             ampl_far_beam21,            & ! far-field diffracted beam amplitude matrix (2,1)
                             ampl_far_beam22,            & ! far-field diffracted beam amplitude matrix (2,2)
-                            theta_vals,                 & ! theta values (in rad)
-                            phi_vals,                   & ! phi values (in rad)
                             ext_diff_outbeam_tree,      & ! tree of outgoing external diffraction beams
                             ampl_far_ext_diff11,        & ! far-field external diffraction amplitude matrix (1,1)
                             ampl_far_ext_diff12,        & ! far-field external diffraction amplitude matrix (1,2)
                             ampl_far_ext_diff21,        & ! far-field external diffraction amplitude matrix (2,1)
                             ampl_far_ext_diff22,        & ! far-field external diffraction amplitude matrix (2,2)
-                            is_multithreaded)             ! whether multithreaded diffraction should be enabled
+                            job_params)
     
         ! sr diff_main is the main shell for diffraction of all beams + external diffraction at a fixed orientation
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
-    real(8), intent(in) :: lambda ! wavelength
-    real(8), dimension(:), allocatable, intent(in) :: theta_vals
-    real(8), dimension(:), allocatable, intent(in) :: phi_vals
+    real(8) lambda ! wavelength
+    real(8), dimension(:), allocatable :: theta_vals
+    real(8), dimension(:), allocatable :: phi_vals
     real(8), dimension(:,:), allocatable :: xfar, yfar, zfar ! far-field bin positions
-    logical, intent(in) :: is_multithreaded
+    logical is_multithreaded
+    type(job_parameters_type), intent(in) :: job_params
     integer j
     complex(8), dimension(:,:), allocatable, intent(out) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! total
     complex(8), dimension(:,:), allocatable, intent(out) :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! total
@@ -753,6 +751,11 @@ module diff_mod
     integer progressInt 
 
     start = omp_get_wtime()
+
+    lambda = job_params%la
+    theta_vals = job_params%theta_vals
+    phi_vals = job_params%phi_vals
+    is_multithreaded = job_params%is_multithreaded
 
     call make_far_field_bins(xfar,yfar,zfar,theta_vals,phi_vals) ! get meshgrid-style far-field bins x, y, z
 

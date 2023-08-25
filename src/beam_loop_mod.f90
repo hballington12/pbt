@@ -104,19 +104,31 @@ subroutine energy_checks(   beam_outbeam_tree, &
 
 end subroutine
 
-subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
-    beamV, beamF1, beamN, beamF2, beamMidpoints, ampl_beam, &
-    beam_outbeam_tree, beam_outbeam_tree_counter, ext_diff_outbeam_tree, &
-    energy_out_beam, energy_out_ext_diff,energy_abs_beam,output_parameters, &
-    is_multithreaded)
+subroutine beam_loop(   Face1, &
+                        verts, &
+                        apertures, &
+                        beamV, &
+                        beamF1, &
+                        beamN, &
+                        beamF2, &
+                        beamMidpoints, &
+                        ampl_beam, &
+                        beam_outbeam_tree, &
+                        beam_outbeam_tree_counter, &
+                        ext_diff_outbeam_tree, &
+                        energy_out_beam, &
+                        energy_out_ext_diff, &
+                        energy_abs_beam, &
+                        output_parameters, &
+                        job_params)
 
     ! main beam loop
 
     ! inputs
     integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
     real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
-    real(8), intent(in) :: la ! wavelength
-    real(8), intent(in) :: rbi, ibi ! real part of the refractive index
+    real(8) la ! wavelength
+    real(8) rbi, ibi ! real part of the refractive index
     ! character(100), intent(in) :: afn ! apertures filename
     real(8), allocatable, dimension(:,:), intent(in) :: beamV ! beam vertices
     real(8), allocatable, dimension(:,:), intent(in) :: beamN ! beam normals
@@ -124,12 +136,13 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     integer(8), allocatable, dimension(:,:), intent(in) :: beamF1 ! beam face vertex indices
     integer(8), allocatable, dimension(:), intent(in) :: beamF2 ! beam face normal indices
     complex(8), allocatable, dimension(:,:,:), intent(in) :: ampl_beam ! amplitude matrix of incident beam
-    integer, intent(in) :: rec ! max number of internal beam recursions
+    integer rec ! max number of internal beam recursions
     type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
     integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     type(output_parameters_type), intent(inout) :: output_parameters 
-    logical, intent(in) :: is_multithreaded ! whether or not code should use multithreading
+    logical is_multithreaded ! whether or not code should use multithreading
+    type(job_parameters_type), intent(in) :: job_params
 
     real(8), dimension(:,:), allocatable :: Norm ! face normals
     integer(8), dimension(:), allocatable :: Face2 ! face normal ID of each face
@@ -205,6 +218,12 @@ subroutine beam_loop(Face1, verts, la, rbi, ibi, apertures, rec, &
     real(8), intent(out) :: energy_out_ext_diff
 
     start = omp_get_wtime()
+
+    la = job_params%la
+    rbi = job_params%rbi
+    ibi = job_params%ibi
+    rec = job_params%rec
+    is_multithreaded = job_params%is_multithreaded
 
     call make_normals(Face1, verts, Face2, Norm) ! recalculate normals
 

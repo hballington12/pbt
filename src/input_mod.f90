@@ -95,24 +95,7 @@ subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_count
     ! stop
     end subroutine
 
-subroutine parse_command_line(  cfn,                & ! particle filename
-                                cft,                & ! particle file type
-                                afn,                & ! apertures filename
-                                la,                 & ! wavelength
-                                rbi,                & ! real refractive index
-                                ibi,                & ! imaginary refractive index
-                                rec,                & ! number of beam recursions
-                                rot_method,         & ! rotation method
-                                is_multithreaded,   & ! is multithreaded?
-                                num_orients,        & ! number of orientations
-                                intellirot,         & ! intelligent rotation angles
-                                c_method,           & ! particle input method
-                                job_name,           & ! job name
-                                eulers,             & ! euler angles, used if euler rotation method
-                                offs,               & ! off values, used if off rotation method
-                                cc_hex_params,      & ! parameters for C. Collier hexagons
-                                theta_vals,         & ! far-field theta values to evaluate at
-                                phi_vals)           ! far-field theta values to evaluate at
+subroutine parse_command_line(job_params)
 
 integer i, j
 character(len=255) :: arg ! a command line argument
@@ -125,23 +108,25 @@ integer theta_vals_counter, theta_splits_counter
 integer phi_vals_counter, phi_splits_counter
 
 ! output variables
-character(100), intent(out) :: cfn ! crystal filename
-character(100), intent(out) :: cft ! crystal file type
-character(100), intent(out) :: afn ! apertures filename
-real(8), intent(out) :: la ! wavelength
-real(8), intent(out) :: rbi ! real part of the refractive index
-real(8), intent(out) :: ibi ! imaginary part of the refractive index
-integer, intent(out) :: rec ! max number of internal beam recursions
-character(100), intent(out) :: rot_method ! rotation method
-logical, intent(out) :: is_multithreaded ! whether or not code should use multithreading
-integer, intent(out) :: num_orients ! number of orientations
-logical, intent(out) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
-character(100), intent(out) :: c_method ! method of particle file input
-character(100), intent(out) :: job_name ! name of job
-integer(8), intent(out) ::  offs(1:2)
-real(8), intent(out) ::  eulers(1:3)
-type(cc_hex_params_type), intent(out) :: cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
-real(8), dimension(:), allocatable, intent(out) :: theta_vals, phi_vals
+character(100) cfn ! crystal filename
+character(100) cft ! crystal file type
+character(100) afn ! apertures filename
+real(8) la ! wavelength
+real(8) rbi ! real part of the refractive index
+real(8) ibi ! imaginary part of the refractive index
+integer rec ! max number of internal beam recursions
+character(100) rot_method ! rotation method
+logical is_multithreaded ! whether or not code should use multithreading
+integer num_orients ! number of orientations
+logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+character(100) c_method ! method of particle file input
+character(100) job_name ! name of job
+integer(8)  offs(1:2)
+real(8)  eulers(1:3)
+type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+real(8), dimension(:), allocatable :: theta_vals, phi_vals
+
+type(job_parameters_type), intent(out) :: job_params ! job parameters (see types_mod for more details)
 
 ! logicals to track required inputs
 logical found_la
@@ -680,6 +665,27 @@ else if (found_c_method .eq. .true.) then
     end if
 end if
 
+job_params%cfn = cfn
+job_params%cft = cft
+job_params%afn = afn
+job_params%la = la
+job_params%rbi = rbi
+job_params%ibi = ibi
+job_params%rec = rec
+job_params%rot_method = rot_method
+job_params%is_multithreaded = is_multithreaded
+job_params%num_orients = num_orients
+job_params%intellirot = intellirot
+job_params%c_method = c_method
+job_params%job_name = job_name
+job_params%offs = offs
+job_params%eulers = eulers
+job_params%cc_hex_params = cc_hex_params
+job_params%theta_vals = theta_vals
+job_params%phi_vals = phi_vals
+
+print*,'c_method: ',job_params%c_method
+
     end subroutine
 
 subroutine area_stats(face_areas)
@@ -717,17 +723,24 @@ write(101,*),'avg. facet area:     ',avg_area
 
 end subroutine
 
-subroutine init_loop(num_orients,alpha_vals,beta_vals,gamma_vals,intellirot)
+subroutine init_loop(   alpha_vals, &
+                        beta_vals, &
+                        gamma_vals, &
+                        job_params)
 
     ! subroutine to pick angles that will be looped over
 
-    integer, intent(in) :: num_orients ! number of orientations
-    logical, intent(in) :: intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+    integer num_orients ! number of orientations
+    logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
+    type(job_parameters_type), intent(in) :: job_params ! job parameters
     real(8), dimension(:), allocatable, intent(out) :: alpha_vals, beta_vals, gamma_vals
     integer(8) num_angles, leftover_angles
     real(8), allocatable, dimension(:) :: intelli_vals
     integer(8) i, j, k, counter
     real(8) spacing, rand
+
+    intellirot = job_params%intellirot
+    num_orients = job_params%num_orients
 
     allocate(alpha_vals(1:num_orients))
     allocate(beta_vals(1:num_orients))
@@ -1038,28 +1051,23 @@ subroutine PROT_CC(verts)
 
 end subroutine
 
-subroutine PROT_MPI(ifn,                & ! input filename (so we can read arguments from the "rot" line)
-                    rot_method,         & ! rotation method: "euler", "off", "none", "multi"
-                    verts,              & ! unrotated vertices
+subroutine PROT_MPI(verts,              & ! unrotated vertices
                     verts_rot,          & ! rotated vertices
                     alpha_vals,         & ! list of values for euler alpha angle in range 0 to 1 (for multirot only)
                     beta_vals,          & ! list of values for beta alpha angle in range 0 to 1 (for multirot only)
                     gamma_vals,         & ! list of values for gamma alpha angle in range 0 to 1 (for multirot only)
                     loop_index,         & ! current loop index that each process is on
-                    num_orients,        & ! total number of orientations for this process
-                    eulers,             &
-                    offs)
+                    job_params)
 
     ! rotates particle
     ! modified to ensure different mpi processes have different 
 
-    character(len=*), intent(in) :: ifn
-    character(100), intent(in) :: rot_method ! rotation method
+    character(100) rot_method ! rotation method
     real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
     real(8), dimension(:,:), allocatable, intent(out) :: verts_rot ! unique vertices    
     real(8), dimension(:), allocatable, intent(in) :: alpha_vals, beta_vals, gamma_vals
-    integer(8), intent(inout) :: offs(1:2)
-    real(8), intent(inout) :: eulers(1:3)
+    integer(8) offs(1:2)
+    real(8) eulers(1:3)
     real(8) vec(1:3) ! off rotation vector
     real(8) hilf0, hilf1
     real(8) rot1(1:3,1:3), rot2(1:3,1:3), rot(1:3,1:3)
@@ -1067,7 +1075,13 @@ subroutine PROT_MPI(ifn,                & ! input filename (so we can read argum
     real(8) s1, s2, s3, c1, c2, c3
     real(8) rand
     integer(8), intent(in) :: loop_index
-    integer, intent(in) ::  num_orients ! number of orientations
+    integer num_orients ! number of orientations
+    type(job_parameters_type), intent(in) :: job_params
+
+    rot_method = job_params%rot_method
+    num_orients = job_params%num_orients
+    eulers = job_params%eulers
+    offs = job_params%offs
 
     print*,'========== start sr PROT_MPI'
     write(101,*),'======================================================'
@@ -1696,18 +1710,14 @@ subroutine SDATIN(  ifn,                & ! input filename
     
 end subroutine
 
-subroutine PDAL2(   ifn,            &
-                    c_method,       &
-                    num_vert,       &
+subroutine PDAL2(   num_vert,       &
                     num_face,       &
                     face_ids,       &
                     verts,          &
                     num_face_vert,  &
                     afn,            &
                     apertures,      &
-                    cc_hex_params,  &
-                    cft,            &
-                    cfn)
+                    job_params)
 
 ! subroutine PDAL2 reads a file containing the particle geometry
 ! accepted file types: "obj" - .obj files, "mrt" - macke ray-tracing style
@@ -1726,8 +1736,8 @@ subroutine PDAL2(   ifn,            &
 !   where each row corresponds to each face and each column corresponds to the vertices in the face.
 !   A vertex ID is used to point to the row of the vertex in verts
         
-    character(len=100), intent(in) ::   cfn ! particle filename
-    character(len=100), intent(in) ::   cft ! particle filetype
+    character(len=100) cfn ! particle filename
+    character(len=100) cft ! particle filetype
     character(100), intent(in) ::  afn ! apertures filename
     integer(8), intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
     ! integer(8), intent(out) :: num_norm ! number of face normals
@@ -1737,10 +1747,10 @@ subroutine PDAL2(   ifn,            &
     ! real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices, face vertex IDs, face normals
     integer(8), dimension(:,:) ,allocatable :: face_ids_temp ! temporary array to hold face vertex IDs
     integer(8), dimension(:,:) ,allocatable, intent(out) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
-    character(100), intent(in) :: c_method ! method of particle file input
-    character(len=*), intent(in) :: ifn
+    character(100) c_method ! method of particle file input
 	integer(8), dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
-    type(cc_hex_params_type), intent(in) :: cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+    type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+    type(job_parameters_type), intent(in) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 
     integer(8), parameter :: num_face_vert_max_in = 20 ! max number of vertices per face
     integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
@@ -1754,6 +1764,11 @@ subroutine PDAL2(   ifn,            &
     integer(8) i, io, j, k, l, m, n, p, o, q ! counting variables
     real(8), dimension(:), allocatable :: faceAreas ! area of each facet
     real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
+
+    c_method = job_params%c_method
+    cc_hex_params = job_params%cc_hex_params
+    cft = job_params%cft
+    cfn = job_params%cfn
 
     print*,'particle input method: "',c_method(1:len(trim(c_method))),'"'
     print*,'========== start sr PDAL2'

@@ -18,15 +18,13 @@ module outputs_mod
                            ampl_far_ext_diff12, & ! amplitude matrix (1,2) due to external diffraction
                            ampl_far_ext_diff21, & ! amplitude matrix (2,1) due to external diffraction
                            ampl_far_ext_diff22, & ! amplitude matrix (2,2) due to external diffraction
-                           theta_vals,          & ! theta values (in rad)
-                           phi_vals,            & ! phi values (in rad)
                            energy_out_beam,     & ! beam energy remaining before diffraction
                            energy_out_ext_diff, & ! external diffraction energy remaining before diffraction
                            mueller,             & ! 2d mueller matrix
                            mueller_1d,          & ! 1d mueller matrix
-                           la,                  & ! wavelength
                            energy_abs_beam,     & ! energy absorbed inside the particle
-                           output_parameters)     ! output parameters
+                           output_parameters,   & ! output parameters
+                           job_params)
 
       ! sr finalise is called at the end of each rotation
       ! it combines the beam and external diffraction far-field amplitude matrices to yield the total far-field
@@ -37,14 +35,15 @@ module outputs_mod
 
    complex(8), dimension(:,:), allocatable, intent(in) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
    complex(8), dimension(:,:), allocatable, intent(in)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
-   real(8), dimension(:), allocatable, intent(in) :: theta_vals, phi_vals
+   real(8), dimension(:), allocatable :: theta_vals, phi_vals
    real(8), intent(in) :: energy_out_beam
    real(8), intent(in) :: energy_out_ext_diff
    real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
    real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
-   real(8), intent(in) :: la ! wavelength
+   real(8) la ! wavelength
    real(8), intent(in) :: energy_abs_beam
    type(output_parameters_type), intent(out) :: output_parameters 
+   type(job_parameters_type), intent(in) :: job_params
 
    complex(8), dimension(:,:), allocatable :: ampl_far11, ampl_far12, ampl_far21, ampl_far22 ! total
    real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
@@ -52,6 +51,10 @@ module outputs_mod
    integer i, j
    real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext, abs, albedo
    real(8) waveno
+
+   theta_vals = job_params%theta_vals
+   phi_vals = job_params%phi_vals
+   la = job_params%la
 
    waveno = 2d0*pi/la
 
