@@ -943,6 +943,101 @@ subroutine PROT(ifn,rot_method,verts)
 
 end subroutine
 
+subroutine PROT_CC(verts)
+
+    ! rotates cc_hex particle so that prism axis is aligned with z axis
+
+    real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
+    integer(8) offs(1:2)
+    real(8) eulers(1:3)
+    real(8) vec(1:3) ! off rotation vector
+    real(8) hilf0, hilf1
+    real(8) rot1(1:3,1:3), rot2(1:3,1:3), rot(1:3,1:3)
+    integer i
+    real(8) s1, s2, s3, c1, c2, c3
+    real(8) rand
+
+    print*,'========== start sr PROT_CC'
+
+    eulers(1) = 90.0
+    eulers(2) = 0.0
+    eulers(3) = 0.0
+
+    print*,'first pre-rotation...'
+
+    print*,'alpha:',eulers(1)
+    print*,'beta:',eulers(2)
+    print*,'gamma:',eulers(3)
+
+    eulers = eulers*pi/180 ! convert to rad
+
+    ! mishchenko rotation
+    s1 = sin(eulers(1))
+    s2 = sin(eulers(2))
+    s3 = sin(eulers(3))
+    c1 = cos(eulers(1))
+    c2 = cos(eulers(2))
+    c3 = cos(eulers(3))
+
+    ! make rotation matrix
+    rot(1,1) = -c1*c2*s3 + c1*c3
+    rot(1,2) = -s1*c2*c3 - c1*s3
+    rot(1,3) = s2*s1
+    rot(2,1) = c1*c2*s3 + s1*c3
+    rot(2,2) = c1*c2*c3 - s1*s3
+    rot(2,3) = -s2*c1
+    rot(3,1) = s2*s3
+    rot(3,2) = s2*c3
+    rot(3,3) = c2
+
+    do i = 1, size(verts,1) ! for each vertex
+        verts(i,1:3) = matmul(rot,verts(i,1:3)) ! rotate
+    end do
+
+    ! #########################
+
+    eulers(1) = 0.0
+    eulers(2) = 90.0
+    eulers(3) = 0.0
+
+    print*,'second pre-rotation...'
+
+    print*,'alpha:',eulers(1)
+    print*,'beta:',eulers(2)
+    print*,'gamma:',eulers(3)
+
+    eulers = eulers*pi/180 ! convert to rad
+
+    ! mishchenko rotation
+    s1 = sin(eulers(1))
+    s2 = sin(eulers(2))
+    s3 = sin(eulers(3))
+    c1 = cos(eulers(1))
+    c2 = cos(eulers(2))
+    c3 = cos(eulers(3))
+
+    ! make rotation matrix
+    rot(1,1) = -c1*c2*s3 + c1*c3
+    rot(1,2) = -s1*c2*c3 - c1*s3
+    rot(1,3) = s2*s1
+    rot(2,1) = c1*c2*s3 + s1*c3
+    rot(2,2) = c1*c2*c3 - s1*s3
+    rot(2,3) = -s2*c1
+    rot(3,1) = s2*s3
+    rot(3,2) = s2*c3
+    rot(3,3) = c2
+
+    do i = 1, size(verts,1) ! for each vertex
+        verts(i,1:3) = matmul(rot,verts(i,1:3)) ! rotate
+    end do
+
+
+    ! stop
+
+    print*,'========== end sr PROT_CC'
+
+end subroutine
+
 subroutine PROT_MPI(ifn,                & ! input filename (so we can read arguments from the "rot" line)
                     rot_method,         & ! rotation method: "euler", "off", "none", "multi"
                     verts,              & ! unrotated vertices
@@ -1940,6 +2035,7 @@ subroutine PDAL2(   ifn,            &
     else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
         print*,'attempting to make cc crystal'
         call CC_HEX_MAIN(cc_hex_params,face_ids,verts,apertures)
+        call PROT_CC(verts) ! align prism axis with z axis
         num_vert = size(verts,1)
         num_face = size(face_ids,1)
         num_face_vert_max = 3
