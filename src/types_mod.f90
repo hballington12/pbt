@@ -59,7 +59,7 @@ type job_parameters_type
 	type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 	real(8), dimension(:), allocatable :: theta_vals
 	real(8), dimension(:), allocatable :: phi_vals
-
+	logical suppress_2d ! whether or not to suppress 2d output of the mueller matrix
 end type job_parameters_type
 
 contains

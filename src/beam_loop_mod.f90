@@ -120,6 +120,7 @@ subroutine beam_loop(   Face1, &
                         energy_out_ext_diff, &
                         energy_abs_beam, &
                         output_parameters, &
+                        num_face_vert,             & ! <-  number of verices in each face
                         job_params)
 
     ! main beam loop
@@ -143,6 +144,7 @@ subroutine beam_loop(   Face1, &
     type(output_parameters_type), intent(inout) :: output_parameters 
     logical is_multithreaded ! whether or not code should use multithreading
     type(job_parameters_type), intent(in) :: job_params
+    integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
 
     real(8), dimension(:,:), allocatable :: Norm ! face normals
     integer(8), dimension(:), allocatable :: Face2 ! face normal ID of each face
@@ -227,15 +229,15 @@ subroutine beam_loop(   Face1, &
 
     call make_normals(Face1, verts, Face2, Norm) ! recalculate normals
 
-    call midPointsAndAreas(Face1, verts, Midpoints, faceAreas) ! calculate particle facet areas
-
-    call init(Face1, isVisible, isVisiblePlusShadows, isWithinBeam, distances, beamIDs, &
-                    isWithinBeam_ps, distances_ps, beamIDs_ps, isShadow, ampl_in, ampl_in_ps, la, waveno, &
-                    rperp, rpar, tperp, tpar, vk71, vk72, vk73, vk91, vk92, vk93, rot_ampl, new_in_ampl, &
-                    new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, ampl_diff, &
-                    beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter) ! initialise some variables
-    ! move beam_loop_mod variables into separate beam_loop_init subroutine and out of main program later...
+    call midPointsAndAreas(Face1, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas
     
+    call init(  Face1, isVisible, isVisiblePlusShadows, isWithinBeam, distances, beamIDs, &
+                isWithinBeam_ps, distances_ps, beamIDs_ps, isShadow, ampl_in, ampl_in_ps, la, waveno, &
+                rperp, rpar, tperp, tpar, vk71, vk72, vk73, vk91, vk92, vk93, rot_ampl, new_in_ampl, &
+                new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, ampl_diff, &
+                beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter) ! initialise some variables
+    ! move beam_loop_mod variables into separate beam_loop_init subroutine and out of main program later...
+
     ! ############# beam_loop_mod #############
     
     ! call readApertures(afn, apertures, Face1) ! read aperture assignments from file (now moved to pdal2 and passed into beam_loop)
@@ -243,8 +245,8 @@ subroutine beam_loop(   Face1, &
     call initApertures(apertures, Norm, Face2, Midpoints, apertureNormals, apertureMidpoints, apertureAreas, illuminatedApertureAreas, sufficientlyIlluminated, &
                              aperturePropagationVectors) ! initialise the aperture variables
     
-    call findVisibleFacets(verts, Face1, Norm, Face2, midPoints, isVisible, isVisiblePlusShadows, apertures) ! find external visible facets in this orientation
-    
+    call findVisibleFacets(verts, Face1, Norm, Face2, midPoints, isVisible, isVisiblePlusShadows, apertures, num_face_vert) ! find external visible facets in this orientation
+    ! stop
     call findWithinBeam(Face1, Midpoints, isVisible, beamV, beamF1, beamN, beamF2, beamMidpoints, isWithinBeam, distances, beamIDs) ! find visible facets within the incident beam
     
     call findWithinBeam(Face1, Midpoints, isVisiblePlusShadows, beamV, beamF1, beamN, beamF2, beamMidpoints, isWithinBeam_ps, distances_ps, beamIDs_ps) ! find visible facets (including shadow) within the incident beam
@@ -388,6 +390,7 @@ integer(8), allocatable, dimension(:,:) :: boundingBoxF
 integer(8) boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
+integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
 integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
 integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
@@ -409,8 +412,11 @@ call CPU_TIME(start)
 ! use the current crystal vertices to create some bounding boxes in x-y plane
 call beam_aligned_bounding_boxes(rotatedVert, boundingBoxV, boundingBoxF)
 
+allocate(boundingBoxNumFaceVert(1:size(boundingBoxF,1)))
+boundingBoxNumFaceVert = 4
+
 ! compute bounding box midpoints
-call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas)
+call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas, boundingBoxNumFaceVert)
 
 allocate(F3(1:size(Face1,1))) ! array to hold index of bounding box that each face belongs to
 allocate(F4(1:size(Face1,1),1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
@@ -2797,7 +2803,7 @@ end do
 
 end subroutine
 
-subroutine findVisibleFacets(verts, Face1, Norm, Face2, midPoints, isVisible, isVisiblePlusShadows, apertures)
+subroutine findVisibleFacets(verts, Face1, Norm, Face2, midPoints, isVisible, isVisiblePlusShadows, apertures, num_face_vert)
 
 ! subroutine findVisibleFacets finds the external visible facets of the particle as viewed in the -z direction
 ! works for concave particles
@@ -2810,12 +2816,14 @@ integer(8), dimension(:,:), allocatable, intent(in) :: Face1
 integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 logical, dimension(:), allocatable, intent(inout) :: isVisible, isVisiblePlusShadows
 integer(8), dimension(:), allocatable, intent(in) :: apertures
+integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
 
 real(8), allocatable, dimension(:,:) :: boundingBoxV
 integer(8), allocatable, dimension(:,:) :: boundingBoxF
 integer(8) boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
+integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
 integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
 integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
@@ -2828,6 +2836,7 @@ real(8) start, finish
 logical, dimension(:), allocatable :: visibleApertures
 integer(8) numApertures
 logical isApertureVisible
+integer(8) num_verts, num_verts_max
 
 ! print*,'========== start sr findVisibleFacets'
 call CPU_TIME(start)
@@ -2841,16 +2850,22 @@ call CPU_TIME(start)
 ! use the current crystal vertices to create some bounding boxes in x-y plane
 call beam_aligned_bounding_boxes(verts, boundingBoxV, boundingBoxF)
 
+allocate(boundingBoxNumFaceVert(1:size(boundingBoxF,1)))
+boundingBoxNumFaceVert = 4
+
 ! compute bounding box midpoints
-call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas)
+call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas, boundingBoxNumFaceVert)
 
 ! check midpoints
 !do i = 1,size(boundingBoxMidpoints,1)
 !    print'(A,f10.6,f10.6)','boundingBoxMidpoints',boundingBoxMidpoints(i,1),boundingBoxMidpoints(i,2)
 !end do
 
+num_verts_max = maxval(num_face_vert)
+print*,'max number of vertices: ', num_verts_max
+
 allocate(F3(1:size(Face1,1))) ! array to hold index of bounding box that each face belongs to
-allocate(F4(1:size(Face1,1),1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
+allocate(F4(1:size(Face1,1),1:num_verts_max)) ! array to hold index of fuzzy bounding box that each face belongs to
 boundingBoxFSize = size(boundingBoxF,1) ! number of bounding box faces
 allocate(distanceToBB(1:boundingBoxFSize)) ! array to hold the distance of a given vertex to each bounding box
 allocate(distanceToFuzzyBB(1:boundingBoxFSize)) ! array to hold the distance of a given vertex to each bounding box
@@ -2859,7 +2874,8 @@ allocate(distanceToFuzzyBB(1:boundingBoxFSize)) ! array to hold the distance of 
 
 ! find which bounding box each vertex belongs to
 do i = 1, size(Face1,1) ! for each face
-!do i = 1, 1! for each face
+    num_verts = num_face_vert(i)
+    ! print*,'this face had ',num_verts,' vertices'
     distanceToBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - Midpoints(i,1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - Midpoints(i,2))**2) ! distance to each bb
     !do j = 1,boundingBoxFSize
     !    print*,'dist to box: ',distanceToBB(j)
@@ -2867,7 +2883,7 @@ do i = 1, size(Face1,1) ! for each face
     F3(i) = minloc(distanceToBB,1) ! record which bounding box midpoint this facet was closest to
     !print'(A,i6,A,f10.6)','i',i,'dist to closest bb: ',distanceToBB(F3(i))
     !print'(A,f10.6,f10.6)','midpoints of closest bb: ',boundingBoxMidpoints(F3(i),1),boundingBoxMidpoints(F3(i),2)
-    do j = 1, 3 ! for each vertex
+    do j = 1, num_verts ! for each vertex
         distanceToFuzzyBB(1:boundingBoxFSize) = sqrt((boundingBoxMidpoints(1:boundingBoxFSize,1) - verts(Face1(i,j),1))**2 + (boundingBoxMidpoints(1:boundingBoxFSize,2) - verts(Face1(i,j),2))**2) ! distance to each bb
         F4(i,j) = minloc(distanceToFuzzyBB,1) ! record which bounding box midpoint this facet vertex was closest to
     end do 
@@ -3052,6 +3068,7 @@ integer(8), allocatable, dimension(:,:) :: boundingBoxF
 integer(8) boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
+integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
 integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
 integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
@@ -3081,8 +3098,11 @@ flippedNorm = -Norm ! flip normals because this is for internal interactions
 ! use the current crystal vertices to create some bounding boxes in x-y plane
 call beam_aligned_bounding_boxes(verts, boundingBoxV, boundingBoxF)
 
+allocate(boundingBoxNumFaceVert(1:size(boundingBoxF,1)))
+boundingBoxNumFaceVert = 4
+
 ! compute bounding box midpoints
-call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas)
+call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas, boundingBoxNumFaceVert)
 
 ! check midpoints
 !do i = 1,size(boundingBoxMidpoints,1)
@@ -3294,6 +3314,7 @@ integer(8), allocatable, dimension(:,:) :: boundingBoxF
 integer(8) boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
+integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
 integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
 integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
@@ -3320,8 +3341,11 @@ flippedNorm = -Norm ! flip normals because this is for internal interactions
 ! use the current crystal vertices to create some bounding boxes in x-y plane
 call beam_aligned_bounding_boxes(verts, boundingBoxV, boundingBoxF)
 
+allocate(boundingBoxNumFaceVert(1:size(boundingBoxF,1)))
+boundingBoxNumFaceVert = 4
+
 ! compute bounding box midpoints
-call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas)
+call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundingBoxFaceAreas, boundingBoxNumFaceVert)
 
 ! check midpoints
 !do i = 1,size(boundingBoxMidpoints,1)

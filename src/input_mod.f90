@@ -152,6 +152,7 @@ is_multithreaded = .false.
 intellirot = .false.
 job_name = 'my_job'
 rot_method = "none"
+job_params%suppress_2d = .false.
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -621,6 +622,11 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             print*,'multithreading: enabled'
             is_multithreaded = .true.
             ! do something
+
+        case ('-no2d')
+            ! print*,'found command line specifier "mt"'
+            print*,'suppress 2d outputs: enabled'
+            job_params%suppress_2d = .true.
 
         case ('-intellirot')
             ! print*,'found command line specifier "intellirot"'
@@ -1369,7 +1375,7 @@ integer(8) num_lines
 
 ! read number of lines in aperture file
 num_lines = 0
-! print*,'opening apertures file:',afn
+print*,'opening apertures file:',afn
 open(unit = 10, file = afn, status = 'old')
 do  ! scan through the lines in the crystal file...
     read(10,"(a)",iostat=io)line
@@ -1715,7 +1721,6 @@ subroutine PDAL2(   num_vert,       &
                     face_ids,       &
                     verts,          &
                     num_face_vert,  &
-                    afn,            &
                     apertures,      &
                     job_params)
 
@@ -1738,7 +1743,7 @@ subroutine PDAL2(   num_vert,       &
         
     character(len=100) cfn ! particle filename
     character(len=100) cft ! particle filetype
-    character(100), intent(in) ::  afn ! apertures filename
+    character(100) afn ! apertures filename
     integer(8), intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
     ! integer(8), intent(out) :: num_norm ! number of face normals
     integer(8), dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
@@ -1769,6 +1774,7 @@ subroutine PDAL2(   num_vert,       &
     cc_hex_params = job_params%cc_hex_params
     cft = job_params%cft
     cfn = job_params%cfn
+    afn = job_params%afn
 
     print*,'particle input method: "',c_method(1:len(trim(c_method))),'"'
     print*,'========== start sr PDAL2'
@@ -2054,6 +2060,8 @@ subroutine PDAL2(   num_vert,       &
         num_vert = size(verts,1)
         num_face = size(face_ids,1)
         num_face_vert_max = 3
+        allocate(num_face_vert(num_face))
+        num_face_vert = 3
         print*,'back from cc_hex_main'
     else
         print*,'error: ',c_method(1:len(trim(c_method))),' is not a valid method of particle file input'
@@ -2066,10 +2074,11 @@ subroutine PDAL2(   num_vert,       &
 
     if (num_face_vert_max .gt. 3) then
         print*,'error: max vertices per facet greater than 3 is currently not supported.'
-        stop
+        ! stop
+        print*,'continuing regardless...'
     end if
 
-    call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas) ! calculate particle facet areas (for doing some checks in the following sr)
+    call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas (for doing some checks in the following sr)
 
     call area_stats(faceAreas)
 

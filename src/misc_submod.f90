@@ -170,7 +170,11 @@ subroutine make_dir(dir_path_in,cwd_out)
 
 end subroutine
 
-subroutine PDAS(verts,face_ids,output_dir,filename)
+subroutine PDAS(verts, &
+                face_ids, &
+                output_dir, &
+                num_face_vert,  & ! <-  number of verices in each face
+                filename)
 
     ! writes rotated particle to file
     ! to do: add Macke-style output
@@ -179,6 +183,7 @@ real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 integer(8), dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
 character(len=*), intent(in) :: output_dir
 character(len=*), intent(in) :: filename
+integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
 
 integer num_verts, num_faces, i, j
 character(100) my_string, my_string2
@@ -222,7 +227,19 @@ do i = 1, num_verts
     write(10,'(A1,f16.8,f16.8,f16.8)') "v ", verts(i,1), verts(i,2), verts(i,3)
 end do
 do i = 1, num_faces
-    write(10,'(A1,I10,I10,I10)') 'f', face_ids(i,1), face_ids(i,2), face_ids(i,3)
+    my_string = "f "
+    call StripSpaces(my_string)
+    do j = 1, num_face_vert(i)
+        write(my_string2,*) face_ids(i,j)
+        call StripSpaces(my_string2)
+        ! print*,'my_string2: ',trim(my_string2)
+        my_string = trim(my_string)//" "//trim(my_string2)
+        ! print*,'my_string: ',trim(my_string) 
+    end do
+    ! print*,'my_string: ',trim(my_string)
+    ! stop
+    ! write(10,'(A1,I10,I10,I10)') 'f', face_ids(i,1), face_ids(i,2), face_ids(i,3)
+    write(10,'(A100)') adjustl(my_string)
 end do
 close(10)
 
@@ -230,10 +247,11 @@ open(10,file=trim(output_dir)//"/"//trim(filename)//".cry") ! macke format (only
 ! write(10,*) '# rotated particle'
 write(10,'(I8)') num_faces
 do i = 1, num_faces
-    write(10,*) 3
+    ! print*,'face #',i,' had ',num_face_vert(i),' vertices'
+    write(10,*) num_face_vert(i)
 end do
 do i = 1, num_faces
-    do j = 1, 3
+    do j = 1, num_face_vert(i)
         write(10,'(f16.8,f16.8,f16.8)') verts(face_ids(i,j),1), verts(face_ids(i,j),2), verts(face_ids(i,j),3)
     end do
 end do
@@ -812,7 +830,7 @@ end do
 
 end subroutine
 
-subroutine midPointsAndAreas(face_ids, verts, midpoints, face_areas)
+subroutine midPointsAndAreas(face_ids, verts, midpoints, face_areas, num_face_vert)
 
 ! subroutine midPointsAndAreas computes midpoints and areas of each facet
 ! assumes triangle facets
@@ -824,6 +842,7 @@ real(8), dimension(:,:), allocatable, intent(out) :: midpoints
 real(8), dimension(:), allocatable, intent(out) :: face_areas
 real(8), dimension(1:3) :: vec_a, vec_b, a_cross_b
 real(8) temp_area
+integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
 
 integer i,j, num_verts
 
@@ -832,9 +851,9 @@ integer i,j, num_verts
 allocate(midpoints(size(face_ids,1),3))
 
 num_verts = size(face_ids,2) ! assumes all faces have the same number of vertices
-!print*,'num verts per face: ',num_verts
     
 do i = 1, size(face_ids,1) ! for each face
+    num_verts = num_face_vert(i)
     midpoints(i,1:3) = sum(verts(face_ids(i,1:num_verts),1:3),1)/num_verts
 end do
 
@@ -843,6 +862,7 @@ allocate(face_areas(1:size(face_ids,1)))
 face_areas = 0 ! initialise
 
 do i = 1, size(face_ids,1) ! for each face
+    num_verts = num_face_vert(i)
     do j = 1,num_verts ! for each vertex in the face
         vec_a = verts(face_ids(i,j),1:3) - midpoints(i,1:3) ! vector from midpoint to vertex j
         if (j .eq. num_verts) then

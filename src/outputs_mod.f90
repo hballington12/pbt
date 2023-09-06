@@ -454,36 +454,40 @@ module outputs_mod
 
    subroutine writeup(  mueller,    &
                         mueller_1d, &
-                        theta_vals, &
-                        phi_vals,   &
                         output_dir, &
-                        output_parameters_total)
+                        output_parameters_total, &
+                        job_params)
 
    ! sr writeup writes the 1d and 2d mueller matrices to the job directory
 
    real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
    real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
-   real(8), dimension(:), allocatable, intent(in) :: theta_vals, phi_vals
+   real(8), dimension(:), allocatable :: theta_vals, phi_vals
    character(len=*), intent(in) :: output_dir
    type(output_parameters_type), intent(inout) :: output_parameters_total
+   type(job_parameters_type), intent(in) :: job_params
 
    integer i, j
 
+   theta_vals = job_params%theta_vals
+   phi_vals = job_params%phi_vals
+
    print*,'writing mueller to file...'
 
-   open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
-   do i = 1, size(theta_vals,1)
-      do j = 1, size(phi_vals,1)
-         write(10,'(f12.4,f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
-         theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
-         mueller(j,i,1), mueller(j,i,2), mueller(j,i,3), mueller(j,i,4), &
-         mueller(j,i,5), mueller(j,i,6), mueller(j,i,7), mueller(j,i,8), &
-         mueller(j,i,9), mueller(j,i,10), mueller(j,i,11), mueller(j,i,12), &
-         mueller(j,i,13), mueller(j,i,14), mueller(j,i,15), mueller(j,i,16)                                                                             
+   if(.not. job_params%suppress_2d) then
+      open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
+      do i = 1, size(theta_vals,1)
+         do j = 1, size(phi_vals,1)
+            write(10,'(f12.4,f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
+            theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
+            mueller(j,i,1), mueller(j,i,2), mueller(j,i,3), mueller(j,i,4), &
+            mueller(j,i,5), mueller(j,i,6), mueller(j,i,7), mueller(j,i,8), &
+            mueller(j,i,9), mueller(j,i,10), mueller(j,i,11), mueller(j,i,12), &
+            mueller(j,i,13), mueller(j,i,14), mueller(j,i,15), mueller(j,i,16)                                                                             
+         end do
       end do
-   end do
-   close(10)
-
+      close(10)
+   end if
    open(10,file=trim(output_dir)//"/"//"mueller_scatgrid_1d")
    do j = 1, size(theta_vals,1)
       write(10,'(f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
