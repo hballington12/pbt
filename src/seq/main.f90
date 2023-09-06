@@ -119,14 +119,14 @@ call PDAL2( num_vert,       & !  -> number of unique vertices
             face_ids,       & !  -> face vertex IDs
             vert_in,        & !  -> unique vertices
             num_face_vert,  & !  -> number of vertices in each face
-            afn,            & !  ->  apertures filename
             apertures,      &
             job_params)
 
 ! write unrotated particle to file (optional)            
-call PDAS(  vert_in,       & ! <-  rotated vertices
-            face_ids,   & ! <-  face vertex IDs
-            output_dir, & ! <-  output directory
+call PDAS(  vert_in,        & ! <-  rotated vertices
+            face_ids,       & ! <-  face vertex IDs
+            output_dir,     & ! <-  output directory
+            num_face_vert,  & ! <-  number of verices in each face
             "unrotated")    ! <-  filename
 
 call init_loop( alpha_vals, &
@@ -151,6 +151,7 @@ do i = 1, num_orients
         call PDAS(  vert,       & ! <-  rotated vertices
                     face_ids,   & ! <-  face vertex IDs
                     output_dir, & ! <-  output directory
+                    num_face_vert,  & ! <-  number of verices in each face
                     "rotated")    ! <-  filename
     end if
 
@@ -181,6 +182,7 @@ do i = 1, num_orients
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
+                    num_face_vert,             & ! <-  number of verices in each face
                     job_params)
     
     if(num_orients .gt. 1) then
@@ -244,7 +246,7 @@ output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / 
 
 ! writing to file
 call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
-call writeup(mueller_total, mueller_1d_total, job_params%theta_vals, job_params%phi_vals, output_dir, output_parameters_total) ! write to file
+call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
 
 finish = omp_get_wtime()
 
