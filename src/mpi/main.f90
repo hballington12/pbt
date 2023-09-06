@@ -154,7 +154,6 @@ call PDAL2( num_vert,       & !  -> number of unique vertices
             face_ids,       & !  -> face vertex IDs
             vert_in,        & !  -> unique vertices
             num_face_vert,  & !  -> number of vertices in each face
-            afn,            & !  ->  apertures filename
             apertures,      &
             job_params)
 
@@ -194,6 +193,7 @@ if (my_rank .eq. 0) then
     call PDAS(  vert_in,        & ! <-  rotated vertices
                 face_ids,       & ! <-  face vertex IDs
                 output_dir,     & ! <-  output directory
+                num_face_vert,  & ! <-  number of verices in each face
                 "unrotated")      ! <-  filename
 end if
 
@@ -247,6 +247,7 @@ do i = my_start, my_end
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
+                    num_face_vert,             & ! <-  number of verices in each face
                     job_params)
 
     ! diffraction
@@ -351,7 +352,7 @@ if (my_rank .eq. 0) then
 
     ! writing to file
     call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
-    call writeup(mueller_total, mueller_1d_total, job_params%theta_vals, job_params%phi_vals, output_dir, output_parameters_total) ! write to file
+    call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
 
     finish = omp_get_wtime()
     print*,'=========='
