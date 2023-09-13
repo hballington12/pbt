@@ -73,6 +73,12 @@ Main source file. It contains the program entry point. The ABT reads input param
 
 - `-no2d` - Suppresses the output of the 2D mueller matrix, which can be a large file if many far-field evaluation points are specified.
 
+- `-tri` - Enables automatic triangulation. Note that use of this flag requires compiling the triangle code in `.\triangle\`.
+
+- `-tri_edge` - Sets the maximum edge length for triangulation.
+
+- `-tri_rough` - Sets the standard deviation for roughness derived from the triangulation.
+
  ## Examples
 
  `abt -lambda 0.532 -rbi 1.3117 -ibi 0 -rec 10 -rot euler 20 35 2 -cmethod read -cft obj -cfn my_particle.obj -afn my_apertures.dat -mt -theta 0 1 180 -phi 0 2 360` - run `abt` executable with wavelength 0.532, refractive index 1.3117 + 0i, 10 beam recursions, particle rotated with euler angles 20, 35, read the particle with particle file type `.obj`, filename `my_particle.obj`, apertures specified in the file `my_apertures.dat`, with multithreading enabled. Evaluate the far-field at polar angle 0 in 1 degree steps to 180 and at azithmual angle 0 in 2 degree steps to 360.
