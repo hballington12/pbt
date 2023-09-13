@@ -73,7 +73,7 @@ Main source file. It contains the program entry point. The ABT reads input param
 
 - `-no2d` - Suppresses the output of the 2D mueller matrix, which can be a large file if many far-field evaluation points are specified.
 
-- `-tri` - Enables automatic triangulation. Note that use of this flag requires compiling the triangle code in `.\triangle\`.
+- `-tri` - Enables automatic triangulation. Note that use of this flag requires compiling the triangle code in `.\tr\`.
 
 - `-tri_edge` - Sets the maximum edge length for triangulation.
 
