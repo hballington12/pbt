@@ -112,6 +112,7 @@ real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 
 ! sr finalise
 type(output_parameters_type) output_parameters 
+type(output_parameters_type) output_parameters_recv
 type(output_parameters_type) output_parameters_total
 
 real(8) max_area, max_edge_length
