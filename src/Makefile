@@ -5,11 +5,17 @@ MPI_DIR =./mpi/
 
 # FSWITCHES = -traceback -debug:full -openmp # debug - windows
 # FSWITCHES = -traceback -g -O -qopenmp # debug - linux
-FSWITCHES = -O3 -openmp # release - windows
-# FSWITCHES = -O3 -qopenmp -xAVX # release - linux
+# FSWITCHES = -O3 -fopenmp -ffree-line-length-512 -I 'C:\MinGW\lib\gcc\mingw32\6.3.0\include\' # release - windows
+FSWITCHES = -O3 -fopenmp -ffree-line-length-512 -fallow-argument-mismatch # release - linux
+# FSWITCHES = -O -Wall -Wtabs -g -fopenmp -ffree-line-length-512 -fallow-argument-mismatch # debug - linux
 
-O_EXT = .obj # windows
-# O_EXT = .o # linux
+CSWITCHES = -O -DLINUX -I/usr/X11R6/include -L/usr/X11R6/lib
+
+FC = gfortran # fortran compiler
+CC = cc # c compiler
+
+# O_EXT = .obj # windows
+O_EXT = .o # linux
 MOD_EXT = .mod
 
 objects = 	types_mod$(O_EXT) \
@@ -30,33 +36,37 @@ modules = 	types_mod$(MOD_EXT) \
 
 .PHONY: abt # sequential target
 .PHONY: abt_mpi # mpi target
+.PHONY: triangle # triangle target
 
-abt: $(SEQ_DIR)main.f90 $(objects)
-	ifort $(FSWITCHES) $(objects) $(SEQ_DIR)main.f90 -o $(SEQ_DIR)abt
+abt: $(SEQ_DIR)main.f90 $(objects) $(TRI_BIN)triangle
+	$(FC) $(FSWITCHES) $(objects) $(SEQ_DIR)main.f90 -o $(SEQ_DIR)abt
 
 abt_mpi: $(MPI_DIR)main.f90 $(objects)
-	mpif90 -f90=ifort $(FSWITCHES) $(objects) $(MPI_DIR)main.f90 -o $(MPI_DIR)abt
+	mpifort $(FSWITCHES) $(objects) $(MPI_DIR)main.f90 -o $(MPI_DIR)abt
 
 outputs_mod$(O_EXT) : outputs_mod.f90 misc_submod$(O_EXT)
-	ifort $(FSWITCHES) -c outputs_mod.f90
+	$(FC) $(FSWITCHES) -c outputs_mod.f90
 
 diff_mod$(O_EXT) : diff_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT)
-	ifort $(FSWITCHES) -c diff_mod.f90
+	$(FC) $(FSWITCHES) -c diff_mod.f90
 
 beam_loop_mod$(O_EXT) : beam_loop_mod.f90 input_mod$(O_EXT) misc_submod$(O_EXT) types_mod$(O_EXT)
-	ifort $(FSWITCHES) -c beam_loop_mod.f90
+	$(FC) $(FSWITCHES) -c beam_loop_mod.f90
 
 input_mod$(O_EXT) : input_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT) cc_hex_mod$(O_EXT)
-	ifort $(FSWITCHES) -c input_mod.f90
+	$(FC) $(FSWITCHES) -c input_mod.f90
 
 misc_submod$(O_EXT) : misc_submod.f90
-	ifort $(FSWITCHES) -c misc_submod.f90
+	$(FC) $(FSWITCHES) -c misc_submod.f90
 
 types_mod$(O_EXT) : types_mod.f90
-	ifort $(FSWITCHES) -c types_mod.f90
+	$(FC) $(FSWITCHES) -c types_mod.f90
 
 cc_hex_mod$(O_EXT) : cc_hex_mod.f90
-	ifort $(FSWITCHES) -c cc_hex_mod.f90
+	$(FC) $(FSWITCHES) -c cc_hex_mod.f90
+
+./tri/triangle: ./tri/triangle.c
+	$(CC) $(CSWITCHES) ./tri/triangle.c -lm -o ./tri/triangle
 
 clean :
 	rm $(objects) $(modules) $(SEQ_DIR)abt

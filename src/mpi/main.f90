@@ -13,7 +13,7 @@ use types_mod
 use diff_mod
 use omp_lib
 use outputs_mod
-use ifport
+! use mpi
 
 implicit none
 
@@ -125,7 +125,9 @@ tag = 1
 
 print*,'========== start main'
 start = omp_get_wtime()
-call seed(99)
+! call seed(99) ! find gfotran replacement for this later!
+
+print*,'my rank: ',my_rank
 
 call parse_command_line(job_params)
 
@@ -134,8 +136,10 @@ call parse_command_line(job_params)
 if (my_rank .eq. 0) then
     call make_dir(job_params%job_name,output_dir)
     print*,'output directory is "',trim(output_dir),'"'
-    result = makedirqq(trim(output_dir)//"/logs") ! make directory for logs
-    ! print*,'sending...'
+    ! result = makedirqq(trim(output_dir)//"/logs") ! make directory for logs
+    call system("mkdir "//trim(output_dir)//"/logs")
+    print*,'sending...'
+    print*,'output_dir: ',output_dir
     do dest = 1, p-1
         CALL MPI_SEND(output_dir, 255, MPI_CHARACTER, dest, tag, MPI_COMM_WORLD, ierr)
     end do
@@ -143,11 +147,15 @@ if (my_rank .eq. 0) then
 else
     call MPI_RECV(output_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
 end if
+
 write(my_rank_str,*) my_rank
 call StripSpaces(my_rank_str)
+print*,'my_rank_str: ',my_rank_str
 write(my_log_dir,*) trim(output_dir)//"/logs/log",trim(my_rank_str)
+my_log_dir = adjustl(my_log_dir)
 ! print*,'my rank is : ,',my_rank,' , my output directory is "',trim(my_log_dir),'"'
-open(101,file=trim(my_log_dir)) ! open global non-standard log file for important records
+
+open(101,file=trim(my_log_dir),status="new") ! open global non-standard log file for important records
 
 ! get input particle information
 call PDAL2( num_vert,       & !  -> number of unique vertices
@@ -342,9 +350,9 @@ if (my_rank .eq. 0) then
     finish = omp_get_wtime()
     print*,'=========='
     print'(A,f16.8,A)',"total time elapsed: ",finish-start," secs"
-    write(101,*),'======================================================'
-    write(101,'(A,f17.8,A)')," total time elapsed: ",finish-start," secs"
-    write(101,*),'======================================================'
+    write(101,*)'======================================================'
+    write(101,'(A,f17.8,A)')" total time elapsed: ",finish-start," secs"
+    write(101,*)'======================================================'
     print*,'========== end main'
 end if
 
