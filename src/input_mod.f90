@@ -1853,7 +1853,6 @@ subroutine PDAL2(   num_vert,       &
             num_vert = 0 ! rest number of unique vertices
             num_face = 0 ! rest number of faces
             ! num_norm = 0 ! rest number of face normals
-            num_face_vert = 0 ! initialise
             
             open(unit = 10, file = cfn, status = 'old')
             
@@ -1880,6 +1879,8 @@ subroutine PDAL2(   num_vert,       &
             allocate(face_ids_temp(num_face,num_face_vert_max_in)) ! allocate an array for the vertex IDs in each face
             ! allocate(norms(num_norm,3)) ! allocate an array for the face normals
             
+            num_face_vert = 0 ! initialise
+
             do  ! reading through the lines in the crystal file...
                 read(10,"(a)",iostat=io)line
                 if (io/=0) exit
@@ -2090,7 +2091,7 @@ subroutine PDAL2(   num_vert,       &
             stop
         end if
 
-        if (auto_apertures .eq. .true.) then
+        if (auto_apertures .eqv. .true.) then
             ! print*,'number of faces:',size(face_ids,1)
             if(size(face_ids,1) .gt. 50) print*,'warning: automatic aperture assignment for large numbers of input faces is not well supported.'
             allocate(apertures(1:size(face_ids,1)))

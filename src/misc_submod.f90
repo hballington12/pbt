@@ -4,7 +4,7 @@
     
 module misc_submod
 
-use ifport
+! use ifport
 use types_mod
 
 implicit none
@@ -120,7 +120,7 @@ close(10)
         character(len=255) dir_path
         character(len=255), intent(out) :: cwd_out
         logical exists ! for checking if directories or files exist
-        integer result ! true if subdirectory was made, false if subdirectory was not made
+        logical result ! true if subdirectory was made, false if subdirectory was not made
         integer job_num ! job number
         character(len=255) job_num_string ! job number
     
@@ -131,28 +131,34 @@ close(10)
         write(dir_path,*) trim(dir_path_in)
         call StripSpaces(dir_path)
         ! print*,'enquiring at: "',trim(dir_path),'"'
-        inquire(directory = trim(dir_path), exist = exists)
-        if(exists .eq. .false.) then ! if job name is available
+        inquire(file = trim(dir_path), exist = exists)
+        ! print*,'exists?',exists
+        ! stop
+        if(exists .eqv. .false.) then ! if job name is available
             ! print*,'Creating job directory at "',trim(dir_path),'"'
             write(cwd_out,*) trim(dir_path)
-            result = makedirqq(trim(dir_path))
+            ! result = makedirqq(trim(dir_path))
+            call system("mkdir "//trim(dir_path))
         else ! if job name is not available, append numbers until an available name is found
-            do while (result .eq. .false.) ! while a new directory has not been made
+            do while (result .eqv. .false.) ! while a new directory has not been made
     
                 ! append job_num to directory name
-                write(job_num_string,"(I)") job_num
+                write(job_num_string,"(I3)") job_num
                 call StripSpaces(job_num_string)
                 ! print*,'job_num_string:',trim(job_num_string)
                 ! print*,'dir_path: ',trim(dir_path_in)//trim(job_num_string)
+                ! stop
                 write(dir_path,*) trim(dir_path_in)//"_"//trim(job_num_string)
                 call StripSpaces(dir_path)
                 ! print*,'attempting to make directory with name "',trim(dir_path),'"'
         
-                inquire(directory = trim(dir_path), exist = exists)
-                if(exists .eq. .false.) then 
+                inquire(file = trim(dir_path), exist = exists)
+                if(exists .eqv. .false.) then 
                     ! print*,'Creating job directory at "',trim(dir_path),'"'
                     write(cwd_out,*) trim(dir_path)
-                    result = makedirqq(trim(dir_path))
+                    ! result = makedirqq(trim(dir_path))
+                    call system("mkdir "//trim(dir_path))
+                    result = .true.
                 else
                     ! if already exists, add 1 to job number and try again
                     job_num = job_num + 1
