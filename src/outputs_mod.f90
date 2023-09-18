@@ -276,7 +276,7 @@ module outputs_mod
    end do
 
    print*,'making 1d mueller matrices...'
-   write(101,*),'------------------------------------------------------'
+   write(101,*)'------------------------------------------------------'
 
    ! phi integrations...
    do i = 1, size(theta_vals,1) ! for each theta bin...
@@ -369,15 +369,15 @@ module outputs_mod
 
    ! theta integrations...
    call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt) ! p11*sin(theta)
-   write(101,'(A40,f16.8)'),'scatt. cross (total):',scatt
+   write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
    print'(A40,f16.8)','scattering cross section (total):',scatt
 
    call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_beam) ! p11*sin(theta)
-   write(101,'(A40,f16.8,A2,f10.6,A3)'),'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
+   write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
 
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_ext_diff) ! p11*sin(theta)
-   write(101,'(A40,f16.8,A2,f10.6,A3)'),'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+   write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
    print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
    
    ! ext = abs(2*pi/waveno*real(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
@@ -389,27 +389,27 @@ module outputs_mod
    ! print'(A40,f16.8)','ext. cross (opt. theorem) imag:',ext 
 
    abs = energy_abs_beam
-   write(101,'(A40,f16.8)'),'abs. cross section:',abs
+   write(101,'(A40,f16.8)')'abs. cross section:',abs
    print'(A40,f16.8)','abs. cross:',abs 
 
    ext = abs + scatt
-   write(101,'(A40,f16.8)'),'ext. cross section:',ext
+   write(101,'(A40,f16.8)')'ext. cross section:',ext
    print'(A40,f16.8)','ext. cross:',ext 
 
    albedo = 1-(ext-scatt)/ext 
-   write(101,'(A40,f16.8)'),'single-scattering albedo:',albedo
+   write(101,'(A40,f16.8)')'single-scattering albedo:',albedo
    print'(A40,f16.8)','single-scatt. albedo:',albedo
 
    call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt,asymmetry) ! p11*sin(theta)
-   write(101,'(A40,f16.8)'),'asymmetry parameter (total):',asymmetry
+   write(101,'(A40,f16.8)')'asymmetry parameter (total):',asymmetry
    print'(A40,f16.8)','asymmetry parameter (total):',asymmetry
 
    call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam,asymmetry_beam) ! p11*sin(theta)
-   write(101,'(A40,f16.8)'),'asymmetry parameter (beam):',asymmetry_beam
+   write(101,'(A40,f16.8)')'asymmetry parameter (beam):',asymmetry_beam
    print'(A40,f16.8)','asymmetry parameter (beam):',asymmetry_beam
 
    call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff,asymmetry_ext_diff) ! p11*sin(theta)
-   write(101,'(A40,f16.8)'),'asymmetry parameter (ext diff):',asymmetry_ext_diff  
+   write(101,'(A40,f16.8)')'asymmetry parameter (ext diff):',asymmetry_ext_diff  
    print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
 
    output_parameters%scatt = scatt

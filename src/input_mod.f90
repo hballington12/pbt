@@ -1,4 +1,3 @@
-
 ! input_mod.f90
 ! module containing various subroutines used to initiate aperture beam tracer
 
@@ -153,6 +152,9 @@ intellirot = .false.
 job_name = 'my_job'
 rot_method = "none"
 job_params%suppress_2d = .false.
+job_params%tri = .false.
+job_params%tri_edge_length = 1
+job_params%tri_roughness = 0D0
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -628,6 +630,33 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             print*,'suppress 2d outputs: enabled'
             job_params%suppress_2d = .true.
 
+        case ('-tri')
+            ! print*,'found command line specifier "mt"'
+            print*,'automatic triangulation: enabled'
+            job_params%tri = .true.
+
+        case ('-tri_edge')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "tri_edge"'
+                stop
+            else
+                read(arg,*) job_params%tri_edge_length
+                print*,'job_params%tri_edge: ', job_params%tri_edge_length
+            end if  
+
+        case ('-tri_rough')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "tri_rough"'
+                stop
+            else
+                read(arg,*) job_params%tri_roughness
+                print*,'job_params%tri_roughness: ', job_params%tri_roughness
+            end if 
+
         case ('-intellirot')
             ! print*,'found command line specifier "intellirot"'
             intellirot = .true.
@@ -641,30 +670,32 @@ do while (i .lt. command_argument_count()) ! looping over command line args
 end do ! end loop over command line args
 
 ! check for missing required arguments
-if (found_la .eq. .false.) then
+if (found_la .eqv. .false.) then
     print*,'error: missing required argument "lambda"'
     stop
-else if (found_rbi .eq. .false.) then
+else if (found_rbi .eqv. .false.) then
     print*,'error: missing required argument "rbi"'
     stop
-else if (found_ibi .eq. .false.) then
+else if (found_ibi .eqv. .false.) then
     print*,'error: missing required argument "ibi"'
     stop
-else if (found_rec .eq. .false.) then
+else if (found_rec .eqv. .false.) then
     print*,'error: missing required argument "rec"'
     stop
-else if (found_c_method .eq. .false.) then
+else if (found_c_method .eqv. .false.) then
     print*,'error: missing required argument "cmethod"'
     stop
-else if (found_c_method .eq. .true.) then
+else if (found_c_method .eqv. .true.) then
     if (c_method .eq. "read") then
-        if (found_cfn .eq. .false.) then
+        if (found_cfn .eqv. .false.) then
             print*,'error: missing required argument "cfn"'
             stop
-        else if (found_afn .eq. .false.) then
-            print*,'error: missing required argument "afn"'
-            stop
-        else if (found_cft .eq. .false.) then
+        else if (found_afn .eqv. .false.) then
+            ! print*,'error: missing required argument "afn"'
+            print*,'no input for afn. Using automatic aperture assignment...'
+            afn = ""
+            ! stop
+        else if (found_cft .eqv. .false.) then
             print*,'error: missing required argument "cft"'
             stop
         end if
@@ -722,10 +753,10 @@ print*,'min facet area:      ',min_area
 print*,'total surface area: ',total_area
 print*,'avg. facet area:     ',avg_area
 
-write(101,*),'max facet area:      ',max_area
-write(101,*),'min facet area:      ',min_area
-write(101,*),'total surface area: ',total_area
-write(101,*),'avg. facet area:     ',avg_area
+write(101,*)'max facet area:      ',max_area
+write(101,*)'min facet area:      ',min_area
+write(101,*)'total surface area: ',total_area
+write(101,*)'avg. facet area:     ',avg_area
 
 end subroutine
 
@@ -831,6 +862,7 @@ subroutine PROT(ifn,rot_method,verts)
     integer i
     real(8) s1, s2, s3, c1, c2, c3
     real(8) rand
+    integer(8) num_vals
 
     print*,'========== start sr PROT'
 
@@ -839,7 +871,8 @@ subroutine PROT(ifn,rot_method,verts)
     if(rot_method(1:len(trim(rot_method))) .eq. 'none') then
         ! do nothing
     else if(rot_method(1:len(trim(rot_method))) .eq. 'off') then
-        call read_input_vals(ifn,"rot off",offs,2)
+        num_vals = 2
+        call read_input_vals(ifn,"rot off",offs,num_vals)
         ! print*,'off values: ', offs(1:2)
 
         if(offs(1) .eq. 30 .and. offs(2) .eq. 0) then
@@ -888,7 +921,8 @@ subroutine PROT(ifn,rot_method,verts)
         ! print*,'verts(2,1:3)',verts(2,1:3)
 
     else if(rot_method(1:len(trim(rot_method))) .eq. 'euler') then
-        call read_input_vals_real(ifn,"rot euler",eulers,3)
+        num_vals = 3
+        call read_input_vals_real(ifn,"rot euler",eulers,num_vals)
         print*,'alpha:',eulers(1)
         print*,'beta:',eulers(2)
         print*,'gamma:',eulers(3)
@@ -1090,9 +1124,9 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
     offs = job_params%offs
 
     print*,'========== start sr PROT_MPI'
-    write(101,*),'======================================================'
-    write(101,*),'======================================================'
-    write(101,*),'orientation: ',loop_index,' / ',num_orients
+    write(101,*)'======================================================'
+    write(101,*)'======================================================'
+    write(101,*)'orientation: ',loop_index,' / ',num_orients
 
     print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
 
@@ -1106,19 +1140,19 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
 
         if(offs(1) .eq. 30 .and. offs(2) .eq. 0) then
             print*,'off setting: 30x0'
-            write(101,*),'off setting: "30x0"'
+            write(101,*)'off setting: "30x0"'
             vec = (/-0.866025,-0.5,0.0/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 10) then
             print*,'off setting: 30x10'
-            write(101,*),'off setting: "30x10"'
+            write(101,*)'off setting: "30x10"'
             vec = (/-0.866025,-0.492404,0.0868240/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 20) then
             print*,'off setting: 30x20'
-            write(101,*),'off setting: "30x20"'
+            write(101,*)'off setting: "30x20"'
             vec = (/-0.866025,-0.469846,0.171010/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 30) then
             print*,'off setting: 30x30'
-            write(101,*),'off setting: "30x30"'
+            write(101,*)'off setting: "30x30"'
             vec = (/-0.866025,-0.433013,0.25/)
         end if
 
@@ -1156,11 +1190,11 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
     else if(rot_method(1:len(trim(rot_method))) .eq. 'euler') then
         ! call read_input_vals_real(ifn,"rot euler",eulers,3)
         print*,'alpha:',eulers(1)
-        write(101,*),'alpha:',eulers(1)
+        write(101,*)'alpha:',eulers(1)
         print*,'beta: ',eulers(2)
-        write(101,*),'beta: ',eulers(2)
+        write(101,*)'beta: ',eulers(2)
         print*,'gamma:',eulers(3)
-        write(101,*),'gamma:',eulers(3)
+        write(101,*)'gamma:',eulers(3)
 
         eulers = eulers*pi/180.0 ! convert to rad
 
@@ -1201,11 +1235,11 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         eulers(3) = 2*pi*(rand)
 
         print*,'alpha:',eulers(1)*180.0/pi
-        write(101,*),'alpha:',eulers(1)*180.0/pi
+        write(101,*)'alpha:',eulers(1)*180.0/pi
         print*,'beta: ',eulers(2)*180.0/pi
-        write(101,*),'beta: ',eulers(2)*180.0/pi
+        write(101,*)'beta: ',eulers(2)*180.0/pi
         print*,'gamma:',eulers(3)*180.0/pi
-        write(101,*),'gamma:',eulers(3)*180.0/pi
+        write(101,*)'gamma:',eulers(3)*180.0/pi
 
         ! mishchenko rotation
         s1 = sin(eulers(1))
@@ -1627,46 +1661,46 @@ subroutine SDATIN(  ifn,                & ! input filename
     intellirot = .false. ! assume no intelligent euler angle choices, unless read from input file
     
     print*,'========== start sr SDATIN'
-    write(101,*),'======================================================'
-    write(101,*),'=====================JOB SETTINGS====================='
-    write(101,*),'======================================================'
+    write(101,*)'======================================================'
+    write(101,*)'=====================JOB SETTINGS====================='
+    write(101,*)'======================================================'
 
 
     ! cfn = read_string(ifn,"cfn") ! get crystal filename
     ! call StripSpaces(cfn) ! remove leading spaces
     ! print*,'particle filename: "',cfn(1:len(trim(cfn))),'"'
-    ! write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'
+    ! write(101,*)'particle filename:      "',cfn(1:len(trim(cfn))),'"'
 
     c_method = read_string(ifn,"cmethod") ! get crystal filename
     call StripSpaces(c_method) ! remove leading spaces
     print*,'particle input method: "',c_method(1:len(trim(c_method))),'"'
-    write(101,*),'particle input method:      "',c_method(1:len(trim(c_method))),'"'
+    write(101,*)'particle input method:      "',c_method(1:len(trim(c_method))),'"'
 
     ! cft = read_string(ifn,"cft") ! get crystal filename
     ! call StripSpaces(cft) ! remove leading spaces
     ! print*,'particle file type: "',cft(1:len(trim(cft))),'"'  
-    ! write(101,*),'particle file type:     "',cft(1:len(trim(cft))),'"' 
+    ! write(101,*)'particle file type:     "',cft(1:len(trim(cft))),'"' 
 
     ! afn = read_string(ifn,"afn") ! get crystal filename
     ! call StripSpaces(afn) ! remove leading spaces
     ! print*,'apertures filename: "',afn(1:len(trim(afn))),'"'    
-    ! write(101,*),'apertures filename:     "',afn(1:len(trim(afn))),'"'    
+    ! write(101,*)'apertures filename:     "',afn(1:len(trim(afn))),'"'    
     
     la = read_real(ifn,"lambda")
     print*,'lambda: ',la
-    write(101,*),'lambda:                ',la
+    write(101,*)'lambda:                ',la
     
     rbi = read_real(ifn,"rbi")
     print*,'refractive index real: ',rbi
-    write(101,*),'refractive index real:',rbi
+    write(101,*)'refractive index real:',rbi
     
     ibi = read_real(ifn,"ibi")
     print*,'refractive index imag: ',ibi
-    write(101,*),'refractive index imag: ',ibi
+    write(101,*)'refractive index imag: ',ibi
 
     rec = read_int(ifn,"rec")
     print*,'max beam recursions: ',rec
-    write(101,*),'max beam recursions:   ',rec
+    write(101,*)'max beam recursions:   ',rec
  
     rot_method = readString2(ifn,"rot") ! get rotation method
     if( rot_method(1:len(trim(rot_method))) .eq. 'off' .or. &
@@ -1690,26 +1724,26 @@ subroutine SDATIN(  ifn,                & ! input filename
     end if
 
     print*,'num_orients: ',num_orients
-    write(101,*),'num_orients:           ',num_orients
+    write(101,*)'num_orients:           ',num_orients
 
     print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
-    write(101,*),'rotation method:        "',rot_method(1:len(trim(rot_method))),'"'
+    write(101,*)'rotation method:        "',rot_method(1:len(trim(rot_method))),'"'
 
 
     if (is_multithreaded) then
         print*,'multithreading: enabled'
-        write(101,*),'multithreading:         ','enabled'
+        write(101,*)'multithreading:         ','enabled'
     else
         print*,'multithreading: disabled'
-        write(101,*),'multithreading:         ','disabled'
+        write(101,*)'multithreading:         ','disabled'
     end if
 
     if (intellirot .and. num_orients .gt. 1) then
         print*,'multirot method: intelligent'
-        write(101,*),'multirot method:        intelligent'
+        write(101,*)'multirot method:        intelligent'
     else if (.not. intellirot .and. num_orients .gt. 1) then
         print*,'multirot method: random'
-        write(101,*),'multirot method:        random'
+        write(101,*)'multirot method:        random'
     end if
 
     print*,'========== end sr SDATIN'
@@ -1769,39 +1803,43 @@ subroutine PDAL2(   num_vert,       &
     integer(8) i, io, j, k, l, m, n, p, o, q ! counting variables
     real(8), dimension(:), allocatable :: faceAreas ! area of each facet
     real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
+    logical auto_apertures ! whether or noth automatic aperture asignment should be used
 
     c_method = job_params%c_method
     cc_hex_params = job_params%cc_hex_params
     cft = job_params%cft
     cfn = job_params%cfn
     afn = job_params%afn
+    auto_apertures = .false.
+
+    if(trim(afn) .eq. "") auto_apertures = .true.
 
     print*,'particle input method: "',c_method(1:len(trim(c_method))),'"'
     print*,'========== start sr PDAL2'
-    write(101,*),'======================================================'
-    write(101,*),'=================PARTICLE INFORMATION================='
-    write(101,*),'======================================================'
+    write(101,*)'======================================================'
+    write(101,*)'=================PARTICLE INFORMATION================='
+    write(101,*)'======================================================'
 
     if(c_method(1:len(trim(c_method))) .eq. "read") then ! if particle is to be read from file
 
         ! cfn = read_string(ifn,"cfn") ! get crystal filename
         ! call StripSpaces(cfn) ! remove leading spaces
         ! print*,'particle filename: "',cfn(1:len(trim(cfn))),'"'
-        write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'
+        write(101,*)'particle filename:      "',cfn(1:len(trim(cfn))),'"'
 
         ! cft = read_string(ifn,"cft") ! get crystal filename
         ! call StripSpaces(cft) ! remove leading spaces
         ! print*,'particle file type: "',cft(1:len(trim(cft))),'"'  
-        write(101,*),'particle file type:     "',cft(1:len(trim(cft))),'"'
+        write(101,*)'particle file type:     "',cft(1:len(trim(cft))),'"'
 
         ! afn = read_string(ifn,"afn") ! get crystal filename
         ! call StripSpaces(afn) ! remove leading spaces
-        ! print*,'apertures filename: "',afn(1:len(trim(afn))),'"'    
-        write(101,*),'apertures filename:     "',afn(1:len(trim(afn))),'"'
+        ! print*,'apertures filename: "',afn(1:len(trim(afn))),'"'
+        write(101,*)'apertures filename:     "',afn(1:len(trim(afn))),'"'
 
         print*,'crystal file type: "',trim(cft),'"'
-        ! write(101,*),'particle filename:      "',cfn(1:len(trim(cfn))),'"'    
-        ! write(101,*),'particle file type:     "',trim(cft),'"'
+        ! write(101,*)'particle filename:      "',cfn(1:len(trim(cfn))),'"'    
+        ! write(101,*)'particle file type:     "',trim(cft),'"'
 
         if (trim(cft) .eq. 'obj') then
 
@@ -1886,7 +1924,8 @@ subroutine PDAL2(   num_vert,       &
                                 if (entry_count .eq. 1) then
                                     vertex_count = vertex_count + 1
                                     if (vertex_count .gt. num_face_vert_max_in) then
-                                        print*,'face',k,' has',vertex_count,' vertices which is greater than the max value of',num_face_vert_max_in
+                                        print*,'face',k,' has',vertex_count, &
+                                            ' vertices which is greater than the max value of',num_face_vert_max_in
                                         print*,'Please increase the max vertices per face "num_face_vert_max_in"'
                                         stop
                                     end if
@@ -2051,8 +2090,17 @@ subroutine PDAL2(   num_vert,       &
             stop
         end if
 
-        call readApertures(afn, apertures, face_ids) ! read aperture assignments from file
-    
+        if (auto_apertures .eq. .true.) then
+            ! print*,'number of faces:',size(face_ids,1)
+            if(size(face_ids,1) .gt. 50) print*,'warning: automatic aperture assignment for large numbers of input faces is not well supported.'
+            allocate(apertures(1:size(face_ids,1)))
+            do i = 1, size(face_ids,1)
+                apertures(i) = i
+            end do
+        else
+            call readApertures(afn, apertures, face_ids) ! read aperture assignments from file
+        end if
+
     else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
         print*,'attempting to make cc crystal'
         call CC_HEX_MAIN(cc_hex_params,face_ids,verts,apertures)
@@ -2068,9 +2116,9 @@ subroutine PDAL2(   num_vert,       &
         stop
     end if
 
-    write(101,*),'number of vertices:   ',num_vert
-    write(101,*),'number of faces:      ',num_face
-    write(101,*),'max vertices per face:',num_face_vert_max
+    write(101,*)'number of vertices:   ',num_vert
+    write(101,*)'number of faces:      ',num_face
+    write(101,*)'max vertices per face:',num_face_vert_max
 
     if (num_face_vert_max .gt. 3) then
         print*,'error: max vertices per facet greater than 3 is currently not supported.'
@@ -2208,7 +2256,7 @@ character(100) function readString2(ifn,var)
         read(10,"(a)",iostat=io)line
         if (line(1:len(var)+1) .eq. var//' ') then ! if match found
             j = 0
-            do while (success2 .eq. .false.)
+            do while (success2 .eqv. .false.)
                 j = j + 1
                 ! print*,line(len(var)+1+j:len(var)+1+j)
                 if(line(len(var)+1+j:len(var)+1+j) .eq. ' ') success2 = .true.

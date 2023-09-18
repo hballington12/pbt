@@ -36,7 +36,7 @@ subroutine energy_checks(   beam_outbeam_tree, &
     real(8), intent(out) :: energy_out_ext_diff
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
 
-    integer i
+    integer(8) i
     integer(8) face_id
     real(8) prop(1:3)
     real(8) normal(1:3)
@@ -57,10 +57,10 @@ subroutine energy_checks(   beam_outbeam_tree, &
         normal = norm(face2(face_id),1:3)
         area = faceAreas(face_id)
         cos_theta = dot_product(prop,normal)
-        intensity_out = 0.5*(   ampl(1,1)*conjg(ampl(1,1)) + &
+        intensity_out = real(0.5*(   ampl(1,1)*conjg(ampl(1,1)) + &
                                 ampl(1,2)*conjg(ampl(1,2)) + &
                                 ampl(2,1)*conjg(ampl(2,1)) + &
-                                ampl(2,2)*conjg(ampl(2,2)))
+                                ampl(2,2)*conjg(ampl(2,2))))
                                 
         if (intensity_out .gt. 1e5) print*,'i_beam:',i,' intensity out: ',intensity_out
         
@@ -77,20 +77,20 @@ subroutine energy_checks(   beam_outbeam_tree, &
         normal = norm(face2(face_id),1:3)
         area = faceAreas(face_id)
         cos_theta = -dot_product(prop,normal)
-        intensity_out = 0.5*(   ampl(1,1)*conjg(ampl(1,1)) + &
+        intensity_out = real(0.5*(   ampl(1,1)*conjg(ampl(1,1)) + &
                                 ampl(1,2)*conjg(ampl(1,2)) + &
                                 ampl(2,1)*conjg(ampl(2,1)) + &
-                                ampl(2,2)*conjg(ampl(2,2)))
+                                ampl(2,2)*conjg(ampl(2,2))))
         energy_out_ext_diff = energy_out_ext_diff + intensity_out*area*cos_theta
     end do
 
-    write(101,*),'------------------------------------------------------'
-    write(101,'(A41,f16.8)'),'energy in (ill. geom. cross sec.): ', energy_in
-    write(101,'(A41,f16.8)'),'beam energy out: ',energy_out_beam
-    write(101,'(A41,f16.8)'),'absorbed beam energy: ',ext_cross_section
-    write(101,'(A41,f16.8)'),'ext diff energy out: ',energy_out_ext_diff
-    write(101,'(A41,f16.8,A2)'),'beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
-    write(101,'(A41,f16.8,A2)'),'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
+    write(101,*)'------------------------------------------------------'
+    write(101,'(A41,f16.8)')'energy in (ill. geom. cross sec.): ', energy_in
+    write(101,'(A41,f16.8)')'beam energy out: ',energy_out_beam
+    write(101,'(A41,f16.8)')'absorbed beam energy: ',ext_cross_section
+    write(101,'(A41,f16.8)')'ext diff energy out: ',energy_out_ext_diff
+    write(101,'(A41,f16.8,A2)')'beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
+    write(101,'(A41,f16.8,A2)')'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
 
     print'(A40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
     print'(A40,f16.8)','beam energy out: ',energy_out_beam
@@ -234,7 +234,7 @@ subroutine beam_loop(   Face1, &
     call init(  Face1, isVisible, isVisiblePlusShadows, isWithinBeam, distances, beamIDs, &
                 isWithinBeam_ps, distances_ps, beamIDs_ps, isShadow, ampl_in, ampl_in_ps, la, waveno, &
                 rperp, rpar, tperp, tpar, vk71, vk72, vk73, vk91, vk92, vk93, rot_ampl, new_in_ampl, &
-                new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, ampl_diff, &
+                new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, &
                 beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter) ! initialise some variables
     ! move beam_loop_mod variables into separate beam_loop_init subroutine and out of main program later...
 
@@ -312,9 +312,9 @@ subroutine beam_loop(   Face1, &
     print*,'=========='
     print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"
     print*,'=========='
-    write(101,*),'=========='
-    write(101,'(A,f16.8,A)'),"end beam loop - time elapsed: ",finish-start," secs"
-    write(101,*),'=========='    
+    write(101,*)'=========='
+    write(101,'(A,f16.8,A)')"end beam loop - time elapsed: ",finish-start," secs"
+    write(101,*)'=========='    
 
     call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, verts, Face1)    
 
@@ -382,7 +382,8 @@ logical, intent(in) :: is_multithreaded
 
 logical am_i_multithreaded
 
-integer i, j, k, m
+integer i, k, m
+integer(8) j
 logical, dimension(:), allocatable :: is_beam
 logical, dimension(:), allocatable :: is_vis
 real(8), allocatable, dimension(:,:) :: boundingBoxV
@@ -394,7 +395,7 @@ integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
 integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
 integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
-integer BB
+integer(8) BB
 logical within_bounds
 real(8) vecb1, vecb2
 real(8) edge_norm1, edge_norm2
@@ -524,7 +525,7 @@ if(am_i_multithreaded) then
     !$OMP PARALLEL DEFAULT(SHARED) num_threads(omp_get_max_threads()) PRIVATE(j,k,m,BB,within_bounds,edge_norm1,edge_norm2,vecb1,vecb2,edge_check)
     !$OMP DO
     do m = 1, size(Face2,1) ! for each facet m
-        if(is_vis(m) .eq. .false.) then ! if facet isnt visible
+        if(is_vis(m) .eqv. .false.) then ! if facet isnt visible
             ! do nothing
         else
             if(rotatedapertureNormals(apertures(m),3) .gt. -0.01) then ! if aperture is downfacing
@@ -566,7 +567,7 @@ if(am_i_multithreaded) then
                                         edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B
                                         if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
                                     end do
-                                    if(within_bounds .eq. .false.) then ! if facet m is not within bounded surface of facet j
+                                    if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
                                         !do nothing
                                     else
                                         if(is_beam(j)) then ! if facet j was part of the illuminating surface
@@ -609,7 +610,7 @@ if(am_i_multithreaded) then
     !$OMP END PARALLEL
 else
     do m = 1, size(Face2,1) ! for each facet m
-        if(is_vis(m) .eq. .false.) then ! if facet isnt visible
+        if(is_vis(m) .eqv. .false.) then ! if facet isnt visible
             ! do nothing
         else
             if(rotatedapertureNormals(apertures(m),3) .gt. -0.01) then ! if aperture is downfacing
@@ -651,7 +652,7 @@ else
                                         edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B
                                         if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
                                     end do
-                                    if(within_bounds .eq. .false.) then ! if facet m is not within bounded surface of facet j
+                                    if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
                                         !do nothing
                                     else
                                         if(is_beam(j)) then ! if facet j was part of the illuminating surface
@@ -1172,7 +1173,7 @@ do i = 1, size(apertureMidpoints,1) ! for each aperture
     if(sufficientlyIlluminated2(i)) then
         if(rotatedapertureNormals(i,3) > -0.01) then ! if normal faces upwards, it is unphysical for internal interactions
             sufficientlyIlluminated2(i) = .false.
-            if(prescan) print'(A,I,A)','aperture ',i,' was suff. illuminated but set not visible because it was facing the wrong way'
+            if(prescan) print'(A,I2,A)','aperture ',i,' was suff. illuminated but set not visible because it was facing the wrong way'
         end if
     end if
 end do
@@ -1456,7 +1457,7 @@ do i = 1, num_sufficiently_illuminated_apertures
     do j = 1, size(Face2,1) ! for each facet
         if(isWithinBeam2_ps(j)) then
             k = k + 1
-            if(isShadow(j) .eq. .false.) then
+            if(isShadow(j) .eqv. .false.) then
                 call cross(-Norm(Face2(j),1:3),aperturePropagationVectors(aperture_id,1:3),vk7a(1:3))
             else
                 aperture = apertures(j)
@@ -1512,7 +1513,7 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)','               (',real(rot_ampl(2,1)),' + ',imag(rot_ampl(2,1)),'i, ',real(rot_ampl(2,2)),' + ',imag(rot_ampl(2,2)),'i)'
 
             ! FRESNEL
-            if(isShadow(j) .eq. .false.) then
+            if(isShadow(j) .eqv. .false.) then
                 theta_i = acos(-rotatedNorm(Face2(j),3)) ! get incident angle
             else
                 aperture = apertures(j) ! probably dont need this line (see above)
@@ -1729,14 +1730,14 @@ allocate(sufficientlyIlluminated(1:size(propagationVectors,1)))
 
 do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previous recursion
     illuminatedFaceIDs(1:size(F1Mapping,1)) = F1Mapping(1:size(F1Mapping,1),i) ! extract the column
-    isWithinBeam = 0 ! initialise
+    isWithinBeam = .false. ! initialise
     ampl = 0 ! initialise
     vk71 = 0 ! initialise
     vk72 = 0 ! initialise
     vk73 = 0 ! initialise
     do j = 1, size(illuminatedFaceIDs,1) ! loop through face IDs
         if(illuminatedFaceIDs(j) .gt. 0) then ! if face was illuminated (had to change to 0 from nan vs. Matlab code)
-            isWithinBeam(illuminatedFaceIDs(j)) = 1 ! set visible
+            isWithinBeam(illuminatedFaceIDs(j)) = .true. ! set visible
             ampl(1,1,illuminatedFaceIDs(j)) = refl_ampl_out11Int(j,i)
             ampl(1,2,illuminatedFaceIDs(j)) = refl_ampl_out12Int(j,i)
             ampl(2,1,illuminatedFaceIDs(j)) = refl_ampl_out21Int(j,i)
@@ -2119,7 +2120,7 @@ real(8), dimension(:), allocatable, intent(in) :: vk71, vk72, vk73 ! reflected e
 integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 integer(8), intent(inout) :: interactionCounter ! counts the current number of interactions
 
-integer i, j
+integer(8) i, j
 integer(8), dimension(:), allocatable :: outbeam_apertures ! the aperture which each facet belongs to
 integer(8), dimension(:), allocatable :: unique_apertures !
 
@@ -2227,8 +2228,8 @@ complex(8), dimension(:,:,:), allocatable, intent(inout) :: refl_ampl ! reflecte
 complex(8), dimension(:,:,:), allocatable, intent(inout) :: trans_ampl ! transmitted amplitude matrices
 
 integer i
-real(8) refl_matrix(1:2,1:2)
-real(8) trans_matrix(1:2,1:2)
+complex(8) refl_matrix(1:2,1:2)
+complex(8) trans_matrix(1:2,1:2)
 
 ! intitialise
 refl_matrix = 0
@@ -2438,7 +2439,7 @@ real(8), dimension(:), allocatable, intent(in) :: distances ! distances to each 
 real(8), dimension(:), allocatable, intent(in) :: distances_ps ! distances to each illuminated face from the illuminating face ID given by beamIDs, including down-facing facets of illuminated apertures
 integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 
-integer i, blockingID
+integer(8) i, blockingID
 
 do i = 1, size(Face1,1) ! for each face
     if(isWithinBeam(i)) then ! if the face was within the beam
@@ -2485,7 +2486,7 @@ integer i
 
 isShadow = .false.
 do i = 1, size(isWithinBeam,1) ! for each facet
-    if(isWithinBeam_ps(i) .and. isWithinBeam(i) .eq. .false.) isShadow(i) = .true. ! determine if it was visible but in the shadow
+    if(isWithinBeam_ps(i) .and. isWithinBeam(i) .eqv. .false.) isShadow(i) = .true. ! determine if it was visible but in the shadow
 end do
 
 end subroutine
@@ -3038,7 +3039,7 @@ do i = 1, numApertures
 end do
 ! if a shdaow facet was visible but part of an aperture that had no non-shadow visible facets, set shadow facets to not visible
 do i = 1, size(Face1,1)
-    if(visibleApertures(apertures(i)) .eq. .false.) isVisiblePlusShadows(i) = .false.
+    if(visibleApertures(apertures(i)) .eqv. .false.) isVisiblePlusShadows(i) = .false.
 end do
 
 
@@ -3681,7 +3682,7 @@ end subroutine
 subroutine init(face_ids, isVisible, isVisiblePlusShadows, isWithinBeam, distances, beamIDs, &
     isWithinBeam_ps, distances_ps, beamIDs_ps, isShadow, ampl_in, ampl_in_ps, la, waveno, &
     rperp, rpar, tperp, tpar, vk71, vk72, vk73, vk91, vk92, vk93, rot_ampl, new_in_ampl, &
-    new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, ampl_diff, &
+    new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, &
     beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter)
 
 ! subroutine init initialises many variables for the beam tracing loop
@@ -3708,7 +3709,6 @@ complex(8), dimension(:,:,:), allocatable, intent(out) :: trans_ampl_ps ! transm
 complex(8), dimension(:,:,:), allocatable, intent(out) :: trans_ampl ! transmitted amplitude matrices
 complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl ! reflected amplitude matrices
 complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl_ps ! reflected amplitude matrices
-complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_diff ! external diffraction amplitude matrices
 type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
 integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
 integer(8), intent(out) :: interactionCounter ! counts the current number of interactions

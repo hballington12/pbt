@@ -60,6 +60,9 @@ type job_parameters_type
 	real(8), dimension(:), allocatable :: theta_vals
 	real(8), dimension(:), allocatable :: phi_vals
 	logical suppress_2d ! whether or not to suppress 2d output of the mueller matrix
+	logical tri ! enable auto triangulation
+	real(8) tri_edge_length ! auto triangulation max edge length
+	real(8) tri_roughness ! auto triangulation roughness magnitude
 end type job_parameters_type
 
 contains

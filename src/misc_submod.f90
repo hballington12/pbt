@@ -48,44 +48,44 @@ c_method = job_params%c_method
 job_name = job_params%job_name
 cc_hex_params = job_params%cc_hex_params
 
-    write(101,*),'======================================================'
-    write(101,*),'=====================JOB SETTINGS====================='
-    write(101,*),'======================================================'
-    write(101,*),'job_name:                      "',trim(job_name),'"'
-    write(101,*),'lambda:                      ',la
-    write(101,*),'refractive index real:      ',rbi
-    write(101,*),'refractive index imag:       ',ibi
-    write(101,*),'max beam recursions:',rec
-    write(101,*),'rotation method:               "',rot_method(1:len(trim(rot_method))),'"'
-    write(101,*),'no. of orientations:',num_orients
+    write(101,*)'======================================================'
+    write(101,*)'=====================JOB SETTINGS====================='
+    write(101,*)'======================================================'
+    write(101,*)'job_name:                      "',trim(job_name),'"'
+    write(101,*)'lambda:                      ',la
+    write(101,*)'refractive index real:      ',rbi
+    write(101,*)'refractive index imag:       ',ibi
+    write(101,*)'max beam recursions:',rec
+    write(101,*)'rotation method:               "',rot_method(1:len(trim(rot_method))),'"'
+    write(101,*)'no. of orientations:',num_orients
     if (is_multithreaded) then
-        write(101,*),'multithreading:                ','enabled'
+        write(101,*)'multithreading:                ','enabled'
     else
-        write(101,*),'multithreading:                ','disabled'
+        write(101,*)'multithreading:                ','disabled'
     end if
-    write(101,*),'particle input method:         "',c_method(1:len(trim(c_method))),'"'
+    write(101,*)'particle input method:         "',c_method(1:len(trim(c_method))),'"'
     if (intellirot .and. num_orients .gt. 1) then
-        write(101,*),'multirot method:        intelligent'
+        write(101,*)'multirot method:        intelligent'
     else if (.not. intellirot .and. num_orients .gt. 1) then
-        write(101,*),'multirot method:        random'
+        write(101,*)'multirot method:        random'
     end if
     if(c_method(1:len(trim(c_method))) .eq. "read") then ! if particle is to be read from file
-        write(101,*),'particle filename:             "',cfn(1:len(trim(cfn))),'"'
-        write(101,*),'particle file type:            "',cft(1:len(trim(cft))),'"'
-        write(101,*),'apertures filename:            "',afn(1:len(trim(afn))),'"'
+        write(101,*)'particle filename:             "',cfn(1:len(trim(cfn))),'"'
+        write(101,*)'particle file type:            "',cft(1:len(trim(cft))),'"'
+        write(101,*)'apertures filename:            "',afn(1:len(trim(afn))),'"'
     else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
-        write(101,*),'gaussian random particle parameters...'
-        write(101,*),'L:                                ',cc_hex_params%l
-        write(101,*),'hexagon edge length:              ',cc_hex_params%hr
-        write(101,*),'no. facets per hex. edge: ',cc_hex_params%nfhr
-        write(101,*),'prism edge length:                ',cc_hex_params%pfl
-        write(101,*),'no. facets per prism edge:',cc_hex_params%nfpl
-        write(101,*),'no. rotations at p-b:     ',cc_hex_params%pher
-        write(101,*),'no. rotations at p-p:     ',cc_hex_params%pper
-        write(101,*),'no. roughness scales:     ',cc_hex_params%nscales
+        write(101,*)'gaussian random particle parameters...'
+        write(101,*)'L:                                ',cc_hex_params%l
+        write(101,*)'hexagon edge length:              ',cc_hex_params%hr
+        write(101,*)'no. facets per hex. edge: ',cc_hex_params%nfhr
+        write(101,*)'prism edge length:                ',cc_hex_params%pfl
+        write(101,*)'no. facets per prism edge:',cc_hex_params%nfpl
+        write(101,*)'no. rotations at p-b:     ',cc_hex_params%pher
+        write(101,*)'no. rotations at p-p:     ',cc_hex_params%pper
+        write(101,*)'no. roughness scales:     ',cc_hex_params%nscales
         do i = 1, cc_hex_params%nscales
-            write(101,'(A,I1,A,f16.8)'),' corr. length ',i,':                ',cc_hex_params%cls(i)
-            write(101,'(A,I1,A,f16.8)'),' std. deviation ',i,':              ',cc_hex_params%sds(i)
+            write(101,'(A,I1,A,f16.8)')' corr. length ',i,':                ',cc_hex_params%cls(i)
+            write(101,'(A,I1,A,f16.8)')' std. deviation ',i,':              ',cc_hex_params%sds(i)
         end do
     end if
 
@@ -112,61 +112,647 @@ close(10)
 
     end subroutine
 
-subroutine make_dir(dir_path_in,cwd_out)
+    subroutine make_dir(dir_path_in,cwd_out)
 
-    ! makes job directory - quick and dirty method
-
-    character(len=*), intent(in) :: dir_path_in
-    character(len=255) dir_path
-    character(len=255), intent(out) :: cwd_out
-    logical exists ! for checking if directories or files exist
-    integer result ! true if subdirectory was made, false if subdirectory was not made
-    integer job_num ! job number
-    character(len=255) job_num_string ! job number
-
-    job_num = 1
-    result = .false.
-
-    ! attempt to make job with specified name
-    write(dir_path,*) trim(dir_path_in)
-    call StripSpaces(dir_path)
-    ! print*,'enquiring at: "',trim(dir_path),'"'
-    inquire(directory = trim(dir_path), exist = exists)
-    if(exists .eq. .false.) then ! if job name is available
-        ! print*,'Creating job directory at "',trim(dir_path),'"'
-        write(cwd_out,*) trim(dir_path)
-        result = makedirqq(trim(dir_path))
-    else ! if job name is not available, append numbers until an available name is found
-        do while (result .eq. .false.) ! while a new directory has not been made
-
-            ! append job_num to directory name
-            write(job_num_string,"(I)") job_num
-            call StripSpaces(job_num_string)
-            ! print*,'job_num_string:',trim(job_num_string)
-            ! print*,'dir_path: ',trim(dir_path_in)//trim(job_num_string)
-            write(dir_path,*) trim(dir_path_in)//"_"//trim(job_num_string)
-            call StripSpaces(dir_path)
-            ! print*,'attempting to make directory with name "',trim(dir_path),'"'
+        ! makes job directory - quick and dirty method
     
-            inquire(directory = trim(dir_path), exist = exists)
-            if(exists .eq. .false.) then 
-                ! print*,'Creating job directory at "',trim(dir_path),'"'
-                write(cwd_out,*) trim(dir_path)
-                result = makedirqq(trim(dir_path))
+        character(len=*), intent(in) :: dir_path_in
+        character(len=255) dir_path
+        character(len=255), intent(out) :: cwd_out
+        logical exists ! for checking if directories or files exist
+        integer result ! true if subdirectory was made, false if subdirectory was not made
+        integer job_num ! job number
+        character(len=255) job_num_string ! job number
+    
+        job_num = 1
+        result = .false.
+    
+        ! attempt to make job with specified name
+        write(dir_path,*) trim(dir_path_in)
+        call StripSpaces(dir_path)
+        ! print*,'enquiring at: "',trim(dir_path),'"'
+        inquire(directory = trim(dir_path), exist = exists)
+        if(exists .eq. .false.) then ! if job name is available
+            ! print*,'Creating job directory at "',trim(dir_path),'"'
+            write(cwd_out,*) trim(dir_path)
+            result = makedirqq(trim(dir_path))
+        else ! if job name is not available, append numbers until an available name is found
+            do while (result .eq. .false.) ! while a new directory has not been made
+    
+                ! append job_num to directory name
+                write(job_num_string,"(I)") job_num
+                call StripSpaces(job_num_string)
+                ! print*,'job_num_string:',trim(job_num_string)
+                ! print*,'dir_path: ',trim(dir_path_in)//trim(job_num_string)
+                write(dir_path,*) trim(dir_path_in)//"_"//trim(job_num_string)
+                call StripSpaces(dir_path)
+                ! print*,'attempting to make directory with name "',trim(dir_path),'"'
+        
+                inquire(directory = trim(dir_path), exist = exists)
+                if(exists .eq. .false.) then 
+                    ! print*,'Creating job directory at "',trim(dir_path),'"'
+                    write(cwd_out,*) trim(dir_path)
+                    result = makedirqq(trim(dir_path))
+                else
+                    ! if already exists, add 1 to job number and try again
+                    job_num = job_num + 1
+                    ! print*,'error: job directory already exists'
+                    ! stop
+                end if
+        
+            end do
+    
+        end if
+    
+        call StripSpaces(cwd_out)
+    
+        
+    
+    end subroutine
+
+
+subroutine fix_collinear_vertices(verts, face_ids, num_vert, num_face, num_face_vert, apertures)
+
+    ! removes edges which have vertices that lie along them
+    ! needs fixing to accommodate multiple collinear vertices lying along 1 edge
+
+    real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
+    integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs
+    integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
+    integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert ! number of vertices in each face
+    integer(8), dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
+
+    integer(8) i, j ,k
+    real(8) edge_vector(1:3), a_vector(1:3) ! some vectors
+    integer(8) next_index, prev_index
+    real(8) edge_vector_length, a_vector_length, a_dot_product, closest_vector_length
+    integer(8) num_collinear_vertices ! number of vertices found along an edge
+    integer(8) collinear_vertex_id ! id of a vertex found to be collinear
+    integer(8) temp_face_ids(1000000,1:10) ! face vertex IDs
+    integer(8) temp_num_face_vert(1000000) ! number of vertices in each face
+    integer(8) temp_apertures(1000000) ! apertures asignments for each facet
+    integer(8) max_verts ! max vertices per face
+    logical success
+
+    success = .true.
+
+    ! save the input face_id and num_face_vert arrays
+    do i = 1, num_face
+        temp_num_face_vert(i) = num_face_vert(i)
+        temp_apertures(i) = apertures(i)
+        do j =1, num_face_vert(i)
+            temp_face_ids(i,j) = face_ids(i,j)
+        end do
+    end do
+
+    do i = 1, size(face_ids,1) ! for each face
+        ! print*,'i:',i,'num faces:',num_face_vert(i)
+        do j = 1, num_face_vert(i) ! for each vertex in the face
+            num_collinear_vertices = 0 ! init counter
+            closest_vector_length = HUGE(1D0) ! get a large number
+            ! get the edge vector
+            if(j .eq. num_face_vert(i)) then
+                next_index = 1
+                prev_index = j - 1
+            else if(j .eq. 1) then
+                next_index = j + 1
+                prev_index = num_face_vert(i)
             else
-                ! if already exists, add 1 to job number and try again
-                job_num = job_num + 1
-                ! print*,'error: job directory already exists'
+                prev_index = j - 1
+                next_index = j + 1
+            end if
+            edge_vector(1:3) = verts(face_ids(i,next_index),1:3) - verts(face_ids(i,j),1:3) ! get edge vector
+            edge_vector_length = sqrt(edge_vector(1)**2 + edge_vector(2)**2 + edge_vector(3)**2) ! get the length of the edge vector
+
+            do k = 1, num_vert ! loop over all other vertices
+                if(k .ne. face_ids(i,next_index) .and. k .ne. face_ids(i,j)) then ! ignore vertices part of this edge
+                    a_vector(1:3) = verts(k,1:3) - verts(face_ids(i,j),1:3) ! get vector from start of edge to this vertex
+                    a_vector_length = sqrt(a_vector(1)**2 + a_vector(2)**2 + a_vector(3)**2) ! get the length of the edge vector
+                    a_dot_product = dot_product(edge_vector,a_vector)/(a_vector_length*edge_vector_length) ! get normalised dot product of edge vector and vector to vertex
+                    if(a_dot_product .gt. 0.999) then
+                        if(a_vector_length .lt. edge_vector_length) then
+                            ! print*,'detected that vertex #',k,'lies on the edge between vertex #',face_ids(i,next_index),'and vertex #',face_ids(i,j)
+                            ! if we pass this point, we have have found a vertex from which we must divide facet
+                            ! we should take care to ensure that this edge does not contain any other vertices (this would require re-calling this subroutine)
+                            num_collinear_vertices = num_collinear_vertices + 1
+                            if(a_vector_length .lt. closest_vector_length) then ! if it was the closest collinear vertex so far
+                                collinear_vertex_id = k ! update a tracker to hold the vertex id
+                                closest_vector_length = a_vector_length ! update the distance
+                            end if
+                        end if
+                    end if
+                end if
+            end do
+            if(num_collinear_vertices .eq. 0) then
+                ! do nothing
+            else if(num_collinear_vertices .gt. 1) then
+                ! print*,'warning: need to recall collinear fix sr'
+                success = .false.
+            else ! else, if only 1 collinear vertex along this edge
+                ! print*,'first vertex of this edge is #',j,'which is vertex ID:',face_ids(i,j)
+                ! print*,'prev vertex of this edge is #',prev_index,'which is vertex ID:',face_ids(i,prev_index)
+                ! print*,'the collinear vertex along this edge was vertex ID:',collinear_vertex_id
+                ! in the old face, replace the first edge vertex with the collinear one we found
+                temp_face_ids(i,j) = collinear_vertex_id
+                ! also make a new triangular face to fill the gap
+                num_face = num_face + 1
+                temp_apertures(num_face) = apertures(i) ! set as the same aperture assignment
+                temp_num_face_vert(num_face) = 3 ! triangular face, so has 3 vertices
+                temp_face_ids(num_face,3) = face_ids(i,j) ! third vertex is the first vertex of the edge
+                temp_face_ids(num_face,2) = collinear_vertex_id ! second vertex is the collinear vertex we found
+                temp_face_ids(num_face,1) = face_ids(i,prev_index) ! first vertex is the previous vertex from the original facet
                 ! stop
             end if
-    
         end do
+    end do
 
+    ! print*,'faces in: ',size(face_ids,1)
+    ! print*,'faces after fix: ',num_face
+
+    if(success) then
+        print*,'sr fix_collinear_vertices: added',num_face - size(face_ids,1),' extra faces to remove some collinear vertices'
+
+        max_verts = maxval(num_face_vert)
+
+        ! print*,'max number of vertices per face = ',max_verts
+
+        ! now reassign
+        deallocate(face_ids)
+        deallocate(num_face_vert)
+        deallocate(apertures)
+        ! print*,'deallocated stuff.'
+        allocate(face_ids(1:num_face,1:max_verts))
+        ! print*,'allocated stuff.'
+        allocate(num_face_vert(1:num_face))
+        ! print*,'allocated stuff.'
+        allocate(apertures(1:num_face))
+        ! print*,'allocated stuff.'
+
+        do i = 1, num_face
+            num_face_vert(i) = temp_num_face_vert(i)
+            apertures(i) = temp_apertures(i)
+            do j =1, temp_num_face_vert(i)
+                face_ids(i,j) = temp_face_ids(i,j)
+            end do
+        end do
+    else
+        print*,'sr fix_collinear_vertices failed because multiple vertices were found to lie along a single edge'
+        print*,'to fix this, please refine triangle settings'
+        ! print*,'results should be ok, expect some small energy losses.'
     end if
 
-    call StripSpaces(cwd_out)
+    ! stop
+    
+
+
+    end subroutine
+
+subroutine merge_vertices(verts, face_ids, num_vert, num_face, distance_threshold)
+
+    ! merges vertices that are close enough together
+    ! general outline:
+    ! for each vertex, calculate the distance to all other vertices
+    ! if the distance is less than the specified distance threshold, merge them at the centre
+    ! else, keep the vertex as it is
+    ! add the vertex to a new vertex array and appropriately assign the face_ids
+
+    real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
+    integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+    integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
+    real(8), intent(in) :: distance_threshold ! max distance between two vertices for them to be merged
+
+    logical, dimension(:), allocatable :: has_vertex_been_checked ! whether this vertex has been checked for merge
+    real(8) this_vertex(1:3), another_vertex(1:3), midpoint(1:3)
+    real(8) distance
+    integer(8) i, j, k, num_vertices_to_merge
+    integer(8) vertices_to_merge_with(1:100)
+    real(8) merged_verts(1000000,1:3)
+    integer(8) merged_vert_counter
+    integer(8), dimension(:,:) ,allocatable :: merged_face_ids ! face vertex IDs (for after excess columns have been truncated)
+    integer(8), dimension(:) ,allocatable :: vertex_mapping ! maps the old vertices to the merged vertices
+
+    print*,'start vertex merge...'
+
+    allocate(vertex_mapping(1:size(verts,1)))
+    allocate(merged_face_ids(1:size(face_ids,1),1:size(face_ids,2)))
+    allocate(has_vertex_been_checked(1:size(verts,1))) ! allocate as same size as number of vertices
+    has_vertex_been_checked = .false.
+    merged_vert_counter = 0
+
+    do i = 1, num_vert ! for each vertex
+        if(.not. has_vertex_been_checked(i)) then ! if we havent already checked this vertex
+            num_vertices_to_merge = 0 ! set the counter
+            this_vertex(1:3) = verts(i,1:3) ! get the components of this vertex
+            do j = 1, num_vert ! check against all other vertices
+                if(j .eq. i) then ! ignore self
+                    ! do nothing
+                else
+                    another_vertex(1:3) = verts(j,1:3) ! get the components of another vertex
+                    distance = sqrt((this_vertex(1)-another_vertex(1))**2 + &
+                                    (this_vertex(2)-another_vertex(2))**2 + &
+                                    (this_vertex(3)-another_vertex(3))**2) ! distance between the 2 vertices
+                    if(distance .lt. distance_threshold) then ! if the 2 vertices are close enough...
+                        num_vertices_to_merge = num_vertices_to_merge + 1 ! update counter
+                        vertices_to_merge_with(num_vertices_to_merge) = j ! record the vertex id
+                    end if
+                end if
+            end do
+            ! print*,'vertex:',i,' - number of vertices to merge with: ',num_vertices_to_merge
+            merged_vert_counter = merged_vert_counter + 1 ! update counter
+
+            ! now get the midpoint of the vertices we wish to merge
+            midpoint(1:3) = this_vertex(1:3) ! start by setting the midpoint to this vertex
+            vertex_mapping(i) = merged_vert_counter ! record the mapping from old to merged vertices
+            ! print*,'i',i,'vertex_mapping(i)',vertex_mapping(i)
+            do k = 1, num_vertices_to_merge
+                ! print*,vertices_to_merge_with(k)
+                midpoint(1:3) = midpoint(1:3) + verts(vertices_to_merge_with(k),1:3) ! add the other vertices
+                vertex_mapping(vertices_to_merge_with(k)) = merged_vert_counter ! record the mapping from old to merged vertices
+                has_vertex_been_checked(vertices_to_merge_with(k)) = .true.
+            end do
+            midpoint(1:3) = midpoint(1:3) / (num_vertices_to_merge + 1) ! divide by number of vertices to get the midpoint
+            
+            merged_verts(merged_vert_counter,1:3) = midpoint(1:3) ! save the new vertex into a new array
+
+            has_vertex_been_checked(i) = .true. ! record that this vertex has been checked
+        end if
+    end do
+
+    ! do i = 1, num_vert
+    !     print*,'vertex',i,' was mapped to merged vertex',vertex_mapping(i)
+    ! end do
+
+    ! make the new face_ids array
+    do i = 1, size(face_ids,1)
+        do j = 1, size(face_ids,2)
+            if((face_ids(i,j)) .ne. 0) then ! if its not a null
+                merged_face_ids(i,j) = vertex_mapping(face_ids(i,j))
+            end if
+        end do
+    end do
+
+    ! repopulate the input arrays with the merged arrays
+    deallocate(verts)
+    allocate(verts(1:merged_vert_counter,1:3))
+
+    do i = 1, merged_vert_counter
+        verts(i,1:3) = merged_verts(i,1:3)
+    end do
+    do i = 1, size(face_ids,1)
+        do j = 1, size(face_ids,2)
+            face_ids(i,j) = merged_face_ids(i,j)
+        end do
+    end do
+
+    print*,'merged',num_vert,' vertices into ',merged_vert_counter,' vertices.'
+
+    num_vert = merged_vert_counter
+
+    ! stop
+
+    end subroutine
+
+subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_length,flags,apertures,roughness)
+
+    ! calls triangle to triangulate and subdivide a surface
+    ! returns the subdivided surface
+
+    real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
+    integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+    integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
+    integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert
+    character(len=*) flags
+    real(8), intent(in) :: max_edge_length
+    integer(8), dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
+    real(8), intent(in) :: roughness
+
+    integer i, j, k, junk, vert_counter, vert_counter_total, face_counter, face_counter_total
+    real(8), dimension(:,:), allocatable :: v, v0, v1 ! vertices of facet (after lr flip)
+    integer(8), dimension(:), allocatable :: my_array ! points some numbers to some other numbers
+    real(8) com(1:3) ! facet centre of mass
+    real(8) rot(1:3,1:3) ! rotation matrix
+    integer(8), dimension(:), allocatable :: num_face_vert_out
+    integer(8), dimension(:), allocatable :: apertures_temp ! apertures asignments for each facet
+
+    integer num_verts
+    integer num_nodes, num_faces, num_edges
+    real(8) verts_out(1:1000000,1:3) ! vertices after triangulation
+    integer(8) face_ids_out(1:1000000,1:3) ! face_ids after triangulation
+    integer(8) apertures_out(1:1000000) ! apertures after triangulation
+
+    real(8), dimension(:,:), allocatable :: verts_out_final
+    integer(8), dimension(:,:), allocatable :: face_ids_out_final
+    character(255) triangle_cmd ! command for calling triangle
+    character(100) a_string
+    logical, dimension(:), allocatable :: is_boundary ! whether or not a vertex lies on the boundary of an aperture
+    integer(8) is_vertex_on_boundary
+    logical exists ! for checking if directories or files exist
+
+    allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
+    apertures_temp = apertures ! save the input apertures
+
+    vert_counter_total = 0
+    face_counter_total = 0
+
+    do i = 1, num_face ! for each face
+    ! do i = 1, 1 ! for each face
+
+        vert_counter = 0
+        face_counter = 0
+
+        print*,'face:',i
+        num_verts = num_face_vert(i)
+        print*,'num verts in this face: ',num_verts
+
+        ! rotate into x-y plane
+        if (allocated(v)) deallocate(v)
+        if (allocated(v0)) deallocate(v0)
+        if (allocated(v1)) deallocate(v1)
+        allocate(v(1:3,1:num_verts))
+        allocate(v0(1:3,1:num_verts))
+        allocate(v1(1:3,1:num_verts))
+
+        do j = 1,num_verts
+            v(1,j) = verts(face_ids(i,j),1)
+            v(2,j) = verts(face_ids(i,j),2)
+            v(3,j) = verts(face_ids(i,j),3)
+            ! print*,v(1:3,j)
+        end do
+
+        com = sum(v,2)/num_verts ! get centre of mass
+
+        ! print*,'com:',com
+
+        v0(1,1:num_verts) = v(1,1:num_verts) - com(1) ! translate aperture to centre of mass system
+        v0(2,1:num_verts) = v(2,1:num_verts) - com(2)
+        v0(3,1:num_verts) = v(3,1:num_verts) - com(3)
+
+        call get_rotation_matrix3(v0,rot)
+
+        v1 = matmul(rot,v0) ! rotate vertices
+
+        print*,'rot:',rot
+
+        call write_face_poly(num_verts,v1,face_ids,i)
+
+        ! print*,'start triangulate...'
+        ! print*,'===================================='
+        ! print*,'===================================='
+
+        ! max_edge_length = 0.25
+
+        write(a_string,'(f12.6)') max_edge_length**2*sqrt(3D0)/4D0 ! based on area -> length of equilateral triangle
+
+        ! print*,'extra flags: ',trim(adjustl(flags))
+
+        ! print*,trim(a_string)
+
+        write(triangle_cmd,*) './src/tri/triangle' // ' -p face.poly -a'//trim(adjustl(a_string))//" "//trim(adjustl(flags))
+        ! write(triangle_cmd,*) './triangle' // ' -p face.poly -q -Q -B -a'//'0.005'//" "//trim(adjustl(flags))
+
+        print*,'triangle command: "',trim(adjustl(triangle_cmd)),'"'
+
+        ! stop
+
+        ! check that triangle has been compiled by the user...
+        inquire(file="./src/tri/triangle", exist=exists)
+
+        if (exists) then
+            print*,'triangle executable found'
+        else
+            print*,'error: triangle exectuable not found. please compile triangle at ./src/tri or disable triangulation'
+            print*,'reminder: triangulation is forced automatically if the input particle has facets with more &
+            than 3 vertices.'
+            stop
+        end if
+        
+        ! call execute_command_line('./triangle' // ' -p face.poly -q -Q -B -a0.25',wait=.true.) ! remove -Q to reenable triangle print commands
+        call execute_command_line(trim(adjustl(triangle_cmd)),wait=.true.) ! remove -Q to reenable triangle print commands
+
+        ! print*,'===================================='
+        ! print*,'===================================='
+        ! print*,'end triangulate'
+
+        ! print*,'reading triangulated face back in...'
+
+        open(unit=10,file="face.1.node") ! open the triangulated node file
+        read(10,*) num_nodes
+        print*,'number of vertices after triangulation: ',num_nodes
+        do j = 1, num_nodes ! read in each node
+            vert_counter = vert_counter + 1 ! update new vertex counter
+            read(10,*) junk, verts_out(vert_counter + vert_counter_total,1), verts_out(vert_counter + vert_counter_total,2), junk, is_vertex_on_boundary
+            ! print*,'is_vertex_on_boundary:',is_vertex_on_boundary
+            verts_out(vert_counter + vert_counter_total,3) = 0 ! always 0 because triangle works in 2D
+            if(is_vertex_on_boundary .eq. 0) then
+                verts_out(vert_counter + vert_counter_total,3) = verts_out(vert_counter + vert_counter_total,3) + roughness*(rand()-0.5) ! apply roughness to z-component
+            end if
+            ! rotate the vertices back
+            verts_out(vert_counter + vert_counter_total,1:3) = matmul(transpose(rot),verts_out(vert_counter + vert_counter_total,1:3))
+            ! add com back
+            verts_out(vert_counter + vert_counter_total,1) = verts_out(vert_counter + vert_counter_total,1) + com(1)
+            verts_out(vert_counter + vert_counter_total,2) = verts_out(vert_counter + vert_counter_total,2) + com(2)
+            verts_out(vert_counter + vert_counter_total,3) = verts_out(vert_counter + vert_counter_total,3) + com(3)
+            ! print*,'applying roughness'
+
+            ! print*,verts_out(vert_counter + vert_counter_total,1), verts_out(vert_counter + vert_counter_total,2), verts_out(vert_counter + vert_counter_total,3)
+        end do
+        close(10)
+
+        open(unit=10,file="face.1.ele") ! open the triangulated ele file
+        read(10,*) num_faces
+        print*,'number of faces after triangulation: ',num_faces
+        do j = 1, num_faces ! read in each face
+            face_counter = face_counter + 1 ! update new vertex counter
+            read(10,*) junk, face_ids_out(face_counter + face_counter_total,1), face_ids_out(face_counter + face_counter_total,2), face_ids_out(face_counter + face_counter_total,3)
+            face_ids_out(face_counter + face_counter_total,1) = face_ids_out(face_counter + face_counter_total,1) + vert_counter_total
+            face_ids_out(face_counter + face_counter_total,2) = face_ids_out(face_counter + face_counter_total,2) + vert_counter_total
+            face_ids_out(face_counter + face_counter_total,3) = face_ids_out(face_counter + face_counter_total,3) + vert_counter_total
+
+            apertures_out(face_counter + face_counter_total) = apertures(i) ! this face aperture set as the same as the input face that it was part of
+            ! print*,face_ids_out(face_counter + face_counter_total,1), face_ids_out(face_counter + face_counter_total,2), face_ids_out(face_counter + face_counter_total,3)
+        end do
+        close(10)
+
+        ! save the total vertices and faces read after this loop iteration
+        vert_counter_total = vert_counter_total + vert_counter
+        face_counter_total = face_counter_total + face_counter
+
+        ! print*,'total vertices read so far: ',vert_counter_total
+        ! print*,'total faces read so far: ',face_counter_total
+        ! print*,'read triangulated face back in'
+        print*,'******************************'
+
+    end do
+
+    print*,'finished triangulation'
+    print*,'total vertices: ',vert_counter_total
+    print*,'total faces: ',face_counter_total
+
+    num_vert = vert_counter_total
+    num_face = face_counter_total
+
+    deallocate(verts)
+    deallocate(face_ids)
+    deallocate(num_face_vert)
+    deallocate(apertures)
+
+    allocate(num_face_vert(1:face_counter_total))
+    allocate(verts(1:vert_counter_total,1:3))
+    allocate(face_ids(1:face_counter_total,1:3))
+    allocate(apertures(1:face_counter_total))
+
+    num_face_vert = 3 ! triangulated
+
+    do i = 1, vert_counter_total
+        verts(i,1:3) = verts_out(i,1:3)
+    end do
+
+    do i = 1, face_counter_total
+        face_ids(i,1:3) = face_ids_out(i,1:3)
+        apertures(i) = apertures_out(i)
+    end do
 
     
+
+
+
+
+end subroutine
+
+subroutine get_rotation_matrix3(v0,rot)
+    
+    ! computes a rotation matrix for rotating into an aperture located in the xy plane
+
+real(8), intent(in) :: v0(1:3,1:3) ! vertices of facet
+real(8), intent(out) :: rot(1:3,1:3) ! rotation matrix
+
+real(8) a1(1:3) ! vector from com to vertex 1
+real(8) b1(1:3) ! vector from com to vertex 2
+real(8) theta1
+real(8) rot1(1:3,1:3) ! rotation matrix (about z-axis)
+real(8) a2(1:3) ! a1 after first rotation
+real(8) b2(1:3) ! b1 after first rotation
+real(8) theta2
+real(8) rot2(1:3,1:3) ! rotation matrix (about x-axis)
+real(8) a3(1:3) ! a1 after second rotation
+real(8) b3(1:3) ! b1 after second rotation
+real(8) theta3
+real(8) rot3(1:3,1:3) ! rotation matrix (about y-axis)
+real(8) a4(1:3) ! a1 after third rotation
+real(8) b4(1:3) ! b1 after third rotation
+real(8) rot4(1:3,1:3) ! flip rotation matrix
+
+a1(1:3) = v0(1:3,1)
+b1(1:3) = v0(1:3,2)
+
+! create the first rotation matrix (about z-axis)
+theta1 = atan(a1(1)/a1(2))
+if(isnan(theta1)) theta1 = 0 ! no rotation if NaN
+rot1(1,1) = cos(theta1)
+rot1(1,2) = -sin(theta1)
+rot1(1,3) = 0
+rot1(2,1) = sin(theta1)
+rot1(2,2) = cos(theta1)
+rot1(2,3) = 0
+rot1(3,1) = 0
+rot1(3,2) = 0
+rot1(3,3) = 1
+
+! do the first rotation (about z-axis)
+a2 = matmul(rot1,a1)
+b2 = matmul(rot1,b1)
+
+! create the second rotation matrix (about x-axis)
+theta2 = -atan(a2(3)/a2(2))
+rot2(1,1) = 1
+rot2(1,2) = 0
+rot2(1,3) = 0
+rot2(2,1) = 0
+rot2(2,2) = cos(theta2)
+rot2(2,3) = -sin(theta2)
+rot2(3,1) = 0
+rot2(3,2) = sin(theta2)
+rot2(3,3) = cos(theta2)
+
+! do the second rotation (about x-axis)
+a3 = matmul(rot2,a2)
+b3 = matmul(rot2,b2)
+
+! create the third rotation matrix (about y-axis)
+theta3 = atan(b3(3)/b3(1))
+rot3(1,1) = cos(theta3)
+rot3(1,2) = 0
+rot3(1,3) = sin(theta3)
+rot3(2,1) = 0
+rot3(2,2) = 1
+rot3(2,3) = 0
+rot3(3,1) = -sin(theta3)
+rot3(3,2) = 0
+rot3(3,3) = cos(theta3)
+
+! print*,'isnan(rot1)',isnan(rot1)
+! print*,'isnan(rot2)',isnan(rot2)
+! print*,'isnan(rot3)',isnan(rot3)
+
+! do the third rotation (about y-axis)
+a4 = matmul(rot3,a3)
+b4 = matmul(rot3,b3)
+
+if (a4(1)*b4(2)-a4(2)*b4(1) .lt. 0) then ! rotate about y-axis (any axis should work) by 180 degrees if facing up
+    rot4(1,1) = -1
+    rot4(1,2) = 0
+    rot4(1,3) = 0
+    rot4(2,1) = 0
+    rot4(2,2) = 1
+    rot4(2,3) = 0
+    rot4(3,1) = 0
+    rot4(3,2) = 0
+    rot4(3,3) = -1
+    rot = matmul(rot4,matmul(rot3,matmul(rot2,rot1)))
+else
+    rot = matmul(rot3,matmul(rot2,rot1))
+end if
+
+end subroutine
+
+subroutine write_face_poly(num_verts,v1,face_ids,i)
+
+    ! writes a face to a temporary file, ready for triangulation
+
+integer(8), dimension(:), allocatable :: my_array ! points some numbers to some other numbers
+integer, intent(in) :: num_verts
+real(8), dimension(:,:), allocatable, intent(in) :: v1
+integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+
+integer j, i
+
+
+! print*,'writing face to file'
+allocate(my_array(1:num_verts))
+    open(unit=10,file="face.poly")
+        write(10,'(I3,I3,I3,I3)') num_verts, 2, 1, 0 ! vertex header
+        do j = 1, num_verts ! write vertices of this face
+            write(10,'(I3,F16.8,F16.8)') j, v1(1,j), v1(2,j)
+            my_array(j) = face_ids(i,j)
+            ! print*,'my_array(j)',my_array(j)
+            ! print*,'v1:',v1(1,j), v1(2,j)
+        end do
+        write(10,'(I3,I3)') num_verts, 0 ! segments header (enforced edges)
+        do j = 1, num_verts
+            if(j .eq. num_verts) then
+                ! print*,'face_ids(i,j)',face_ids(i,j)
+                ! print*,'findloc(my_array,face_ids(i,j))',findloc(my_array,face_ids(i,j))
+                ! write(10,'(I3,I3,I3)') j, face_ids(i,j), face_ids(i,1)
+                write(10,'(I3,I3,I3)') j, findloc(my_array,face_ids(i,j)), findloc(my_array,face_ids(i,1))
+            else
+                ! write(10,'(I3,I3,I3)') j, face_ids(i,j), face_ids(i,j+1)
+                write(10,'(I3,I3,I3)') j, findloc(my_array,face_ids(i,j)), findloc(my_array,face_ids(i,j+1))
+            end if
+        end do
+        write(10,'(I3)') 0 ! number of holes
+    close(10)
+    
+    ! print*,'finished writing face to file'
 
 end subroutine
 
@@ -899,7 +1485,7 @@ c(3) = a(1)*b(2) - a(2)*b(1)
 nf = sqrt(c(1)**2 + c(2)**2 + c(3)**2)
 
 if(present(normalise)) then
-    if(normalise .eq. .false.) nf = 1
+    if(normalise .eqv. .false.) nf = 1
 end if
 
 c = c/nf
@@ -1185,7 +1771,7 @@ subroutine simpne ( ntab, x, y, result )
         INTEGER USIZE(NTYPES)	!Size of the time unit.
         CHARACTER*3 UNAME(NTYPES)!Name of the time unit.
         PARAMETER (USIZE = (/7*24*60*60, 24*60*60, 60*60,   60,    1/))	!The compiler does some arithmetic.
-        PARAMETER (UNAME = (/      "wk",      "d",  "hr","min","sec"/))	!Approved names, with trailing spaces.
+        PARAMETER (UNAME = (/      "wk ",      "d  ",  "hr ","min","sec"/))	!Approved names, with trailing spaces.
         CHARACTER*28 TEXT	!A scratchpad.
         INTEGER I,L,N,S		!Assistants.
          S = T			!A copy I can mess with.
@@ -1205,7 +1791,7 @@ subroutine simpne ( ntab, x, y, result )
          END DO			!On to the next unit.
 !  Cast forth the result.
          print*, ">> ",TEXT(1:L)," <<"	!With annotation.
-         write(101,*), ">> ",TEXT(1:L)," <<"	!With annotation.
+         write(101,*) ">> ",TEXT(1:L)," <<"	!With annotation.
         END			!Simple enough with integers.
  
 
