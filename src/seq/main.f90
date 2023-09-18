@@ -13,7 +13,6 @@ use types_mod
 use diff_mod
 use omp_lib
 use outputs_mod
-use ifport
 
 implicit none
 
@@ -97,12 +96,13 @@ type(output_parameters_type) output_parameters
 type(output_parameters_type) output_parameters_total
 
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
+real(8) max_area, max_edge_length
 
 ! ############################################################################################################
 ! start
 print*,'========== start main'
 start = omp_get_wtime()
-call seed(99)
+! call seed(99)
 
 call parse_command_line(job_params)
 
@@ -122,13 +122,25 @@ call PDAL2( num_vert,       & !  -> number of unique vertices
             apertures,      &
             job_params)
 
+max_edge_length = job_params%la*2
+max_area = max_edge_length**2*sqrt(3D0)/4D0
+print*,'area threshold: ',max_area
+
+if (job_params%tri) then
+    print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
+    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness) ! triangulate the particle
+    call merge_vertices(vert_in, face_ids, num_vert, num_face, 1D-1) ! merge vertices that are close enough
+    call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
+    ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
+end if
+! stop
 ! write unrotated particle to file (optional)            
 call PDAS(  vert_in,        & ! <-  rotated vertices
             face_ids,       & ! <-  face vertex IDs
             output_dir,     & ! <-  output directory
             num_face_vert,  & ! <-  number of verices in each face
             "unrotated")    ! <-  filename
-
+! stop
 call init_loop( alpha_vals, &
                 beta_vals, &
                 gamma_vals, &
@@ -252,9 +264,9 @@ finish = omp_get_wtime()
 
 print*,'=========='
 print'(A,f16.8,A)',"total time elapsed: ",finish-start," secs"
-write(101,*),'======================================================'
-write(101,'(A,f17.8,A)')," total time elapsed: ",finish-start," secs"
-write(101,*),'======================================================'
+write(101,*)'======================================================'
+write(101,'(A,f17.8,A)')" total time elapsed: ",finish-start," secs"
+write(101,*)'======================================================'
 print*,'========== end main'
 
 close(101) ! close global non-standard output file
