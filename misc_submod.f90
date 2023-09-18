@@ -446,7 +446,6 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
     character(100) a_string
     logical, dimension(:), allocatable :: is_boundary ! whether or not a vertex lies on the boundary of an aperture
     integer(8) is_vertex_on_boundary
-    logical exists ! for checking if directories or files exist
 
     allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
     apertures_temp = apertures ! save the input apertures
@@ -514,18 +513,6 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
 
         ! stop
 
-        ! check that triangle has been compiled by the user...
-        inquire(file="./src/tri/triangle", exist=exists)
-
-        if (exists) then
-            print*,'triangle executable found'
-        else
-            print*,'error: triangle exectuable not found. please compile triangle at ./src/tri or disable triangulation'
-            print*,'reminder: triangulation is forced automatically if the input particle has facets with more &
-            than 3 vertices.'
-            stop
-        end if
-        
         ! call execute_command_line('./triangle' // ' -p face.poly -q -Q -B -a0.25',wait=.true.) ! remove -Q to reenable triangle print commands
         call execute_command_line(trim(adjustl(triangle_cmd)),wait=.true.) ! remove -Q to reenable triangle print commands
 

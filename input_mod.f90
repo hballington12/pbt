@@ -1789,7 +1789,7 @@ subroutine PDAL2(   num_vert,       &
     character(100) c_method ! method of particle file input
 	integer(8), dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
-    type(job_parameters_type), intent(in) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+    type(job_parameters_type), intent(inout) :: job_params ! job parameters (intent(inout) so that automatic triangulation can be enabled if required)
 
     integer(8), parameter :: num_face_vert_max_in = 20 ! max number of vertices per face
     integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
@@ -2120,10 +2120,11 @@ subroutine PDAL2(   num_vert,       &
     write(101,*)'number of faces:      ',num_face
     write(101,*)'max vertices per face:',num_face_vert_max
 
-    if (num_face_vert_max .gt. 3) then
-        print*,'error: max vertices per facet greater than 3 is currently not supported.'
+    if (num_face_vert_max .gt. 3 .and. job_params%tri .eqv. .false.) then
+        print*,'error: max vertices per facet greater than 3 is currently not supported without automatic triangulation.'
         ! stop
-        print*,'continuing regardless...'
+        print*,'enabling automatic triangulation...'
+        job_params%tri = .true.
     end if
 
     call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas (for doing some checks in the following sr)

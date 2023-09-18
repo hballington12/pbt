@@ -21,11 +21,15 @@ include 'mpif.h'
 
 ! to do:
 ! add vector re-normalisation checks after rotations (ie. sr rotate_into_aperture_system)
+! fix direct forward scattering
+! mpi support
+! asymmetry parameter, single scat albedo
 ! add absorption
 ! add quad support
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
+! fix phi = 0 numerical error
 
 ! ############################################################################################################
 
@@ -96,11 +100,6 @@ complex(8), dimension(:,:), allocatable :: ampl_far_ext_diff11, ampl_far_ext_dif
 real(8), dimension(:,:,:), allocatable :: mueller, mueller_total, mueller_recv ! mueller matrices
 real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d_recv ! phi-integrated mueller matrices
 
-! sr finalise
-type(output_parameters_type) output_parameters 
-type(output_parameters_type) output_parameters_total
-type(output_parameters_type) output_parameters_recv
-
 ! mpi
 integer ierr
 integer tag
@@ -110,6 +109,12 @@ integer status(MPI_STATUS_SIZE)
 integer my_start, my_end, my_rank
 integer n1, n2
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
+
+! sr finalise
+type(output_parameters_type) output_parameters 
+type(output_parameters_type) output_parameters_total
+
+real(8) max_area, max_edge_length
 
 ! ############################################################################################################
 
@@ -143,10 +148,6 @@ call StripSpaces(my_rank_str)
 write(my_log_dir,*) trim(output_dir)//"/logs/log",trim(my_rank_str)
 ! print*,'my rank is : ,',my_rank,' , my output directory is "',trim(my_log_dir),'"'
 open(101,file=trim(my_log_dir)) ! open global non-standard log file for important records
-
-! ############# input_mod #############
-! write job parameters to log file
-call write_job_params(job_params)
 
 ! get input particle information
 call PDAL2( num_vert,       & !  -> number of unique vertices
@@ -188,13 +189,25 @@ else
     call MPI_RECV(gamma_vals,size(gamma_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
 end if
 
+max_edge_length = job_params%la*2
+max_area = max_edge_length**2*sqrt(3D0)/4D0
+print*,'area threshold: ',max_area
+
+if (job_params%tri) then
+    print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
+    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness) ! triangulate the particle
+    call merge_vertices(vert_in, face_ids, num_vert, num_face, 1D-1) ! merge vertices that are close enough
+    call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
+    ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
+end if
+
 if (my_rank .eq. 0) then
     ! write unrotated particle to file (optional)            
     call PDAS(  vert_in,        & ! <-  rotated vertices
                 face_ids,       & ! <-  face vertex IDs
                 output_dir,     & ! <-  output directory
                 num_face_vert,  & ! <-  number of verices in each face
-                "unrotated")      ! <-  filename
+                "unrotated")    ! <-  filename
 end if
 
 do i = my_start, my_end  
@@ -207,19 +220,7 @@ do i = my_start, my_end
                     gamma_vals, &
                     i,          &
                     job_params)
- 
-    if(my_end-my_start .gt. 1) then ! num_orients -> my_end-my_start+1, i -> i-my_start+1
-        print'(A15,I8,A3,I8,A20,f8.4,A3)','my orientation: ',i-my_start+1,' / ',my_end-my_start+1,' (my progress: ',dble(i-my_start)/dble(my_end-my_start+1)*100,' %)'
-        write(101,'(A15,I8,A3,I8,A20,f8.4,A3)'),'my orientation: ',i-my_start+1,' / ',my_end-my_start+1,' (my progress: ',dble(i-my_start)/dble(my_end-my_start+1)*100,' %)'
-        ! print*,'total time elapsed: ',omp_get_wtime()-start
-        ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
-        if (i-my_start+1 .gt. 1) then
-            print'(A20,F12.4,A5)','est. time remaining: '
-            write(101,'(A20,F12.4,A5)'),'est. time remaining: '
-            call PROUST(nint(dble(my_end-i+1)*(omp_get_wtime()-start) / dble(i-my_start+1)))
-        end if
-    end if
-                
+
     ! fast implementation of the incident beam
     call makeIncidentBeam(  beamV,         & ! ->  beam vertices
                             beamF1,        & ! ->  beam face vertex indices
@@ -231,24 +232,35 @@ do i = my_start, my_end
                             ampl_beam)       !  -> amplitude matrix of incident beam       
 
     ! beam loop
-    call beam_loop( face_ids,                  & ! <-  face vertex IDs
-                    vert,                      & ! <-  unique vertices
-                    apertures,                 & ! <-  apertures
-                    beamV,                     & ! <-  beam vertices
-                    beamF1,                    & ! <-  beam face vertex indices
-                    beamN,                     & ! <-  beam normals
-                    beamF2,                    & ! <-  beam face normal indices
-                    beamMidpoints,             & ! <-  beam  midpoints
-                    ampl_beam,                 & ! <-  amplitude matrix of incident beam
-                    beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
-                    beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
-                    ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
-                    energy_out_beam,           & !  -> total energy out from beams (before diffraction)
-                    energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
-                    energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
-                    output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
-                    num_face_vert,             & ! <-  number of verices in each face
-                    job_params)
+        call beam_loop( face_ids,                  & ! <-  face vertex IDs
+                        vert,                      & ! <-  unique vertices
+                        apertures,                 & ! <-  apertures
+                        beamV,                     & ! <-  beam vertices
+                        beamF1,                    & ! <-  beam face vertex indices
+                        beamN,                     & ! <-  beam normals
+                        beamF2,                    & ! <-  beam face normal indices
+                        beamMidpoints,             & ! <-  beam  midpoints
+                        ampl_beam,                 & ! <-  amplitude matrix of incident beam
+                        beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
+                        beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
+                        ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
+                        energy_out_beam,           & !  -> total energy out from beams (before diffraction)
+                        energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
+                        energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
+                        output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
+                        num_face_vert,             & ! <-  number of verices in each face
+                        job_params)
+
+    ! if(num_orients .gt. 1) then
+    !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'
+    !     ! print*,'total time elapsed: ',omp_get_wtime()-start
+    !     ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
+    !     if (i .gt. 1) then
+    !         print'(A20,F12.4,A5)','est. time remaining: '
+    !         call PROUST(nint(dble(num_orients-i+1)*(omp_get_wtime()-start) / dble(i)))
+    !     end if
+    ! end if
+    
 
     ! diffraction
     call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing
@@ -288,20 +300,11 @@ end do
 
 print*,'my rank:',my_rank,'finished'
 
-! sum up across all mpi processes
+! sum up mueller 2d and 1d across all mpi processes
 print*,'i have finished. my rank = ',my_rank
 if (my_rank .ne. 0) then ! if not rank 0 process, send mueller to rank 0
     call MPI_SEND(mueller_1d_total,size(mueller_1d_total,1)*size(mueller_1d_total,2),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
     call MPI_SEND(mueller_total,size(mueller_total,1)*size(mueller_total,2)*size(mueller_total,3),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%abs,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%scatt,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%ext,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%albedo,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%asymmetry,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%abs_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%scatt_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%ext_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
-    call MPI_SEND(output_parameters_total%geo_cross_sec,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
     print*,'sent to rank 0. my rank = ',my_rank
 else ! if rank 0 process, receieve from all other ranks
     ! allocate some arrays to hold the received values
@@ -313,24 +316,6 @@ else ! if rank 0 process, receieve from all other ranks
         mueller_1d_total = mueller_1d_total + mueller_1d_recv ! sum
         call MPI_RECV(mueller_recv,size(mueller_recv,1)*size(mueller_recv,2)*size(mueller_recv,3),MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
         mueller_total = mueller_total + mueller_recv ! sum        
-        call MPI_RECV(output_parameters_recv%abs,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%abs = output_parameters_total%abs + output_parameters_recv%abs ! sum  
-        call MPI_RECV(output_parameters_recv%scatt,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%scatt = output_parameters_total%scatt + output_parameters_recv%scatt ! sum  
-        call MPI_RECV(output_parameters_recv%ext,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%ext = output_parameters_total%ext + output_parameters_recv%ext ! sum  
-        call MPI_RECV(output_parameters_recv%albedo,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%albedo = output_parameters_total%albedo + output_parameters_recv%albedo ! sum  
-        call MPI_RECV(output_parameters_recv%asymmetry,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%asymmetry = output_parameters_total%asymmetry + output_parameters_recv%asymmetry ! sum  
-        call MPI_RECV(output_parameters_recv%abs_eff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%abs_eff = output_parameters_total%abs_eff + output_parameters_recv%abs_eff ! sum  
-        call MPI_RECV(output_parameters_recv%scatt_eff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%scatt_eff = output_parameters_total%scatt_eff + output_parameters_recv%scatt_eff ! sum  
-        call MPI_RECV(output_parameters_recv%ext_eff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%ext_eff = output_parameters_total%ext_eff + output_parameters_recv%ext_eff ! sum  
-        call MPI_RECV(output_parameters_recv%geo_cross_sec,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
-        output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec + output_parameters_recv%geo_cross_sec ! sum  
         print*,'received from ',source,' my rank = ',my_rank
     end do
 end if
@@ -349,7 +334,7 @@ if (my_rank .eq. 0) then
     output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / num_orients
     output_parameters_total%ext_eff = output_parameters_total%ext_eff / num_orients
     output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / num_orients
-
+    
     ! writing to file
     call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
     call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file

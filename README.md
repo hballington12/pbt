@@ -2,9 +2,9 @@
     Fortran Console Application : "abt" Project Overview
 ========================================================================
 
-This file contains a summary of the aperture beam tracer (ABT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse
+This file contains a summary of the aperture beam tracer (ABT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse.
 
-## main.f90
+## `./src/seq/abt.f90`
 
 Main source file. It contains the program entry point. The ABT reads input parameters from the command line. There are a few required input arguments, as well as a few optional ones. The code will stop if a mandatory argument is missing from the command line. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of most arguments in the command line is not important and the ABT will search through lines from left to right in an attempt to find each argument. A summary of command line arguments is given below:
 
@@ -72,6 +72,12 @@ Main source file. It contains the program entry point. The ABT reads input param
     - `-phi 0 2 360` - Evaluate the far-field from 0 in 2 degree steps to 360.
 
 - `-no2d` - Suppresses the output of the 2D mueller matrix, which can be a large file if many far-field evaluation points are specified.
+
+- `-tri` - Enables automatic triangulation. Note that use of this flag requires compiling the triangle code in `.\tri\`.
+
+- `-tri_edge` - Sets the maximum edge length for triangulation.
+
+- `-tri_rough` - Sets the standard deviation for roughness derived from the triangulation.
 
  ## Examples
 
