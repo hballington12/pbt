@@ -962,8 +962,8 @@ real(8), dimension(:), allocatable :: illuminatedApertureAreas2_ps
 ! allocations
 allocate(isVisible(1:size(Face2,1)))
 allocate(isVisiblePlusShadows(1:size(Face2,1)))
-allocate(beamV(size(rotatedVert,1),1:3))
-allocate(beamN(size(rotatedNorm,1),1:3))
+allocate(beamV(size(Verts,1),1:3))
+allocate(beamN(size(Norm,1),1:3))
 allocate(isWithinBeam2(1:size(Face2,1)))
 allocate(isWithinBeam2_ps(1:size(Face2,1)))
 allocate(distances(1:size(Face2,1)))

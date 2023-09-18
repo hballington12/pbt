@@ -1,5 +1,5 @@
 #!/bin/sh
-#PBS -l walltime=24:00:00
+#PBS -l walltime=8:00:00
 #PBS -l nodes=1:ppn=1
 #PBS -k oe
 #PBS -o /Multirot/test
@@ -19,32 +19,32 @@ echo PBS: current home directory is $PBS_O_HOME
 echo PBS: PATH = $PBS_O_PATH
 echo ------------------------------------------------------
 
+eval `/usr/bin/modulecmd bash load gcc-13.1`
+eval `/usr/bin/modulecmd bash load openmpi-4.0.5`
 
-
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/soft/intel/compilers_and_libraries_2018.3.222/linux/compiler/lib/intel64_lin
 export OMP_NUM_THREADS=32
 export OMP_STACKSIZE=100M
 ulimit -s unlimited
 
 cd /home/hballington/abt
 
-/soft/intel/impi/2019.8.254/intel64/bin/mpiexec \
+mpiexec \
 /home/hballington/abt/src/seq/abt \
 -lambda 0.532 \
 -rbi 1.3117 \
 -ibi 0 \
 -rec 8 \
--cmethod read \
+-cmethod cc_hex \
 -cft obj \
 -cfn test_sphere.obj \
 -afn test_sphere_apertures.dat \
 -rot euler 0.01 90 0.01 \
 -jobname testing_a_sphere \
--cc_hex_l 10 \
--cc_hex_hr 5 \
+-cc_hex_l 20 \
+-cc_hex_hr 10 \
 -cc_hex_nfhr 4 \
 -cc_hex_pfl 10 \
--cc_hex_nfpl 8 \
+-cc_hex_nfpl 4 \
 -cc_hex_pher 1 \
 -cc_hex_pper 2 \
 -cc_hex_nscales 1 \
@@ -53,4 +53,4 @@ cd /home/hballington/abt
 -theta 0 1 180 \
 -phi 0 2 360 \
 -mt \
-> log2
+> log
