@@ -84,6 +84,9 @@ Main source file. It contains the program entry point. The ABT reads input param
 
 - `-tri_rough` - Sets the standard deviation for roughness derived from the triangulation.
 
+- `-resume` - Resumes a previous job that was saved at an intermediate point. Must be used along with `-cache_id` (see below). This option overrides most input parameters with those read from the cached job.
+- `-cached_id <value>` - Indicates which directory to read cached files from to resume a job. Cached files are saved in `cache/`.
+
  ## Examples
 
  `abt -lambda 0.532 -rbi 1.3117 -ibi 0 -rec 10 -rot euler 20 35 2 -cmethod read -cft obj -cfn my_particle.obj -afn my_apertures.dat -mt -theta 0 1 180 -phi 0 2 360` - run `abt` executable with wavelength 0.532, refractive index 1.3117 + 0i, 10 beam recursions, particle rotated with euler angles 20, 35, read the particle with particle file type `.obj`, filename `my_particle.obj`, apertures specified in the file `my_apertures.dat`, with multithreading enabled. Evaluate the far-field at polar angle 0 in 1 degree steps to 180 and at azithmual angle 0 in 2 degree steps to 360.
