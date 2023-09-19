@@ -34,14 +34,14 @@ modules = 	types_mod$(MOD_EXT) \
 			outputs_mod$(MOD_EXT) \
 			cc_hex_mod$(MOD_EXT)
 
-.PHONY: abt # sequential target
-.PHONY: abt_mpi # mpi target
+.PHONY: seq # sequential target
+.PHONY: mpi # mpi target
 .PHONY: triangle # triangle target
 
-abt: $(SEQ_DIR)main.f90 $(objects) $(TRI_BIN)triangle
+seq: $(SEQ_DIR)main.f90 $(objects) $(TRI_BIN)triangle
 	$(FC) $(FSWITCHES) $(objects) $(SEQ_DIR)main.f90 -o $(SEQ_DIR)abt
 
-abt_mpi: $(MPI_DIR)main.f90 $(objects)
+mpi: $(MPI_DIR)main.f90 $(objects)
 	mpifort $(FSWITCHES) $(objects) $(MPI_DIR)main.f90 -o $(MPI_DIR)abt
 
 outputs_mod$(O_EXT) : outputs_mod.f90 misc_submod$(O_EXT)
@@ -69,7 +69,4 @@ cc_hex_mod$(O_EXT) : cc_hex_mod.f90
 	$(CC) $(CSWITCHES) ./tri/triangle.c -lm -o ./tri/triangle
 
 clean :
-	rm $(objects) $(modules) $(SEQ_DIR)abt
-
-clean_mpi :
-	rm $(objects) $(modules) $(MPI_DIR)abt
+	rm $(objects) $(modules) $(SEQ_DIR)abt $(MPI_DIR)abt
