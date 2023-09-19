@@ -5,7 +5,7 @@ This file contains a summary of the aperture beam tracer (ABT), a physical optic
 Compile instructions (gcc-13.0.1 & openmpi-4.0.5)
 
 - `cd src; make` - compiles sequential code
-- `cd src; make abt_mpi` - compiles mpi code
+- `cd src; make mpi` - compiles mpi code
 
 Example shell scripts for submitting jobs may be found in `template/`
 
