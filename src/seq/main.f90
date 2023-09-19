@@ -231,7 +231,7 @@ do i_loop = loop_start, job_params%num_orients
 
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
-    if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .or. i_loop .eq. 11) then
+    if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
         call cache_job( vert_in,                    & ! unrotated vertices
                         face_ids,                   & ! face ids
                         num_face_vert,              & ! num vertices per face
