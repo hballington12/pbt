@@ -418,7 +418,7 @@ subroutine merge_vertices(verts, face_ids, num_vert, num_face, distance_threshol
 
     end subroutine
 
-subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_length,flags,apertures,roughness)
+subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_length,flags,apertures,roughness,rank,output_dir)
 
     ! calls triangle to triangulate and subdivide a surface
     ! returns the subdivided surface
@@ -431,6 +431,7 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
     real(8), intent(in) :: max_edge_length
     integer(8), dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
     real(8), intent(in) :: roughness
+    character(len=255), intent(in) :: output_dir ! output directory
 
     integer i, j, k, junk, vert_counter, vert_counter_total, face_counter, face_counter_total
     real(8), dimension(:,:), allocatable :: v, v0, v1 ! vertices of facet (after lr flip)
@@ -453,6 +454,8 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
     logical, dimension(:), allocatable :: is_boundary ! whether or not a vertex lies on the boundary of an aperture
     integer(8) is_vertex_on_boundary
     logical exists ! for checking if directories or files exist
+    integer rank ! for avoiding clashes between processes of different rank
+    character(len=16) rank_string
 
     allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
     apertures_temp = apertures ! save the input apertures
@@ -497,9 +500,16 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
 
         v1 = matmul(rot,v0) ! rotate vertices
 
-        print*,'rot:',rot
+        ! print*,'rot:',rot
 
-        call write_face_poly(num_verts,v1,face_ids,i)
+        print*,'rank: ',rank
+
+        write(rank_string,*) rank
+        
+
+        call write_face_poly(num_verts,v1,face_ids,i,rank_string,output_dir)
+
+        ! stop
 
         ! print*,'start triangulate...'
         ! print*,'===================================='
@@ -513,12 +523,11 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
 
         ! print*,trim(a_string)
 
-        write(triangle_cmd,*) './src/tri/triangle' // ' -p face.poly -a'//trim(adjustl(a_string))//" "//trim(adjustl(flags))
+        ! write(triangle_cmd,*) './src/tri/triangle' // ' -p face.poly -a'//trim(adjustl(a_string))//" "//trim(adjustl(flags))
+        write(triangle_cmd,*) './src/tri/triangle' // ' -p ',trim(output_dir)//'/tmp/face'//trim(adjustl(rank_string))//'.poly'//' -a'//trim(adjustl(a_string))//" "//trim(adjustl(flags))
         ! write(triangle_cmd,*) './triangle' // ' -p face.poly -q -Q -B -a'//'0.005'//" "//trim(adjustl(flags))
 
         print*,'triangle command: "',trim(adjustl(triangle_cmd)),'"'
-
-        ! stop
 
         ! check that triangle has been compiled by the user...
         inquire(file="./src/tri/triangle", exist=exists)
@@ -527,8 +536,7 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
             print*,'triangle executable found'
         else
             print*,'error: triangle exectuable not found. please compile triangle at ./src/tri or disable triangulation'
-            print*,'reminder: triangulation is forced automatically if the input particle has facets with more &
-            than 3 vertices.'
+            print*,'reminder: triangulation is forced automatically if the input particle has facets with more than 3 vertices.'
             stop
         end if
         
@@ -541,7 +549,7 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
 
         ! print*,'reading triangulated face back in...'
 
-        open(unit=10,file="face.1.node") ! open the triangulated node file
+        open(unit=10,file=trim(output_dir)//'/tmp/face'//trim(adjustl(rank_string))//'.1.node',status="old") ! open the triangulated node file
         read(10,*) num_nodes
         print*,'number of vertices after triangulation: ',num_nodes
         do j = 1, num_nodes ! read in each node
@@ -564,7 +572,7 @@ subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_l
         end do
         close(10)
 
-        open(unit=10,file="face.1.ele") ! open the triangulated ele file
+        open(unit=10,file=trim(output_dir)//'/tmp/face'//trim(adjustl(rank_string))//'.1.ele',status="old") ! open the triangulated ele file
         read(10,*) num_faces
         print*,'number of faces after triangulation: ',num_faces
         do j = 1, num_faces ! read in each face
@@ -721,7 +729,7 @@ end if
 
 end subroutine
 
-subroutine write_face_poly(num_verts,v1,face_ids,i)
+subroutine write_face_poly(num_verts,v1,face_ids,i,rank_string,output_dir)
 
     ! writes a face to a temporary file, ready for triangulation
 
@@ -729,14 +737,18 @@ integer(8), dimension(:), allocatable :: my_array ! points some numbers to some 
 integer, intent(in) :: num_verts
 real(8), dimension(:,:), allocatable, intent(in) :: v1
 integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+character(len=16), intent(in) :: rank_string
+character(len=255), intent(in) :: output_dir ! output directory
 
 integer j, i
 
-
+! print*,'my rank string: ',trim(adjustl(rank_string))
+! stop
 ! print*,'writing face to file'
 allocate(my_array(1:num_verts))
-    open(unit=10,file="face.poly")
-        write(10,'(I3,I3,I3,I3)') num_verts, 2, 1, 0 ! vertex header
+! open(unit=10,file="face.poly"//trim(adjustl(rank_string)))
+    open(unit=10,file=trim(output_dir)//"/tmp/face"//trim(adjustl(rank_string))//".poly")
+    write(10,'(I3,I3,I3,I3)') num_verts, 2, 1, 0 ! vertex header
         do j = 1, num_verts ! write vertices of this face
             write(10,'(I3,F16.8,F16.8)') j, v1(1,j), v1(2,j)
             my_array(j) = face_ids(i,j)
