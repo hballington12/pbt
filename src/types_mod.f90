@@ -63,6 +63,9 @@ type job_parameters_type
 	logical tri ! enable auto triangulation
 	real(8) tri_edge_length ! auto triangulation max edge length
 	real(8) tri_roughness ! auto triangulation roughness magnitude
+	real(8) time_limit ! job time limit in hours
+	logical resume ! enable resume of cached data
+	integer(8) cache_id ! cached data to resume from
 end type job_parameters_type
 
 contains
