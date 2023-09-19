@@ -6,3 +6,5 @@ log
 **.i90
 **.sh
 **.o
+src/seq/abt
+src/mpi/abt

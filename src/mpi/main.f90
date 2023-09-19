@@ -116,6 +116,7 @@ type(output_parameters_type) output_parameters_recv
 type(output_parameters_type) output_parameters_total
 
 real(8) max_area, max_edge_length
+integer seed(1:8)
 
 ! ############################################################################################################
 
@@ -126,7 +127,8 @@ tag = 1
 
 print*,'========== start main'
 start = omp_get_wtime()
-! call seed(99) ! find gfotran replacement for this later!
+seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
+call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 
 print*,'my rank: ',my_rank
 
