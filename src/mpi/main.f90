@@ -138,6 +138,9 @@ if (my_rank .eq. 0) then
     print*,'output directory is "',trim(output_dir),'"'
     ! result = makedirqq(trim(output_dir)//"/logs") ! make directory for logs
     call system("mkdir "//trim(output_dir)//"/logs")
+    print*,'log files directory is "',trim(output_dir)//"/logs/",'"'
+    call system("mkdir "//trim(output_dir)//"/tmp") ! make directory for temp files
+    print*,'temporary files directory is "',trim(output_dir)//"/tmp/",'"'
     print*,'sending...'
     print*,'output_dir: ',output_dir
     do dest = 1, p-1
@@ -203,7 +206,7 @@ print*,'area threshold: ',max_area
 
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
-    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness) ! triangulate the particle
+    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness, my_rank, output_dir) ! triangulate the particle
     call merge_vertices(vert_in, face_ids, num_vert, num_face, 1D-1) ! merge vertices that are close enough
     call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
@@ -346,6 +349,9 @@ if (my_rank .eq. 0) then
     ! writing to file
     call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
     call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
+
+    ! clean up temporary files
+    call system("rm -r "//trim(output_dir)//"/tmp") ! make directory for temp files
 
     finish = omp_get_wtime()
     print*,'=========='

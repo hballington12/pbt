@@ -76,17 +76,21 @@ type(output_parameters_type) output_parameters_total
 
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 real(8) max_area, max_edge_length
+integer my_rank
 
 ! ############################################################################################################
 ! start
 print*,'========== start main'
 start = omp_get_wtime()
+my_rank = 0
 ! call seed(99)
 
 call parse_command_line(job_params)
 
 call make_dir(job_params%job_name,output_dir)
 print*,'output directory is "',trim(output_dir),'"'
+call system("mkdir "//trim(output_dir)//"/tmp") ! make directory for temp files
+print*,'temporary files directory is "',trim(output_dir)//"/tmp/",'"'
 open(101,file=trim(output_dir)//"/"//"log") ! open global non-standard log file for important records
 
 ! write job parameters to log file
@@ -107,10 +111,12 @@ print*,'area threshold: ',max_area
 
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
-    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness) ! triangulate the particle
+    print*,'================================='
+    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness, my_rank, output_dir) ! triangulate the particle
     call merge_vertices(vert_in, face_ids, num_vert, num_face, 1D-1) ! merge vertices that are close enough
     call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
+    print*,'================================='
 end if
 ! stop
 ! write unrotated particle to file (optional)            
@@ -238,6 +244,9 @@ output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / 
 ! writing to file
 call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
 call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
+
+! clean up temporary files
+call system("rm -r "//trim(output_dir)//"/tmp") ! make directory for temp files
 
 finish = omp_get_wtime()
 
