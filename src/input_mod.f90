@@ -151,10 +151,15 @@ is_multithreaded = .false.
 intellirot = .false.
 job_name = 'my_job'
 rot_method = "none"
+afn = "(null)"
+cfn = "(null)"
+cft = "(null)"
 job_params%suppress_2d = .false.
 job_params%tri = .false.
 job_params%tri_edge_length = 1
 job_params%tri_roughness = 0D0
+job_params%resume = .false.
+job_params%cache_id = -1
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -635,6 +640,22 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             print*,'automatic triangulation: enabled'
             job_params%tri = .true.
 
+        case ('-resume')
+            ! print*,'found command line specifier "mt"'
+            print*,'resume from cached data: enabled'
+            job_params%resume = .true.
+
+        case ('-cache_id')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "cache_id"'
+                stop
+            else
+                read(arg,*) job_params%cache_id
+                print*,'job_params%cache_id: ', job_params%cache_id
+            end if
+
         case ('-tri_edge')
             i = i + 1 ! update counter to read the rotation method
             call get_command_argument(i,arg,status=my_status)
@@ -661,6 +682,17 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             ! print*,'found command line specifier "intellirot"'
             intellirot = .true.
             ! do something
+
+        case ('-time_limit')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "tri_edge"'
+                stop
+            else
+                read(arg,*) job_params%time_limit
+                print*,'job_params%time_limit: ', job_params%time_limit,' hours'
+            end if  
 
         case default ! if argument was unrecognised
             print '(2a, /)', 'unrecognised command-line option: ', arg
@@ -693,7 +725,6 @@ else if (found_c_method .eqv. .true.) then
         else if (found_afn .eqv. .false.) then
             ! print*,'error: missing required argument "afn"'
             print*,'no input for afn. Using automatic aperture assignment...'
-            afn = ""
             ! stop
         else if (found_cft .eqv. .false.) then
             print*,'error: missing required argument "cft"'
@@ -1103,7 +1134,7 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
     ! modified to ensure different mpi processes have different 
 
     character(100) rot_method ! rotation method
-    real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
+    real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices    
     real(8), dimension(:,:), allocatable, intent(out) :: verts_rot ! unique vertices    
     real(8), dimension(:), allocatable, intent(in) :: alpha_vals, beta_vals, gamma_vals
     integer(8) offs(1:2)
@@ -1804,6 +1835,7 @@ subroutine PDAL2(   num_vert,       &
     real(8), dimension(:), allocatable :: faceAreas ! area of each facet
     real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
     logical auto_apertures ! whether or noth automatic aperture asignment should be used
+    character(len=32) cache_id_string
 
     c_method = job_params%c_method
     cc_hex_params = job_params%cc_hex_params
@@ -1812,7 +1844,18 @@ subroutine PDAL2(   num_vert,       &
     afn = job_params%afn
     auto_apertures = .false.
 
-    if(trim(afn) .eq. "") auto_apertures = .true.
+    if(job_params%resume .eqv. .true.) then
+
+        write(cache_id_string,*) job_params%cache_id
+
+        c_method = "read"
+        cft = "mrt"
+        cfn = "cache/"//adjustl(trim(cache_id_string)//"/unrotated.cry")
+        afn = "cache/"//adjustl(trim(cache_id_string)//"/apertures.dat")
+
+    end if
+
+    if(trim(afn) .eq. "(null)") auto_apertures = .true.
 
     print*,'particle input method: "',c_method(1:len(trim(c_method))),'"'
     print*,'========== start sr PDAL2'

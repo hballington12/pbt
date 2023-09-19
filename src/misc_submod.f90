@@ -13,6 +13,231 @@ real(8), parameter, public :: pi = 3.14159265358979
 
 contains
 
+subroutine resume_job(job_params,loop_start,mueller_total,mueller_1d_total,output_parameters_total)
+
+! attempts to pull cached files from cache directory
+
+type(job_parameters_type), intent(inout) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
+integer(8), intent(inout) :: loop_start
+real(8), dimension(:,:,:), allocatable, intent(out) :: mueller_total ! mueller matrices
+real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d_total ! mueller matrices
+type(output_parameters_type), intent(out) :: output_parameters_total
+
+integer(8) cache_id, i, nlines, io, j
+character(len=32) cache_id_string
+character(len=255) line
+real(8) junk
+
+cache_id = job_params%cache_id
+
+if(cache_id .eq. -1) then
+    print*,'error: invalid cache id. did you forget to specify flag "-cache_id <value>"?'
+    stop
+else
+    print*,'cache id: ',cache_id
+end if
+
+print*,'opening cache files...'
+
+write(cache_id_string,*) cache_id
+
+print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/job_params.txt"
+
+open(10,file="cache/"//trim(adjustl(cache_id_string))//"/job_params.txt") ! open job_params file
+    read(10,*) loop_start
+    loop_start = loop_start + 1 ! add 1 because loop_start was where the last job part finished
+    read(10,*) job_params%cfn
+    read(10,*) job_params%cft
+    read(10,*) job_params%afn
+    read(10,*) job_params%la
+    read(10,*) job_params%rbi
+    read(10,*) job_params%ibi
+    read(10,*) job_params%rec
+    read(10,*) job_params%rot_method
+    read(10,*) job_params%is_multithreaded
+    read(10,*) job_params%num_orients
+    read(10,*) job_params%intellirot
+    read(10,*) job_params%c_method
+    read(10,*) job_params%job_name
+    read(10,*) job_params%suppress_2d
+    read(10,*) job_params%tri
+    job_params%tri = .false. ! dont re-triangulate
+    read(10,*) job_params%tri_edge_length
+    read(10,*) job_params%tri_roughness
+close(10)
+
+print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/output_params.txt"
+
+open(10,file="cache/"//trim(adjustl(cache_id_string))//"/output_params.txt") ! open job_params file
+    read(10,*) output_parameters_total%abs
+    read(10,*) output_parameters_total%scatt
+    read(10,*) output_parameters_total%ext
+    read(10,*) output_parameters_total%albedo
+    read(10,*) output_parameters_total%asymmetry
+    read(10,*) output_parameters_total%abs_eff
+    read(10,*) output_parameters_total%scatt_eff
+    read(10,*) output_parameters_total%ext_eff
+    read(10,*) output_parameters_total%geo_cross_sec
+close(10)
+
+print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/theta_vals.dat"
+
+open(10,file="cache/"//trim(adjustl(cache_id_string))//"/theta_vals.dat") ! open job_params file
+nlines = 0
+do  ! scan through the lines in the crystal file...
+    read(10,"(a)",iostat=io)line
+    if (io/=0) exit
+    nlines = nlines + 1
+end do
+! deallocate if necessary, then reallocate theta vals to match cached file
+if(allocated(job_params%theta_vals)) deallocate(job_params%theta_vals)
+allocate(job_params%theta_vals(1:nlines))
+print*,'num lines in theta file: ',nlines
+rewind(10)
+do i = 1, nlines
+    read(10,*) job_params%theta_vals(i)
+    ! print*,'job_params%theta_vals(i)',job_params%theta_vals(i)
+end do
+close(10)
+
+print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/phi_vals.dat"
+
+open(10,file="cache/"//trim(adjustl(cache_id_string))//"/phi_vals.dat") ! open job_params file
+nlines = 0
+do  ! scan through the lines in the crystal file...
+    read(10,"(a)",iostat=io)line
+    if (io/=0) exit
+    nlines = nlines + 1
+end do
+! deallocate if necessary, then reallocate theta vals to match cached file
+if(allocated(job_params%phi_vals)) deallocate(job_params%phi_vals)
+allocate(job_params%phi_vals(1:nlines))
+print*,'num lines in phi file: ',nlines
+rewind(10)
+do i = 1, nlines
+    read(10,*) job_params%phi_vals(i)
+    ! print*,'job_params%phi_vals(i)',job_params%phi_vals(i)
+end do
+close(10)
+
+! read mueller
+
+print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid_1d"
+open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid_1d") ! open job_params file
+
+allocate(mueller_1d_total(1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
+
+do i = 1, size(job_params%theta_vals,1)
+    read(10,'(f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
+    junk, &
+    mueller_1d_total(i,1), mueller_1d_total(i,2), mueller_1d_total(i,3), mueller_1d_total(i,4), &
+    mueller_1d_total(i,5), mueller_1d_total(i,6), mueller_1d_total(i,7), mueller_1d_total(i,8), &
+    mueller_1d_total(i,9), mueller_1d_total(i,10), mueller_1d_total(i,11), mueller_1d_total(i,12), &
+    mueller_1d_total(i,13), mueller_1d_total(i,14), mueller_1d_total(i,15), mueller_1d_total(i,16)
+end do
+
+close(10)
+
+print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid"
+open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid") ! open job_params file
+
+allocate(mueller_total(1:size(job_params%phi_vals,1),1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
+
+do i = 1, size(job_params%theta_vals,1)
+    do j = 1, size(job_params%phi_vals,1)
+       read(10,'(f12.4,f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
+       junk, junk, &
+       mueller_total(j,i,1), mueller_total(j,i,2), mueller_total(j,i,3), mueller_total(j,i,4), &
+       mueller_total(j,i,5), mueller_total(j,i,6), mueller_total(j,i,7), mueller_total(j,i,8), &
+       mueller_total(j,i,9), mueller_total(j,i,10), mueller_total(j,i,11), mueller_total(j,i,12), &
+       mueller_total(j,i,13), mueller_total(j,i,14), mueller_total(j,i,15), mueller_total(j,i,16)                                                                             
+    end do
+ end do
+
+close(10)
+
+print*,'read cached files. resuming at loop index',loop_start,"/",job_params%num_orients
+
+end subroutine
+
+subroutine save_params(job_params,loop_index,output_dir,output_parameters_total)
+
+! saves the job parameters to a file
+
+character(len=255), intent(in) :: output_dir ! cached files directory (if job stops early)
+integer(8), intent(in) :: loop_index ! current loop index of the main loop
+type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
+type(output_parameters_type), intent(in) :: output_parameters_total
+
+integer i
+
+open(10,file=trim(output_dir)//"/job_params.txt") ! open job_params file
+    write(10,*) loop_index
+    write(10,*) job_params%cfn
+    write(10,*) job_params%cft
+    write(10,*) job_params%afn
+    write(10,*) job_params%la
+    write(10,*) job_params%rbi
+    write(10,*) job_params%ibi
+    write(10,*) job_params%rec
+    write(10,*) job_params%rot_method
+    write(10,*) job_params%is_multithreaded
+    write(10,*) job_params%num_orients
+    write(10,*) job_params%intellirot
+    write(10,*) job_params%c_method
+    write(10,*) job_params%job_name
+    write(10,*) job_params%suppress_2d
+    write(10,*) job_params%tri
+    write(10,*) job_params%tri_edge_length
+    write(10,*) job_params%tri_roughness
+close(10)
+
+open(10,file=trim(output_dir)//"/theta_vals.dat") ! open theta_vals file
+    do i = 1, size(job_params%theta_vals,1)
+        write(10,*) job_params%theta_vals(i)
+    end do
+close(10)
+
+open(10,file=trim(output_dir)//"/phi_vals.dat") ! open phi_vals file
+    do i = 1, size(job_params%phi_vals,1)
+        write(10,*) job_params%phi_vals(i)
+    end do
+close(10)
+
+open(10,file=trim(output_dir)//"/output_params.txt") ! open output_params file
+    write(10,*) output_parameters_total%abs
+    write(10,*) output_parameters_total%scatt
+    write(10,*) output_parameters_total%ext
+    write(10,*) output_parameters_total%albedo
+    write(10,*) output_parameters_total%asymmetry
+    write(10,*) output_parameters_total%abs_eff
+    write(10,*) output_parameters_total%scatt_eff
+    write(10,*) output_parameters_total%ext_eff
+    write(10,*) output_parameters_total%geo_cross_sec
+close(10)
+
+end subroutine
+
+subroutine save_apertures(  apertures,  &
+                            output_dir)
+
+! saves the apertures to a file
+
+character(len=255), intent(in) :: output_dir ! cached files directory (if job stops early)
+integer(8), dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
+
+integer(8) i
+
+open(10,file=trim(output_dir)//"/apertures.dat") ! open pertures file
+
+do i = 1,size(apertures,1)
+    write(10,*) apertures(i)
+end do
+
+close(10)
+
+end subroutine
+
 subroutine write_job_params(job_params)
 
 character(100) cfn ! crystal filename
@@ -176,6 +401,54 @@ close(10)
     
     end subroutine
 
+    subroutine make_cache_dir(dir_path_in,cwd_out)
+
+        ! makes the a cache directory
+    
+        character(len=*), intent(in) :: dir_path_in
+        character(len=255) dir_path
+        character(len=255), intent(out) :: cwd_out
+        logical exists ! for checking if directories or files exist
+        logical result ! true if subdirectory was made, false if subdirectory was not made
+        integer job_num ! job number
+        character(len=255) job_num_string ! job number
+    
+        job_num = 1
+        result = .false.
+
+        do while (result .eqv. .false.) ! while a new directory has not been made
+
+            ! append job_num to directory name
+            write(job_num_string,"(I3)") job_num
+            call StripSpaces(job_num_string)
+            ! print*,'job_num_string:',trim(job_num_string)
+            ! print*,'dir_path: ',trim(dir_path_in)//trim(job_num_string)
+            ! stop
+            write(dir_path,*) trim(dir_path_in)//""//trim(job_num_string)
+            call StripSpaces(dir_path)
+            ! print*,'attempting to make directory with name "',trim(dir_path),'"'
+    
+            inquire(file = trim(dir_path), exist = exists)
+            if(exists .eqv. .false.) then 
+                ! print*,'Creating job directory at "',trim(dir_path),'"'
+                write(cwd_out,*) trim(dir_path)
+                ! result = makedirqq(trim(dir_path))
+                call system("mkdir "//trim(dir_path))
+                result = .true.
+            else
+                ! if already exists, add 1 to job number and try again
+                job_num = job_num + 1
+                ! print*,'error: job directory already exists'
+                ! stop
+            end if
+    
+        end do
+    
+        call StripSpaces(cwd_out)
+    
+        
+    
+    end subroutine
 
 subroutine fix_collinear_vertices(verts, face_ids, num_vert, num_face, num_face_vert, apertures)
 
@@ -789,10 +1062,10 @@ character(len=*), intent(in) :: output_dir
 character(len=*), intent(in) :: filename
 integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
 
-integer num_verts, num_faces, i, j
+integer(8) num_verts, num_faces, i, j, k, max_verts
 character(100) my_string, my_string2
 
-print*,'========== end sr PDAS'
+print*,'========== start sr PDAS'
 
 num_verts = size(verts,1)
 num_faces = size(face_ids,1)
@@ -854,9 +1127,13 @@ do i = 1, num_faces
     ! print*,'face #',i,' had ',num_face_vert(i),' vertices'
     write(10,*) num_face_vert(i)
 end do
+! print*,'maxval(num_face_vert)',maxval(num_face_vert)
+! stop
 do i = 1, num_faces
     do j = 1, num_face_vert(i)
-        write(10,'(f16.8,f16.8,f16.8)') verts(face_ids(i,j),1), verts(face_ids(i,j),2), verts(face_ids(i,j),3)
+        k = num_face_vert(i) - j + 1
+        ! k = j
+        write(10,'(f16.8,f16.8,f16.8)') verts(face_ids(i,k),1), verts(face_ids(i,k),2), verts(face_ids(i,k),3)
     end do
 end do
 close(10)

@@ -27,14 +27,11 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i
+integer(8) i_loop, loop_start
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
 character(len=255) :: output_dir ! output directory
-
-! sr SDATIN
-integer num_orients ! number of orientations
 type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
@@ -84,10 +81,16 @@ integer seed(1:8)
 print*,'========== start main'
 start = omp_get_wtime()
 my_rank = 0
+loop_start = 1
 seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
-call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 
 call parse_command_line(job_params)
+
+if(job_params%resume) then
+    print*,'attempting to resume job using cache #',job_params%cache_id
+    call resume_job(job_params,loop_start,mueller_total,mueller_1d_total,output_parameters_total)
+    ! stop
+end if
 
 call make_dir(job_params%job_name,output_dir)
 print*,'output directory is "',trim(output_dir),'"'
@@ -104,12 +107,8 @@ call PDAL2( num_vert,       & !  -> number of unique vertices
             face_ids,       & !  -> face vertex IDs
             vert_in,        & !  -> unique vertices
             num_face_vert,  & !  -> number of vertices in each face
-            apertures,      &
-            job_params)
-
-max_edge_length = job_params%la*2
-max_area = max_edge_length**2*sqrt(3D0)/4D0
-print*,'area threshold: ',max_area
+            apertures,      & !  -> apertures
+            job_params)       ! <-  job parameters
 
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
@@ -117,7 +116,10 @@ if (job_params%tri) then
     call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness, my_rank, output_dir) ! triangulate the particle
     call merge_vertices(vert_in, face_ids, num_vert, num_face, 1D-1) ! merge vertices that are close enough
     call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
-    ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
+    ! max_edge_length = job_params%la*2
+    ! max_area = max_edge_length**2*sqrt(3D0)/4D0
+    ! print*,'area threshold: ',max_area
+    ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than threshold
     print*,'================================='
 end if
 ! stop
@@ -128,13 +130,14 @@ call PDAS(  vert_in,        & ! <-  rotated vertices
             num_face_vert,  & ! <-  number of verices in each face
             "unrotated")    ! <-  filename
 ! stop
+
+call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 call init_loop( alpha_vals, &
                 beta_vals, &
                 gamma_vals, &
                 job_params)
 
-num_orients = job_params%num_orients 
-do i = 1, num_orients
+do i_loop = loop_start, job_params%num_orients 
 
     ! rotate particle
     call PROT_MPI(  vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
@@ -142,11 +145,11 @@ do i = 1, num_orients
                     alpha_vals, &
                     beta_vals,  &
                     gamma_vals, &
-                    i,          &
+                    i_loop,     &
                     job_params)
 
     ! write rotated particle to file (optional)
-    if (num_orients .eq. 1) then
+    if (job_params%num_orients  .eq. 1) then
         call PDAS(  vert,       & ! <-  rotated vertices
                     face_ids,   & ! <-  face vertex IDs
                     output_dir, & ! <-  output directory
@@ -184,13 +187,13 @@ do i = 1, num_orients
                     num_face_vert,             & ! <-  number of verices in each face
                     job_params)
     
-    if(num_orients .gt. 1) then
-        print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'
+    if(job_params%num_orients .gt. 1) then
+        print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i_loop,' / ',job_params%num_orients,' (total progress: ',dble(i_loop-1)/dble(job_params%num_orients)*100,' %)'
         ! print*,'total time elapsed: ',omp_get_wtime()-start
         ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
-        if (i .gt. 1) then
+        if (i_loop .gt. 1) then
             print'(A20,F12.4,A5)','est. time remaining: '
-            call PROUST(nint(dble(num_orients-i+1)*(omp_get_wtime()-start) / dble(i)))
+            call PROUST(nint(dble(job_params%num_orients-i_loop+1)*(omp_get_wtime()-start) / dble(i_loop)))
         end if
     end if
 
@@ -228,27 +231,39 @@ do i = 1, num_orients
 
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
+    if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .or. i_loop .eq. 11) then
+        call cache_job( vert_in,                    & ! unrotated vertices
+                        face_ids,                   & ! face ids
+                        num_face_vert,              & ! num vertices per face
+                        apertures,                  & ! apertures
+                        job_params,                 & ! job parameters
+                        i_loop,                     & ! current loop index
+                        output_parameters_total,    & ! total output parameters
+                        mueller_total,              & ! total 2d mueller
+                        mueller_1d_total)             ! total 1d mueller
+    end if
+
 end do
 
 ! divide by no. of orientations
-mueller_total = mueller_total / num_orients
-mueller_1d_total = mueller_1d_total / num_orients
-output_parameters_total%abs = output_parameters_total%abs / num_orients
-output_parameters_total%scatt = output_parameters_total%scatt / num_orients
-output_parameters_total%ext = output_parameters_total%ext / num_orients
-output_parameters_total%albedo = output_parameters_total%albedo / num_orients
-output_parameters_total%asymmetry = output_parameters_total%asymmetry / num_orients
-output_parameters_total%abs_eff = output_parameters_total%abs_eff / num_orients
-output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / num_orients
-output_parameters_total%ext_eff = output_parameters_total%ext_eff / num_orients
-output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / num_orients
+mueller_total = mueller_total / job_params%num_orients 
+mueller_1d_total = mueller_1d_total / job_params%num_orients 
+output_parameters_total%abs = output_parameters_total%abs / job_params%num_orients 
+output_parameters_total%scatt = output_parameters_total%scatt / job_params%num_orients 
+output_parameters_total%ext = output_parameters_total%ext / job_params%num_orients 
+output_parameters_total%albedo = output_parameters_total%albedo / job_params%num_orients 
+output_parameters_total%asymmetry = output_parameters_total%asymmetry / job_params%num_orients 
+output_parameters_total%abs_eff = output_parameters_total%abs_eff / job_params%num_orients 
+output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / job_params%num_orients 
+output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%num_orients 
+output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients 
 
 ! writing to file
 call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
 call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
 
 ! clean up temporary files
-call system("rm -r "//trim(output_dir)//"/tmp") ! make directory for temp files
+call system("rm -r "//trim(output_dir)//"/tmp") ! remove directory for temp files
 
 finish = omp_get_wtime()
 
