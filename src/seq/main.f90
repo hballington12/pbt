@@ -77,13 +77,15 @@ type(output_parameters_type) output_parameters_total
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 real(8) max_area, max_edge_length
 integer my_rank
+integer seed(1:8)
 
 ! ############################################################################################################
 ! start
 print*,'========== start main'
 start = omp_get_wtime()
 my_rank = 0
-! call seed(99)
+seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
+call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 
 call parse_command_line(job_params)
 
