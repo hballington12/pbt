@@ -33,17 +33,17 @@ Main source file. It contains the program entry point. The ABT reads input param
     
         - `afn` `<string>` - Defines the apertures filename. Is required. The apertures file containes a single column defining which aperture each face belongs to. The number of lines in the apertures file must match the total number of faces in the particle file.
     
-    - `cc_hex` - attempts to make gaussian rough hexagonal column/plate. Uses method developed by C. Collier, based on Muinonen & Saarinen 2000. If this flag flag is used, several other flags must also be specified:
+    - `cc_hex` - Attempts to make gaussian rough hexagonal column/plate. Uses method developed by C. Collier, based on Muinonen & Saarinen 2000. If this flag flag is used, several other flags must also be specified:
         - `-cc_hex_l` `<value>` - L from Muinonen & Saarinen 2000. Should be large compared to the correlation length (see below).
-        - `-cc_hex_hr` - hexagonal edge length.
-        - `-cc_hex_nfhr` - number of subdivisions along each hexagonal edge.
-        - `-cc_hex_pfl` - prism edge length.
-        - `-cc_hex_nfpl` - number of subdivisions along each prism edge.
-        - `-cc_hex_pher` - number of rotations to perform at prism facet-basal facet edges (10% of no. of subfacets along prism edge).
-        - `-cc_hex_pper` - number of rotations to perform at prism facet-prism facet edges (10% of subfacets along hexagon edge).
-        - `-cc_hex_nscales` - number of roughness scales.
-        - `-cc_hex_cls` - correlation lengths for each roughness scale, separated by spaces.
-        - `-cc_hex_sds` - standard deviations for each roughness scale, separated by spaces.
+        - `-cc_hex_hr` - Hexagonal edge length.
+        - `-cc_hex_nfhr` - Number of subdivisions along each hexagonal edge.
+        - `-cc_hex_pfl` - Prism edge length.
+        - `-cc_hex_nfpl` - Number of subdivisions along each prism edge.
+        - `-cc_hex_pher` - Number of rotations to perform at prism facet-basal facet edges (10% of no. of subfacets along prism edge).
+        - `-cc_hex_pper` - Number of rotations to perform at prism facet-prism facet edges (10% of subfacets along hexagon edge).
+        - `-cc_hex_nscales` - Number of roughness scales.
+        - `-cc_hex_cls` - Correlation lengths for each roughness scale, separated by spaces.
+        - `-cc_hex_sds` - Standard deviations for each roughness scale, separated by spaces.
 
 - `-rec` `<value>` - Defines the total number of beam recursions per orientation. Is required.
 
