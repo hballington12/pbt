@@ -24,7 +24,8 @@ objects = 	types_mod$(O_EXT) \
 			beam_loop_mod$(O_EXT) \
 			diff_mod$(O_EXT) \
 			outputs_mod$(O_EXT) \
-			cc_hex_mod$(O_EXT)
+			cc_hex_mod$(O_EXT) \
+			mpi_mod$(O_EXT)
 
 modules = 	types_mod$(MOD_EXT) \
 			misc_submod$(MOD_EXT) \
@@ -32,7 +33,8 @@ modules = 	types_mod$(MOD_EXT) \
 			beam_loop_mod$(MOD_EXT) \
 			diff_mod$(MOD_EXT) \
 			outputs_mod$(MOD_EXT) \
-			cc_hex_mod$(MOD_EXT)
+			cc_hex_mod$(MOD_EXT) \
+			mpi_mod$(MOD_EXT)
 
 .PHONY: seq # sequential target
 .PHONY: mpi # mpi target
@@ -64,6 +66,9 @@ types_mod$(O_EXT) : types_mod.f90
 
 cc_hex_mod$(O_EXT) : cc_hex_mod.f90
 	$(FC) $(FSWITCHES) -c cc_hex_mod.f90
+
+mpi_mod$(O_EXT) : mpi_mod.f90 types_mod$(O_EXT)
+	mpifort $(FSWITCHES) -c mpi_mod.f90
 
 ./tri/triangle: ./tri/triangle.c
 	$(CC) $(CSWITCHES) ./tri/triangle.c -lm -o ./tri/triangle
