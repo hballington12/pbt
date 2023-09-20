@@ -33,7 +33,7 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i, j, k, i_loop
+integer i, j, k, i_loop
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -56,35 +56,35 @@ integer num_orients ! number of orientations
 logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
 character(100) c_method ! method of particle file input
 character(100) job_name ! name of job
-integer(8) offs(1:2) ! off values, used if off rotation method
+integer offs(1:2) ! off values, used if off rotation method
 real(8) eulers(1:3) ! euler angles, used if euler rotation method
 type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
-integer(8) num_vert ! number of unique vertices
-integer(8) num_face !  number of faces
-integer(8) num_norm ! number of face normals
-integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
+integer num_vert ! number of unique vertices
+integer num_face !  number of faces
+integer num_norm ! number of face normals
+integer, dimension(:,:), allocatable :: face_ids ! face vertex IDs
 real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
 real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
 real(8), dimension(:,:), allocatable :: norm ! face normals
-integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
-integer(8), dimension(:), allocatable :: norm_ids ! face normal ID of each face
-integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
+integer, dimension(:), allocatable :: num_face_vert ! number of vertices in each face
+integer, dimension(:), allocatable :: norm_ids ! face normal ID of each face
+integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
 
 ! sr makeIncidentBeam
 real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
 real(8), allocatable, dimension(:,:) :: beamN ! beam normals
 real(8), allocatable, dimension(:,:) :: beamMidpoints ! beam  midpoints
-integer(8), allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
-integer(8), allocatable, dimension(:) :: beamF2 ! beam face normal indices
+integer, allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
+integer, allocatable, dimension(:) :: beamF2 ! beam face normal indices
 complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of incident beam
 
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
 type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing beams from external diffraction
-integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer beam_outbeam_tree_counter ! counts the current number of beam outbeams
 real(8) energy_out_beam
 real(8) energy_out_ext_diff
 real(8) energy_abs_beam
@@ -190,7 +190,7 @@ print*,'area threshold: ',max_area
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
     call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness, my_rank, output_dir) ! triangulate the particle
-    call merge_vertices(vert_in, face_ids, num_vert, num_face, 1D-1) ! merge vertices that are close enough
+    call merge_vertices(vert_in, face_ids, num_vert, 1D-1) ! merge vertices that are close enough
     call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
 end if
@@ -264,7 +264,6 @@ do i = my_start, my_end
                             beamN,         & ! ->  beam normals
                             beamF2,        & ! ->  beam face normal indices
                             vert,          & ! <-  unique vertices
-                            face_ids,      & ! <- face vertex IDs
                             beamMidpoints, & !  -> beam  midpoints
                             ampl_beam)       !  -> amplitude matrix of incident beam       
 

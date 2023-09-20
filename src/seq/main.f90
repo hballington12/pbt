@@ -27,7 +27,7 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i_loop, loop_start, i
+integer i_loop, loop_start, i
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -35,26 +35,26 @@ character(len=255) :: output_dir ! output directory
 type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
-integer(8) num_vert ! number of unique vertices
-integer(8) num_face !  number of faces
-integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
+integer num_vert ! number of unique vertices
+integer num_face !  number of faces
+integer, dimension(:,:), allocatable :: face_ids ! face vertex IDs
 real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
 real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
-integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
-integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
+integer, dimension(:), allocatable :: num_face_vert ! number of vertices in each face
+integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
 
 ! sr makeIncidentBeam
 real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
 real(8), allocatable, dimension(:,:) :: beamN ! beam normals
 real(8), allocatable, dimension(:,:) :: beamMidpoints ! beam  midpoints
-integer(8), allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
-integer(8), allocatable, dimension(:) :: beamF2 ! beam face normal indices
+integer, allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
+integer, allocatable, dimension(:) :: beamF2 ! beam face normal indices
 complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of incident beam
 
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
 type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing beams from external diffraction
-integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer beam_outbeam_tree_counter ! counts the current number of beam outbeams
 real(8) energy_out_beam
 real(8) energy_out_ext_diff
 real(8) energy_abs_beam
@@ -72,7 +72,7 @@ type(output_parameters_type) output_parameters
 type(output_parameters_type) output_parameters_total
 
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
-real(8) max_area, max_edge_length
+! real(8) max_area, max_edge_length
 integer my_rank
 integer seed(1:8)
 character(len=255) cache_dir ! cached files directory (if job stops early)
@@ -118,7 +118,7 @@ if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
     print*,'================================='
     call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness, my_rank, output_dir) ! triangulate the particle
-    call merge_vertices(vert_in, face_ids, num_vert, num_face, 1D-1) ! merge vertices that are close enough
+    call merge_vertices(vert_in, face_ids, num_vert, 1D-1) ! merge vertices that are close enough
     call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! max_edge_length = job_params%la*2
     ! max_area = max_edge_length**2*sqrt(3D0)/4D0
@@ -180,7 +180,6 @@ do i = 1, num_remaining_orients
                             beamN,         & ! ->  beam normals
                             beamF2,        & ! ->  beam face normal indices
                             vert,          & ! <-  unique vertices
-                            face_ids,      & ! <- face vertex IDs
                             beamMidpoints, & !  -> beam  midpoints
                             ampl_beam)       !  -> amplitude matrix of incident beam       
 
@@ -250,7 +249,7 @@ do i = 1, num_remaining_orients
 
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
         call make_cache_dir("cache/",cache_dir)
-        call cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients,job_params)
+        call cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients)
         call cache_job( vert_in,                    & ! unrotated vertices
                         face_ids,                   & ! face ids
                         num_face_vert,              & ! num vertices per face

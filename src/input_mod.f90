@@ -11,7 +11,7 @@ implicit none
 
 contains
 
-subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter,theta_splits_counter)
+subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter)
 
     ! sr read_theta,vals reads and makes the phi values
     ! taken from sr anglesplit
@@ -23,9 +23,10 @@ subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_count
     real(8), dimension(:), allocatable, intent(out) :: theta_vals
     real(8), dimension(:), intent(in) :: theta_vals_in(1:10000)
     real(8), dimension(:), intent(in) :: theta_splits_in(1:10000)
-    integer, intent(in) ::  theta_vals_counter, theta_splits_counter
+    integer, intent(in) ::  theta_vals_counter
 
-    integer nlines, i, io, j, jmax
+    integer nlines, i, j, jmax
+    ! integer io
     real(8), dimension(:) ,allocatable :: anglesint ,splitsint
     real(8), dimension(:) ,allocatable :: anglesout, anglesteps
     integer kint
@@ -99,7 +100,7 @@ subroutine parse_command_line(job_params)
 integer i, j
 character(len=255) :: arg ! a command line argument
 integer my_status ! success code
-integer ierror ! error status
+! integer ierror ! error status
 logical finished
 real(8), dimension(:) :: theta_vals_in(1:10000), phi_vals_in(1:10000)
 real(8), dimension(:) :: theta_splits_in(1:10000), phi_splits_in(1:10000)
@@ -120,7 +121,7 @@ integer num_orients ! number of orientations
 logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
 character(100) c_method ! method of particle file input
 character(100) job_name ! name of job
-integer(8)  offs(1:2)
+integer  offs(1:2)
 real(8)  eulers(1:3)
 type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 real(8), dimension(:), allocatable :: theta_vals, phi_vals
@@ -569,7 +570,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             print*,'theta values read: ',theta_vals_in(1:theta_vals_counter)
             print*,'theta splits read: ',theta_splits_in(1:theta_splits_counter)
 
-            call make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter,theta_splits_counter)
+            call make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter)
             ! convert theta vals to rad
             theta_vals = theta_vals*pi/180d0
 
@@ -615,7 +616,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             print*,'phi values read: ',phi_vals_in(1:phi_vals_counter)
             print*,'phi splits read: ',phi_splits_in(1:phi_splits_counter)
             ! stop
-            call make_angles(phi_vals,phi_vals_in,phi_splits_in,phi_vals_counter,phi_splits_counter)
+            call make_angles(phi_vals,phi_vals_in,phi_splits_in,phi_vals_counter)
             ! convert phi vals to rad
             phi_vals = phi_vals*pi/180d0
 
@@ -800,9 +801,9 @@ subroutine init_loop(   alpha_vals, &
     logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
     type(job_parameters_type), intent(in) :: job_params ! job parameters
     real(8), dimension(:), allocatable, intent(out) :: alpha_vals, beta_vals, gamma_vals
-    integer(8) num_angles, leftover_angles
+    integer num_angles, leftover_angles
     real(8), allocatable, dimension(:) :: intelli_vals
-    integer(8) i, j, k, counter
+    integer i, j, k, counter
     real(8) spacing, rand
 
     intellirot = job_params%intellirot
@@ -883,7 +884,7 @@ subroutine PROT(ifn,rot_method,verts)
     character(len=*), intent(in) :: ifn
     character(100), intent(in) :: rot_method ! rotation method
     real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
-    integer(8) offs(1:2)
+    integer offs(1:2)
     real(8) eulers(1:3)
     real(8) vec(1:3) ! off rotation vector
     real(8) hilf0, hilf1
@@ -891,7 +892,7 @@ subroutine PROT(ifn,rot_method,verts)
     integer i
     real(8) s1, s2, s3, c1, c2, c3
     real(8) rand
-    integer(8) num_vals
+    integer num_vals
 
     print*,'========== start sr PROT'
 
@@ -1030,14 +1031,14 @@ subroutine PROT_CC(verts)
     ! rotates cc_hex particle so that prism axis is aligned with z axis
 
     real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
-    integer(8) offs(1:2)
+    ! integer offs(1:2)
     real(8) eulers(1:3)
-    real(8) vec(1:3) ! off rotation vector
-    real(8) hilf0, hilf1
-    real(8) rot1(1:3,1:3), rot2(1:3,1:3), rot(1:3,1:3)
+    ! real(8) vec(1:3) ! off rotation vector
+    ! real(8) hilf0, hilf1
+    real(8) rot(1:3,1:3)
     integer i
     real(8) s1, s2, s3, c1, c2, c3
-    real(8) rand
+    ! real(8) rand
 
     print*,'========== start sr PROT_CC'
 
@@ -1135,7 +1136,7 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
     real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices    
     real(8), dimension(:,:), allocatable, intent(out) :: verts_rot ! unique vertices    
     real(8), dimension(:), allocatable, intent(in) :: alpha_vals, beta_vals, gamma_vals
-    integer(8) offs(1:2)
+    integer offs(1:2)
     real(8) eulers(1:3)
     real(8) vec(1:3) ! off rotation vector
     real(8) hilf0, hilf1
@@ -1143,7 +1144,7 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
     integer i
     real(8) s1, s2, s3, c1, c2, c3
     real(8) rand
-    integer(8), intent(in) :: loop_index
+    integer, intent(in) :: loop_index
     integer num_orients ! number of orientations
     type(job_parameters_type), intent(in) :: job_params
 
@@ -1309,13 +1310,13 @@ subroutine read_input_vals(fn,string,vals,num_vals)
 
     character(len=*), intent(in) :: fn ! filename to read from
     character(len=*), intent(in) :: string ! first part of the line to read from
-    integer(8), dimension(:) :: vals ! values to be read
-    integer(8) num_vals ! number of values to read
+    integer, dimension(:) :: vals ! values to be read
+    integer num_vals ! number of values to read
 
-    integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
+    integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
-    integer(8) i, io ! counting variables
-    integer(8) num_lines
+    integer i, io ! counting variables
+    integer num_lines
     logical success
     integer j, k, val_count ! number chars since last delimiter
 
@@ -1370,12 +1371,12 @@ subroutine read_input_vals_real(fn,string,vals,num_vals)
     character(len=*), intent(in) :: fn ! filename to read from
     character(len=*), intent(in) :: string ! first part of the line to read from
     real(8), dimension(:) :: vals ! values to be read
-    integer(8) num_vals ! number of values to read
+    integer num_vals ! number of values to read
 
-    integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
+    integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
-    integer(8) i, io ! counting variables
-    integer(8) num_lines
+    integer i, io ! counting variables
+    integer num_lines
     logical success
     integer j, k, val_count ! number chars since last delimiter
 
@@ -1425,14 +1426,14 @@ subroutine readApertures(afn,apertures, face_ids)
 ! sr readApertures reads the apertures filename
 ! will exit if the apertures file does not have the correct number of lines
 
-integer(8), dimension(:), allocatable, intent(out) :: apertures
+integer, dimension(:), allocatable, intent(out) :: apertures
 character(100), intent(in) :: afn ! crystal filename
-integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
+integer, dimension(:,:), allocatable, intent(in) :: face_ids
 
-integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
+integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
 character(max_line_length) line ! a line in a file
-integer(8) i, io ! counting variables
-integer(8) num_lines
+integer i, io ! counting variables
+integer num_lines
     
 ! print*,'========== start sr readApertures'
 
@@ -1469,17 +1470,17 @@ close(10)
 
 end subroutine
 
-subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, verts, face_ids, beamMidpoints, ampl_beam)
+subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, verts, beamMidpoints, ampl_beam)
 
 ! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle (currently set to 1000)
 ! the width and length of the wavefront is set larger than the maximum x and y vertex values of the particle (full illumination)
 
 real(8), allocatable, intent(out), dimension(:,:) :: beamV, beamN
-integer(8), allocatable, intent(out), dimension(:,:) :: beamF1
-integer(8), allocatable, intent(out), dimension(:) :: beamF2
+integer, allocatable, intent(out), dimension(:,:) :: beamF1
+integer, allocatable, intent(out), dimension(:) :: beamF2
 real(8), dimension(:,:) ,allocatable, intent(in) :: verts
 real(8), dimension(:,:) ,allocatable, intent(out) :: beamMidpoints
-integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids
+! integer, dimension(:,:) ,allocatable, intent(in) :: face_ids
 complex(8), allocatable, dimension(:,:,:), intent(out) :: ampl_beam ! amplitude matrix of incident beam
 
 real(8) min_x, min_y, max_x, max_y, min_z, max_z, fac
@@ -1571,7 +1572,7 @@ end subroutine
 !
 !! subroutine midPointsAndAreas computes midpoints and areas of each facet (assumes triangle facets)
 !
-!integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids
+!integer, dimension(:,:) ,allocatable, intent(in) :: face_ids
 !real(8), dimension(:,:), allocatable, intent(in) :: verts
 !real(8), dimension(:,:), allocatable, intent(out) :: Midpoints
 !real(8), dimension(:), allocatable, intent(out) :: faceAreas
@@ -1616,8 +1617,8 @@ subroutine make_normals(face_ids, verts, norm_ids, norms)
     
 ! subroutine make_normals recomputes and returns the normals, as well as the corresponding IDs for each face
     
-integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
-integer(8), dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
+integer, dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
+integer, dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
 real(8), dimension(:,:) ,allocatable, intent(in) :: verts ! unique vertices
 real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices
     
@@ -1807,29 +1808,29 @@ subroutine PDAL2(   num_vert,       &
     character(len=100) cfn ! particle filename
     character(len=100) cft ! particle filetype
     character(100) afn ! apertures filename
-    integer(8), intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
-    ! integer(8), intent(out) :: num_norm ! number of face normals
-    integer(8), dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
-    ! integer(8), dimension(:), allocatable, intent(out) :: norm_ids ! face normal ID of each face
+    integer, intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
+    ! integer, intent(out) :: num_norm ! number of face normals
+    integer, dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
+    ! integer, dimension(:), allocatable, intent(out) :: norm_ids ! face normal ID of each face
     real(8), dimension(:,:) ,allocatable, intent(out) :: verts ! unique vertices
     ! real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices, face vertex IDs, face normals
-    integer(8), dimension(:,:) ,allocatable :: face_ids_temp ! temporary array to hold face vertex IDs
-    integer(8), dimension(:,:) ,allocatable, intent(out) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+    integer, dimension(:,:) ,allocatable :: face_ids_temp ! temporary array to hold face vertex IDs
+    integer, dimension(:,:) ,allocatable, intent(out) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
     character(100) c_method ! method of particle file input
-	integer(8), dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
+    integer, dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
     type(job_parameters_type), intent(in) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 
-    integer(8), parameter :: num_face_vert_max_in = 20 ! max number of vertices per face
-    integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
+    integer, parameter :: num_face_vert_max_in = 20 ! max number of vertices per face
+    integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
-    integer(8) face_string_length
-    integer(8) entry_count
+    integer face_string_length
+    integer entry_count
     logical is_current_char_slash
-    integer(8) vertex_count
-    integer(8) num_face_vert_max
+    integer vertex_count
+    integer num_face_vert_max
     logical has_end_of_line_reached
-    integer(8) i, io, j, k, l, m, n, p, o, q ! counting variables
+    integer i, io, j, k, m, o ! counting variables
     real(8), dimension(:), allocatable :: faceAreas ! area of each facet
     real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
     logical auto_apertures ! whether or noth automatic aperture asignment should be used
@@ -2425,7 +2426,7 @@ logical function read_flag(ifn,var)
 character(len=*), intent(in) :: ifn ! input filename
 character(len=*), intent(in) :: var ! variable to read
 ! character(100) string_to_convert
-! integer(8) output ! output variable
+! integer output ! output variable
 character(100) line
 integer num_lines, io, i
 logical success

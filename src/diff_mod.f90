@@ -63,7 +63,7 @@ module diff_mod
     ! outgoing beams are ignored if the amplitude matrix has less than 1e-6 energy
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_tree ! beam_tree to be trimmed
-    integer(8), intent(inout) :: beam_tree_counter ! counts the current number of beam outbeams
+    integer, intent(inout) :: beam_tree_counter ! counts the current number of beam outbeams
 
     integer i, j
     type(outbeamtype), dimension(:), allocatable :: beam_tree_temp ! beam_tree temporary copy
@@ -74,10 +74,10 @@ module diff_mod
     j = 0
     ! do i = 1, size(beam_tree,1) ! loop over beam_tree entries
     do i = 1, beam_tree_counter ! loop over beam_tree entries
-            energy = 0.5*(  beam_tree(i)%ampl(1,1)*conjg(beam_tree(i)%ampl(1,1)) + &
-                            beam_tree(i)%ampl(1,2)*conjg(beam_tree(i)%ampl(1,2)) + &
-                            beam_tree(i)%ampl(2,1)*conjg(beam_tree(i)%ampl(2,1)) + &
-                            beam_tree(i)%ampl(2,2)*conjg(beam_tree(i)%ampl(2,2))) ! calc energy out
+            energy = real(0.5*( beam_tree(i)%ampl(1,1)*conjg(beam_tree(i)%ampl(1,1)) + &
+                                beam_tree(i)%ampl(1,2)*conjg(beam_tree(i)%ampl(1,2)) + &
+                                beam_tree(i)%ampl(2,1)*conjg(beam_tree(i)%ampl(2,1)) + &
+                                beam_tree(i)%ampl(2,2)*conjg(beam_tree(i)%ampl(2,2)))) ! calc energy out
         if(energy .gt. 1e-6) then ! if significant energy
             j = j + 1 ! update total number of outbeams
             beam_tree_temp(j) = beam_tree(i) ! add entry to trimmed outbeam tree
@@ -102,7 +102,7 @@ module diff_mod
     
     real(8), dimension(:,:), allocatable :: x1, y1, z1 ! far-field bin positions after translation to new com
     
-    integer(8) i, j
+    integer i, j
     
     ! ===== start transform bins =====
     
@@ -146,7 +146,7 @@ module diff_mod
     real(8), dimension(:,:), allocatable :: binvecs
     real(8), dimension(:,:), allocatable :: rotbinvecs
     
-    integer(8) i
+    integer i
     
     ! ===== start transform bins =====
     
@@ -379,7 +379,7 @@ module diff_mod
     real(8), intent(in) :: rot2(1:3,1:3) ! rotation matrix (about x-axis)
     real(8) rot(1:3,1:3) ! update to new rotation matrix which aligns with incidence
     real(8) v1(1:3,1:3) ! vertices of facet after rotating
-    integer(8) j, i1, i2
+    integer j, i1, i2
     real(8), dimension(:,:), allocatable, intent(in) :: x3, y3, z3
     real(8), dimension(:,:), allocatable :: kxxs, kyys, bin_vec_size_ks
     real(8), intent(in) :: prop2(1:3)
@@ -391,7 +391,7 @@ module diff_mod
     real(8) alpha, beta, delta, omega1, omega2
     real(8) sumre, sumim
     real(8) delta1, delta2
-    real(8) nf
+    ! real(8) nf
 
     ! allocate
     allocate(kxxs(1:size(x3,2),1:size(x3,1)))
@@ -485,7 +485,7 @@ module diff_mod
                 sumim = +alpha*(cos(delta)-cos(delta+omega1)) - beta*(cos(delta)-cos(delta+omega2))
                 sumre = -alpha*(sin(delta)-sin(delta+omega1)) + beta*(sin(delta)-sin(delta+omega2))
 
-                area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k)) * cmplx(sumre,sumim) / lambda
+                area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k),8) * cmplx(sumre,sumim,8) / lambda
 
             end do
         end do
@@ -561,13 +561,13 @@ module diff_mod
     real(8) angle
     real(8) prop2(1:3), perp2(1:3), e_par2(1:3)
     real(8), dimension(:,:), allocatable:: x3, y3, z3 ! far-field bin positions
-    real(8) cos_rot, sin_rot
-    real(8) bin_vec_size ! distance to far-field bins - important for accurate phase
+    ! real(8) cos_rot, sin_rot
+    ! real(8) bin_vec_size ! distance to far-field bins - important for accurate phase
     real(8) phi
     real(8) my_k(1:3)
     real(8), dimension(:), allocatable :: my_phi_vals ! phi values in aperture system for this aperture only
     logical success
-    integer(8) theta_i
+    integer theta_i
 
     allocate(my_phi_vals(1:size(phi_vals,1)))
     allocate(area_facs2(1:size(xfar,1),1:size(xfar,2)))
@@ -729,7 +729,7 @@ module diff_mod
         ! sr diff_main is the main shell for diffraction of all beams + external diffraction at a fixed orientation
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-    integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+    integer, intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     real(8) lambda ! wavelength
     real(8), dimension(:), allocatable :: theta_vals
     real(8), dimension(:), allocatable :: phi_vals
@@ -747,7 +747,7 @@ module diff_mod
     complex(8), dimension(:,:), allocatable :: area_facs2
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
     real(8) start, finish ! cpu timing variables
-    real(8) progressReal
+    ! real(8) progressReal
     integer progressInt 
 
     start = omp_get_wtime()
@@ -1003,21 +1003,16 @@ module diff_mod
 
     end subroutine
     
-    subroutine make_far_field_bins(x, y, z,theta_vals, phi_vals, & ! non-optional args
-        theta_start_in, theta_end_in, phi_start_in, phi_end_in) ! optional args
+    subroutine make_far_field_bins(x, y, z,theta_vals, phi_vals) ! optional args
     
         ! makes the far field x, y, z bins at which the diffracted field will be computed
     
-    integer(8) theta_dim, phi_dim ! theta and phi discretisation
-    real(8), dimension(:,:), allocatable, intent(out) :: x, y, z ! far-field bin positions
-    real(8), optional, intent(in) :: theta_start_in, theta_end_in, phi_start_in, phi_end_in ! 
-    
+    integer theta_dim, phi_dim ! theta and phi discretisation
+    real(8), dimension(:,:), allocatable, intent(out) :: x, y, z ! far-field bin positions    
     real(8) r ! distance to far-field
     real(8), dimension(:), allocatable, intent(in) :: theta_vals
     real(8), dimension(:), allocatable, intent(in) :: phi_vals
     real(8), dimension(:,:), allocatable :: theta_vals_mesh, phi_vals_mesh
-    real(8) theta_start, theta_end, phi_start, phi_end ! 
-    integer i
 
     ! call read_theta_vals(theta_vals)
 

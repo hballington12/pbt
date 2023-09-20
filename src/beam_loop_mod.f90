@@ -26,9 +26,9 @@ subroutine energy_checks(   beam_outbeam_tree, &
                             energy_abs_beam)
 
     type(outbeamtype), dimension(:), allocatable, intent(in) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-    integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+    integer, intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     real(8), dimension(:,:), allocatable :: norm ! face normals
-    integer(8), dimension(:), allocatable :: face2 ! face normal ID of each face
+    integer, dimension(:), allocatable :: face2 ! face normal ID of each face
     real(8), dimension(:), allocatable :: faceAreas ! area of each facet
     real(8), intent(in) :: energy_in
     real(8), intent(out) :: energy_out_beam
@@ -36,8 +36,8 @@ subroutine energy_checks(   beam_outbeam_tree, &
     real(8), intent(out) :: energy_out_ext_diff
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
 
-    integer(8) i
-    integer(8) face_id
+    integer i
+    integer face_id
     real(8) prop(1:3)
     real(8) normal(1:3)
     real(8) cos_theta
@@ -126,7 +126,7 @@ subroutine beam_loop(   Face1, &
     ! main beam loop
 
     ! inputs
-    integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+    integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
     real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
     real(8) la ! wavelength
     real(8) rbi, ibi ! real part of the refractive index
@@ -134,20 +134,20 @@ subroutine beam_loop(   Face1, &
     real(8), allocatable, dimension(:,:), intent(in) :: beamV ! beam vertices
     real(8), allocatable, dimension(:,:), intent(in) :: beamN ! beam normals
     real(8), allocatable, dimension(:,:), intent(in) :: beamMidpoints ! beam  midpoints
-    integer(8), allocatable, dimension(:,:), intent(in) :: beamF1 ! beam face vertex indices
-    integer(8), allocatable, dimension(:), intent(in) :: beamF2 ! beam face normal indices
+    integer, allocatable, dimension(:,:), intent(in) :: beamF1 ! beam face vertex indices
+    integer, allocatable, dimension(:), intent(in) :: beamF2 ! beam face normal indices
     complex(8), allocatable, dimension(:,:,:), intent(in) :: ampl_beam ! amplitude matrix of incident beam
     integer rec ! max number of internal beam recursions
     type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
-    integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+    integer, intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     type(output_parameters_type), intent(inout) :: output_parameters 
     logical is_multithreaded ! whether or not code should use multithreading
     type(job_parameters_type), intent(in) :: job_params
-    integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
+    integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
 
     real(8), dimension(:,:), allocatable :: Norm ! face normals
-    integer(8), dimension(:), allocatable :: Face2 ! face normal ID of each face
+    integer, dimension(:), allocatable :: Face2 ! face normal ID of each face
     real(8) start, finish ! cpu timing variables
     integer i
 
@@ -163,8 +163,8 @@ subroutine beam_loop(   Face1, &
     logical, dimension(:), allocatable :: isShadow ! whether the facet was in shadow (down-facing but within the illuminating beam and part of an illuminated aperture)
     real(8), dimension(:), allocatable :: distances ! distances to each illuminated face from the illuminating face ID given by beamIDs
     real(8), dimension(:), allocatable :: distances_ps ! distances to each illuminated face from the illuminating face ID given by beamIDs, including down-facing facets of illuminated apertures
-    integer(8), dimension(:), allocatable :: beamIDs ! the beamF1 ID of the face which illuminated this facet
-    integer(8), dimension(:), allocatable :: beamIDs_ps ! the beamF1 ID of the face which illuminated this facet, including down-facing facets of illuminated aperture
+    integer, dimension(:), allocatable :: beamIDs ! the beamF1 ID of the face which illuminated this facet
+    integer, dimension(:), allocatable :: beamIDs_ps ! the beamF1 ID of the face which illuminated this facet, including down-facing facets of illuminated aperture
     complex(8), dimension(:,:,:), allocatable :: ampl_in ! amplitude matrix over the surface, for a specific recursion
     complex(8), dimension(:,:,:), allocatable :: ampl_in_ps ! amplitude matrix over the surface, for a specific recursion
     real(8) waveno ! wavenumber in vacuum
@@ -182,12 +182,12 @@ subroutine beam_loop(   Face1, &
     complex(8), dimension(:,:,:), allocatable :: refl_ampl ! reflected amplitude matrices
     complex(8), dimension(:,:,:), allocatable :: refl_ampl_ps ! reflected amplitude matrices
     complex(8), dimension(:,:,:), allocatable :: ampl_diff ! external diffraction amplitude matrices
-    integer(8) interactionCounter ! counts the current number of interactions
+    integer interactionCounter ! counts the current number of interactions
     
     ! sr findVisibleFacets
     
     ! sr readApertures
-    integer(8), dimension(:), allocatable, intent(in)  :: apertures ! the aperture which each facet belongs to
+    integer, dimension(:), allocatable, intent(in)  :: apertures ! the aperture which each facet belongs to
     
     ! sr initApertures
     real(8), dimension(:,:), allocatable :: apertureNormals ! the normal of each aperture
@@ -206,7 +206,7 @@ subroutine beam_loop(   Face1, &
     ! beam_loop -> diffraction
     
     ! main loop
-    integer(8), dimension(:,:), allocatable :: F1Mapping ! the face indices of each row of variables to go into main loop
+    integer, dimension(:,:), allocatable :: F1Mapping ! the face indices of each row of variables to go into main loop
     complex(8), dimension(:,:), allocatable :: refl_ampl_out11Int ! the amplitude matrix that goes into the main loop
     complex(8), dimension(:,:), allocatable :: refl_ampl_out12Int ! needs renaming
     complex(8), dimension(:,:), allocatable :: refl_ampl_out21Int
@@ -338,11 +338,11 @@ subroutine get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, verts
     ! uses the FOut data to add vertex information to a beamtree
 
 type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer, intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 
-integer(8) i, face_id
+integer i, face_id
 
 do i = 1, beam_outbeam_tree_counter ! for each beam
     face_id = beam_outbeam_tree(i)%FOut ! get the face id
@@ -363,39 +363,39 @@ subroutine find_vis(aperture_id, rotatedVert, Face1, Face2, &
     ! computes the internally illuminated facets for a given illuminating aperture
     ! uses a z-buffer technique to increase speed, among a few other tricks
 
-integer(8), intent(in) :: aperture_id
-integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+integer, intent(in) :: aperture_id
+integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedVert
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedMidpoints
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedNorm
 logical, dimension(:), allocatable, intent(out) :: in_beam
 real(8), dimension(:), allocatable, intent(out) :: dist_beam
-integer(8), dimension(:), allocatable, intent(out) :: id_beam
+integer, dimension(:), allocatable, intent(out) :: id_beam
 logical, dimension(:), allocatable, intent(out) :: is_shad
 real(8), dimension(:,:), allocatable, intent(in) :: beamV
-integer(8), dimension(:,:), allocatable, intent(in) :: beamF1 ! face vertex IDs
+integer, dimension(:,:), allocatable, intent(in) :: beamF1 ! face vertex IDs
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
 logical, intent(in) :: is_multithreaded
 
 logical am_i_multithreaded
 
 integer i, k, m
-integer(8) j
+integer j
 logical, dimension(:), allocatable :: is_beam
 logical, dimension(:), allocatable :: is_vis
 real(8), allocatable, dimension(:,:) :: boundingBoxV
-integer(8), allocatable, dimension(:,:) :: boundingBoxF
-integer(8) boundingBoxFSize
+integer, allocatable, dimension(:,:) :: boundingBoxF
+integer boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
-integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
-integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
-integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
+integer, dimension(:), allocatable :: boundingBoxNumFaceVert
+integer, dimension(:), allocatable :: F3 ! bounding box IDs
+integer, dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
-integer(8) BB
+integer BB
 logical within_bounds
 real(8) vecb1, vecb2
 real(8) edge_norm1, edge_norm2
@@ -732,8 +732,8 @@ subroutine rotate_back_propagation_vectors(rotationMatrices, propagationVectors2
 real(8), dimension(:,:,:), allocatable, intent(in) :: rotationMatrices
 real(8), dimension(:,:,:), allocatable, intent(inout) :: propagationVectors2
 logical, dimension(:), allocatable, intent(in) :: sufficientlyIlluminated2 ! whether each aperture was sufficiently illuminated by the previous beam
-integer(8), intent(in) :: counter
-integer(8), intent(in) :: aperture_id
+integer, intent(in) :: counter
+integer, intent(in) :: aperture_id
 
 real(8), dimension(:,:,:), allocatable :: propagationVectors2_temp
 integer i
@@ -754,7 +754,7 @@ end subroutine
 
 subroutine get_reflection_vectors(propagationVectors2, rotatedapertureNormals, sufficientlyIlluminated2, counter)
 
-integer(8), intent(in) :: counter
+integer, intent(in) :: counter
 real(8), dimension(:,:,:), allocatable, intent(inout) :: propagationVectors2
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
 logical, dimension(:), allocatable, intent(in) :: sufficientlyIlluminated2 ! whether each aperture was sufficiently illuminated by the previous beam
@@ -789,7 +789,7 @@ real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints ! face midpoints
-integer(8), intent(in) :: aperture_id
+integer, intent(in) :: aperture_id
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedaperturePropagationVectors
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedapertureMidpoints
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedapertureNormals
@@ -801,7 +801,7 @@ real(8), dimension(:,:,:), allocatable, intent(inout) :: rotationMatrices
 real(8) theta_1, theta_2
 real(8) rot1(1:3,1:3), rot2(1:3,1:3), rot(1:3,1:3)
 real(8) temp_vector(1:3)
-integer(8) i, j
+integer i, j
 
 ! print*,'rotating into aperture system for aperture:',aperture_id
 
@@ -905,16 +905,16 @@ real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints ! face midpoints
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam
-integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), dimension(:), allocatable, intent(in) :: faceAreas ! area of each facet
 real(8), intent(in) :: threshold ! minimum area of illumination per aperture to create new beam
-integer(8), intent(in) :: aperture_id
-! integer(8), intent(inout) :: maxIlluminatedFacets ! counts the maximum number of facets illuminated across all illuminating apertures
-integer(8), intent(inout) :: maxIlluminatedFacets_ps ! counts the maximum number of facets illuminated across all illuminating apertures (plus shadow)
-integer(8), intent(inout) :: totalIlluminatedApertures
+integer, intent(in) :: aperture_id
+! integer, intent(inout) :: maxIlluminatedFacets ! counts the maximum number of facets illuminated across all illuminating apertures
+integer, intent(inout) :: maxIlluminatedFacets_ps ! counts the maximum number of facets illuminated across all illuminating apertures (plus shadow)
+integer, intent(inout) :: totalIlluminatedApertures
 logical, intent(in) :: prescan
 logical, dimension(:), allocatable, intent(inout) :: sufficientlyIlluminated2 ! whether each aperture was sufficiently illuminated by the previous beam
 real(8), dimension(:), allocatable, intent(out) :: beamFaceAreas
@@ -923,7 +923,7 @@ complex(8), dimension(:,:,:), allocatable, intent(out) :: beam_ampl
 logical, dimension(:), allocatable, intent(out) :: isWithinBeam2, isWithinBeam2_ps
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedapertureNormals
 real(8), dimension(:,:,:), allocatable, intent(inout) :: rotationMatrices
-integer(8), dimension(:), allocatable, intent(out) :: beamIDs_ps
+integer, dimension(:), allocatable, intent(out) :: beamIDs_ps
 complex(8), dimension(:,:,:), allocatable, intent(in) :: ampl
 real(8), dimension(:), allocatable, intent(in) :: vk71, vk72, vk73 ! reflected e-perp vector from each facet
 real(8), dimension(:), allocatable, intent(out) :: distances_ps
@@ -932,7 +932,7 @@ real(8), dimension(:,:), allocatable, intent(out) :: rotatedNorm
 ! new ray tracing algorithm
 logical, dimension(:), allocatable, intent(out) :: is_shad
 logical, dimension(:), allocatable :: in_beam
-integer(8), dimension(:), allocatable :: id_beam
+integer, dimension(:), allocatable :: id_beam
 real(8), dimension(:), allocatable :: dist_beam
 logical, intent(in) :: is_multithreaded
 
@@ -944,18 +944,18 @@ real(8), dimension(:,:), allocatable :: rotatedapertureMidpoints
 real(8), dimension(:,:), allocatable :: rotatedMidpoints
 ! beam variables
 real(8), dimension(:,:), allocatable :: beamV
-integer(8), dimension(:,:), allocatable :: beamF1 ! face vertex IDs
+integer, dimension(:,:), allocatable :: beamF1 ! face vertex IDs
 real(8), dimension(:,:), allocatable :: beamN
-integer(8), dimension(:), allocatable :: beamF2 ! face normal ID of each face
+integer, dimension(:), allocatable :: beamF2 ! face normal ID of each face
 real(8), dimension(:,:), allocatable :: BeamMidPoints
 ! findVisible and findWithinBeam
 logical, dimension(:), allocatable :: isVisible, isVisiblePlusShadows
-integer(8) i, num_beam_facets, counter, counter2
+integer i, num_beam_facets, counter, counter2
 real(8), dimension(:), allocatable :: distances
-integer(8), dimension(:), allocatable :: beamIDs
+integer, dimension(:), allocatable :: beamIDs
 ! illuminations
-integer(8) totalIlluminated_ps
-integer(8) j
+integer totalIlluminated_ps
+integer j
 real(8), dimension(:), allocatable :: illuminatedApertureAreas2
 real(8), dimension(:), allocatable :: illuminatedApertureAreas2_ps
 
@@ -1219,10 +1219,10 @@ real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints ! face midpoints
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam
-integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), dimension(:), allocatable, intent(in) :: faceAreas ! area of each facet
 real(8), intent(in) :: threshold ! minimum area of illumination per aperture to create new beam
 real(8), intent(in) :: rbi ! real part of the refractive index
@@ -1236,17 +1236,17 @@ complex(8), dimension(:,:), allocatable, intent(out) :: trans_ampl_out11_2, tran
 complex(8), dimension(:,:), allocatable, intent(out) :: refl_ampl_out11_2, refl_ampl_out12_2, refl_ampl_out21_2, refl_ampl_out22_2
 real(8), dimension(:,:), allocatable, intent(out) :: vk71Int2, vk72Int2, vk73Int2
 real(8), dimension(:,:), allocatable, intent(out) :: vk121Int ,vk122Int, vk123Int
-integer(8), dimension(:,:), allocatable, intent(out) :: FInt
+integer, dimension(:,:), allocatable, intent(out) :: FInt
 logical, intent(in) :: is_multithreaded
 
-! integer(8) maxIlluminatedFacets ! counts the maximum number of facets illuminated across all illuminating apertures
-integer(8) maxIlluminatedFacets_ps ! counts the maximum number of facets illuminated across all illuminating apertures (including shadow)
-integer(8) totalIlluminatedApertures ! total number of new apertures illuminated
-integer(8) i, counter, num_sufficiently_illuminated_apertures, j, k, l
-integer(8) aperture_id
-integer(8), dimension(:), allocatable :: sufficiently_illuminated_indices ! indices of sufficiently illuminated apertures
+! integer maxIlluminatedFacets ! counts the maximum number of facets illuminated across all illuminating apertures
+integer maxIlluminatedFacets_ps ! counts the maximum number of facets illuminated across all illuminating apertures (including shadow)
+integer totalIlluminatedApertures ! total number of new apertures illuminated
+integer i, counter, num_sufficiently_illuminated_apertures, j, k, l
+integer aperture_id
+integer, dimension(:), allocatable :: sufficiently_illuminated_indices ! indices of sufficiently illuminated apertures
 logical, dimension(:), allocatable :: sufficientlyIlluminated2 ! whether each aperture was sufficiently illuminated by the previous beam
-integer(8) sum_suff_ill ! total number of new sufficiently illuminated apertures
+integer sum_suff_ill ! total number of new sufficiently illuminated apertures
 real(8), dimension(:), allocatable :: beamFaceAreas
 real(8), dimension(:), allocatable :: beamvk71, beamvk72, beamvk73
 complex(8), dimension(:,:,:), allocatable :: beam_ampl
@@ -1256,10 +1256,10 @@ logical, dimension(:), allocatable :: isWithinBeam2, isWithinBeam2_ps
 real(8), dimension(:,:), allocatable :: rotatedapertureNormals
 real(8), dimension(:,:,:), allocatable :: rotationMatrices
 real(8) vk7a(1:3)
-integer(8) aperture
+integer aperture
 real(8) rot(1:2,1:2)
 complex(8) rot_ampl(1:2,1:2)
-integer(8), dimension(:), allocatable :: beamIDs_ps
+integer, dimension(:), allocatable :: beamIDs_ps
 real(8), dimension(:), allocatable :: distances_ps
 real(8), dimension(:,:), allocatable :: rotatedVert
 real(8), dimension(:,:), allocatable :: rotatedNorm
@@ -1662,16 +1662,16 @@ subroutine internal_recursion_outer(F1Mapping, &
 ! monster subroutine for the outer part of each beam recursion
 ! vk71, vk72, and vk73 appear to have errors and have been incorrectly implemented (also in Matlab code)
 
-integer(8), dimension(:,:), allocatable, intent(inout) :: F1Mapping ! the face indices of each row of variables to go into main loop
+integer, dimension(:,:), allocatable, intent(inout) :: F1Mapping ! the face indices of each row of variables to go into main loop
 real(8), dimension(:,:,:), allocatable, intent(inout) :: propagationVectors ! propagation vector of beam emitted from each aperture
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints ! face midpoints
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 real(8), dimension(:,:), allocatable, intent(in) :: apertureMidpoints ! the midpoint of each aperture
 real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal of each aperture
-integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), dimension(:), allocatable, intent(in) :: faceAreas ! area of each facet
 real(8), intent(in) :: threshold ! minimum area of illumination per aperture to create new beam
 real(8), intent(in) :: rbi ! real part of the refractive index
@@ -1679,12 +1679,12 @@ real(8), intent(in) :: ibi ! imaginary part of the refractive index
 real(8), intent(in) :: waveno ! wavenumber in vacuum
 real(8), dimension(:,:), allocatable, intent(inout) :: vk71Int, vk72Int, vk73Int ! reflected e-perp vector
 type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer, intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
 complex(8), dimension(:,:), allocatable, intent(inout) :: refl_ampl_out11Int ! the amplitude matrix that goes into the main loop
 complex(8), dimension(:,:), allocatable, intent(inout) :: refl_ampl_out12Int ! needs renaming
 complex(8), dimension(:,:), allocatable, intent(inout) :: refl_ampl_out21Int ! needs renaming
 complex(8), dimension(:,:), allocatable, intent(inout) :: refl_ampl_out22Int ! needs renaming
-integer(8), intent(inout) :: interactionCounter ! counts the current number of interactions
+integer, intent(inout) :: interactionCounter ! counts the current number of interactions
 logical, intent(in) :: is_multithreaded
 
 real(8), dimension(:,:,:), allocatable :: propagationVectors2
@@ -1700,22 +1700,22 @@ real(8), dimension(:,:), allocatable :: vk71Int3, vk72Int3, vk73Int3
 real(8), dimension(:), allocatable :: vk71Int1, vk72Int1, vk73Int1
 real(8), dimension(:,:), allocatable :: vk121Int2 ,vk122Int2, vk123Int2
 real(8), dimension(:), allocatable :: vk121Int1 ,vk122Int1, vk123Int1
-integer(8), dimension(:,:), allocatable :: FInt2
-integer(8), dimension(:,:), allocatable :: FInt3
-integer(8), dimension(:), allocatable :: FInt1
-integer(8), dimension(:,:), allocatable :: InteractionInt2
-integer(8), dimension(:), allocatable :: InteractionInt1
+integer, dimension(:,:), allocatable :: FInt2
+integer, dimension(:,:), allocatable :: FInt3
+integer, dimension(:), allocatable :: FInt1
+integer, dimension(:,:), allocatable :: InteractionInt2
+integer, dimension(:), allocatable :: InteractionInt1
 
 integer i, j, k, m
-integer(8), dimension(:), allocatable :: illuminatedFaceIDs
+integer, dimension(:), allocatable :: illuminatedFaceIDs
 logical, dimension(:), allocatable :: isWithinBeam
 real(8), dimension(:,:), allocatable :: aperturePropagationVectors
 logical, dimension(:), allocatable :: sufficientlyIlluminated
 complex(8), dimension(:,:,:), allocatable :: ampl
 real(8), dimension(:), allocatable :: vk71, vk72, vk73
-integer(8) FTemp, counter
-integer(8), dimension(:), allocatable :: illuminated_apertures_temp
-integer(8), dimension(:), allocatable :: unique_illuminated_apertures
+integer FTemp, counter
+integer, dimension(:), allocatable :: illuminated_apertures_temp
+integer, dimension(:), allocatable :: unique_illuminated_apertures
 logical, dimension(:), allocatable :: FInt1_mask
 
 ! allocations
@@ -2060,13 +2060,13 @@ subroutine init_for_main_loop(Face1, trans_ampl_ps, F1Mapping, &
 
 ! initialises the variables that go into the main beam loop
 
-integer(8), dimension(:,:), allocatable, intent(out) :: F1Mapping ! the face indices of each row of variables to go into main loop
+integer, dimension(:,:), allocatable, intent(out) :: F1Mapping ! the face indices of each row of variables to go into main loop
 complex(8), dimension(:,:), allocatable, intent(out) :: refl_ampl_out11Int ! the amplitude matrix that goes into the main loop
 complex(8), dimension(:,:), allocatable, intent(out) :: refl_ampl_out12Int ! needs renaming
 complex(8), dimension(:,:), allocatable, intent(out) :: refl_ampl_out21Int
 complex(8), dimension(:,:), allocatable, intent(out) :: refl_ampl_out22Int
 complex(8), dimension(:,:,:), allocatable, intent(in) :: trans_ampl_ps ! transmitted amplitude matrices, including shadowed facets
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 real(8), dimension(:,:,:), allocatable, intent(out) :: propagationVectors ! propagation vector of beam emitted from each aperture
 real(8), dimension(:,:), allocatable, intent(in) :: aperturePropagationVectors ! propagation vector of beam emitted from each aperture
 real(8), dimension(:), allocatable, intent(in) :: vk71, vk72, vk73 ! reflected e-perp vector from each facet
@@ -2112,17 +2112,17 @@ subroutine add_refl_to_outbeam_tree(beam_outbeam_tree, beam_outbeam_tree_counter
 ! adds external reflection to outbeam tree
 
 type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer, intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam ! whether each visible facet was within the illuminating beam
 complex(8), dimension(:,:,:), allocatable, intent(in) :: refl_ampl ! reflected amplitude matrices
 real(8), dimension(:), allocatable, intent(in) :: vk91, vk92, vk93 ! reflected prop vector from each facet
 real(8), dimension(:), allocatable, intent(in) :: vk71, vk72, vk73 ! reflected e-perp vector from each facet
-integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
-integer(8), intent(inout) :: interactionCounter ! counts the current number of interactions
+integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+integer, intent(inout) :: interactionCounter ! counts the current number of interactions
 
-integer(8) i, j
-integer(8), dimension(:), allocatable :: outbeam_apertures ! the aperture which each facet belongs to
-integer(8), dimension(:), allocatable :: unique_apertures !
+integer i, j
+integer, dimension(:), allocatable :: outbeam_apertures ! the aperture which each facet belongs to
+integer, dimension(:), allocatable :: unique_apertures !
 
 ! add stuff to outbeam tree for the first external reflection
 do i = 1, size(isWithinBeam,1) ! for each facet
@@ -2174,7 +2174,7 @@ logical, dimension(:), allocatable, intent(in) :: isVisible ! whether each facet
 type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
 real(8), dimension(:), allocatable, intent(in) :: vk71, vk72, vk73 ! reflected e-perp vector from each facet
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 
 integer i, num_outbeams_counter
 
@@ -2307,10 +2307,10 @@ subroutine getReflectionVectors(Norm, Face2, isShadow, apertureNormals, aperture
 ! returns perp e-field vector and propagation vectors
 
 real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 logical, dimension(:), allocatable, intent(in) :: isShadow ! whether the facet was in shadow (down-facing but within the illuminating beam and part of an illuminated aperture)
 real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal of each aperture
-integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), dimension(:), allocatable, intent(inout) :: vk71, vk72, vk73 ! reflected e-perp vector from each facet
 real(8), dimension(:), allocatable, intent(inout) :: vk91, vk92, vk93 ! reflected prop vector from each facet
 
@@ -2390,12 +2390,12 @@ end subroutine
 
 subroutine getFresnel(Face1, isShadow, Norm, Face2, apertureNormals, apertures, m, rperp, rpar, tperp, tpar)
 
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 logical, dimension(:), allocatable, intent(in) :: isShadow ! whether the facet was in shadow (down-facing but within the illuminating beam and part of an illuminated aperture)
 real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal of each aperture
-integer(8), dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), intent(in) :: m ! real part of the refractive index
 complex(8), dimension(:), allocatable, intent(inout) :: rperp ! Fresnel coefficient
 complex(8), dimension(:), allocatable, intent(inout) :: rpar ! Fresnel coefficient
@@ -2432,14 +2432,14 @@ complex(8), dimension(:,:,:), allocatable, intent(inout) :: ampl_in_ps ! amplitu
 complex(8), allocatable, dimension(:,:,:), intent(in) :: ampl_beam ! amplitude matrix of incident beam
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam ! whether each visible facet was within the illuminating beam
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam_ps ! whether each visible facet was within the illuminating beam, including down-facing facets of illuminated apertures
-integer(8), dimension(:), allocatable, intent(in) :: beamIDs ! the beamF1 ID of the face which illuminated this facet
-integer(8), dimension(:), allocatable, intent(in) :: beamIDs_ps ! the beamF1 ID of the face which illuminated this facet, including down-facing facets of illuminated aperture
+integer, dimension(:), allocatable, intent(in) :: beamIDs ! the beamF1 ID of the face which illuminated this facet
+integer, dimension(:), allocatable, intent(in) :: beamIDs_ps ! the beamF1 ID of the face which illuminated this facet, including down-facing facets of illuminated aperture
 real(8), intent(in) :: waveno ! wavenumber in vacuum
 real(8), dimension(:), allocatable, intent(in) :: distances ! distances to each illuminated face from the illuminating face ID given by beamIDs
 real(8), dimension(:), allocatable, intent(in) :: distances_ps ! distances to each illuminated face from the illuminating face ID given by beamIDs, including down-facing facets of illuminated apertures
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 
-integer(8) i, blockingID
+integer i, blockingID
 
 do i = 1, size(Face1,1) ! for each face
     if(isWithinBeam(i)) then ! if the face was within the beam
@@ -2511,7 +2511,7 @@ subroutine getIlluminatedGeoCrossSection(faceAreas, isWithinBeam, Norm, Face2, i
 real(8), dimension(:), allocatable, intent(in) :: faceAreas
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam
 real(8), dimension(:,:), allocatable, intent(in) :: Norm
-integer(8), dimension(:), allocatable, intent(in) :: Face2
+integer, dimension(:), allocatable, intent(in) :: Face2
 real(8), intent(out) :: illuminatedGeoCrossSection
 
 integer i
@@ -2532,17 +2532,17 @@ end subroutine
 subroutine initApertures(apertures, Norm, Face2, Midpoints, apertureNormals, apertureMidpoints, apertureAreas, illuminatedApertureAreas, sufficientlyIlluminated, &
                          aperturePropagationVectors)
 
-integer(8), dimension(:), allocatable, intent(in) :: apertures
+integer, dimension(:), allocatable, intent(in) :: apertures
 real(8), dimension(:,:), allocatable, intent(in) :: Norm
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints
 real(8), dimension(:,:), allocatable, intent(out) :: aperturePropagationVectors
-integer(8), dimension(:), allocatable, intent(in) :: Face2
+integer, dimension(:), allocatable, intent(in) :: Face2
 real(8), dimension(:,:), allocatable, intent(out) :: apertureNormals
 real(8), dimension(:,:), allocatable, intent(out) :: apertureMidpoints
 real(8), dimension(:), allocatable, intent(out) :: apertureAreas, illuminatedApertureAreas
 logical, dimension(:), allocatable, intent(out) :: sufficientlyIlluminated
 
-integer(8) noFaces, i, j, noApertures, face_counter
+integer noFaces, i, j, noApertures, face_counter
 real(8) nf
 
 noFaces = size(Face2,1)
@@ -2589,14 +2589,14 @@ end subroutine
 
 subroutine getApertureAreas(apertures, isWithinBeam, apertureAreas, illuminatedApertureAreas, apertureNormals, faceAreas)
 
-integer(8), dimension(:), allocatable, intent(in) :: apertures
+integer, dimension(:), allocatable, intent(in) :: apertures
 logical, dimension(:), allocatable, intent(in) :: isWithinBeam
 real(8), dimension(:), allocatable, intent(inout) :: apertureAreas, illuminatedApertureAreas
 real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals
 real(8), dimension(:), allocatable, intent(in) :: faceAreas
 
 logical, dimension(:), allocatable :: logical_array
-integer(8) i, j
+integer i, j
 
 allocate(logical_array(1:size(apertures,1))) ! logical array with number of rows equal to number of facets
 illuminatedApertureAreas = 0 ! initialise
@@ -2625,18 +2625,18 @@ end subroutine
 
 subroutine findWithinBeam(Face1, Midpoints, isVisible, beamV, beamF1, beamN, beamF2, beamMidpoints, isWithinBeam, distances, beamIDs)
 
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1, beamF1
+integer, dimension(:,:), allocatable, intent(in) :: Face1, beamF1
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints, beamMidpoints
 logical, dimension(:), allocatable, intent(in) :: isVisible
 real(8), dimension(:,:), allocatable, intent(in) :: beamV, beamN
-integer(8), dimension(:), allocatable, intent(in) :: beamF2
+integer, dimension(:), allocatable, intent(in) :: beamF2
 logical, dimension(:), allocatable, intent(inout) :: isWithinBeam
 real(8), dimension(:), allocatable, intent(inout) :: distances
-integer(8), dimension(:), allocatable, intent(inout) :: beamIDs
+integer, dimension(:), allocatable, intent(inout) :: beamIDs
 
 real(8) start, finish
-integer(8), dimension(:), allocatable :: upFacingIndices, indicesToLookAt
-integer(8) i, j, k, l, m, numUpFacingIndices, numIndicesToLookAt, noPoints
+integer, dimension(:), allocatable :: upFacingIndices, indicesToLookAt
+integer i, j, k, l, m, numUpFacingIndices, numIndicesToLookAt, noPoints
 logical, dimension(:), allocatable :: areBlocking
 real(8), dimension(:,:), allocatable :: vecAs, vecBs, edgeNormals, edgeVectors
 real(8), dimension(:), allocatable :: AdotNs, NdotKs, vecs, edgeChecks, nfs
@@ -2731,14 +2731,14 @@ subroutine beam_aligned_bounding_boxes(verts, boundingBoxV, boundingBoxF)
 
 real(8), dimension(:,:), allocatable, intent(in) :: verts
 real(8), allocatable, dimension(:,:), intent(out) :: boundingBoxV
-integer(8), allocatable, dimension(:,:), intent(out) :: boundingBoxF
+integer, allocatable, dimension(:,:), intent(out) :: boundingBoxF
 
 real(8) min_x, min_y, max_x, max_y, min_z, max_z
-integer(8), parameter :: bounding_box_x_dim = 8 ! bounding box x dimension
-integer(8), parameter :: bounding_box_y_dim = 8 ! bounding box y dimension
+integer, parameter :: bounding_box_x_dim = 8 ! bounding box x dimension
+integer, parameter :: bounding_box_y_dim = 8 ! bounding box y dimension
 real(8), parameter :: fac = 1.1
 real(8), dimension(1:bounding_box_x_dim+1, 1:bounding_box_y_dim+1) :: xvals, yvals ! bounding box x and y vertices
-integer(8) i,j, vert_counter, face_counter
+integer i,j, vert_counter, face_counter
 
 ! get the max xyz and min xy coordinates
 max_x = maxval(verts(1:size(verts,1),1))
@@ -2813,31 +2813,31 @@ subroutine findVisibleFacets(verts, Face1, Norm, Face2, midPoints, isVisible, is
 ! may need to increase fac to improve consistency
 
 real(8), dimension(:,:), allocatable, intent(in) :: verts, Norm, Midpoints
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:,:), allocatable, intent(in) :: Face1
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 logical, dimension(:), allocatable, intent(inout) :: isVisible, isVisiblePlusShadows
-integer(8), dimension(:), allocatable, intent(in) :: apertures
-integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
+integer, dimension(:), allocatable, intent(in) :: apertures
+integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
 
 real(8), allocatable, dimension(:,:) :: boundingBoxV
-integer(8), allocatable, dimension(:,:) :: boundingBoxF
-integer(8) boundingBoxFSize
+integer, allocatable, dimension(:,:) :: boundingBoxF
+integer boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
-integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
-integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
-integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
+integer, dimension(:), allocatable :: boundingBoxNumFaceVert
+integer, dimension(:), allocatable :: F3 ! bounding box IDs
+integer, dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
-integer(8) i, j, k, l, m, BB, numUpFacingIndices, numIndicesToLookAt, noPoints
-integer(8), dimension(:), allocatable :: upFacingIndices, indicesToLookAt
+integer i, j, k, l, m, BB, numUpFacingIndices, numIndicesToLookAt, noPoints
+integer, dimension(:), allocatable :: upFacingIndices, indicesToLookAt
 logical, dimension(:), allocatable :: areBlocking, areBlocking2
 real(8), dimension(:,:), allocatable :: vecAs, edgeVectors, vecBs, edgeNormals
 real(8), dimension(:), allocatable :: AdotNs, NdotKs, vecs, edgeChecks, nfs
 real(8) start, finish
 logical, dimension(:), allocatable :: visibleApertures
-integer(8) numApertures
+integer numApertures
 logical isApertureVisible
-integer(8) num_verts, num_verts_max
+integer num_verts, num_verts_max
 
 ! print*,'========== start sr findVisibleFacets'
 call CPU_TIME(start)
@@ -3058,29 +3058,29 @@ subroutine findVisibleFacetsInt(verts, Face1, Norm, Face2, midPoints, isVisible,
 ! may need to increase fac to improve consistency
 
 real(8), dimension(:,:), allocatable, intent(in) :: verts, Norm, Midpoints
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:,:), allocatable, intent(in) :: Face1
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 logical, dimension(:), allocatable, intent(inout) :: isVisible
 ! logical, dimension(:), allocatable, intent(inout) :: isVisiblePlusShadows
-integer(8), dimension(:), allocatable, intent(in) :: apertures
+integer, dimension(:), allocatable, intent(in) :: apertures
 
 real(8), allocatable, dimension(:,:) :: boundingBoxV
-integer(8), allocatable, dimension(:,:) :: boundingBoxF
-integer(8) boundingBoxFSize
+integer, allocatable, dimension(:,:) :: boundingBoxF
+integer boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
-integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
-integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
-integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
+integer, dimension(:), allocatable :: boundingBoxNumFaceVert
+integer, dimension(:), allocatable :: F3 ! bounding box IDs
+integer, dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
-integer(8) i, j, k, l, m, BB, numUpFacingIndices, numIndicesToLookAt, noPoints
-integer(8), dimension(:), allocatable :: upFacingIndices, indicesToLookAt
+integer i, j, k, l, m, BB, numUpFacingIndices, numIndicesToLookAt, noPoints
+integer, dimension(:), allocatable :: upFacingIndices, indicesToLookAt
 logical, dimension(:), allocatable :: areBlocking, areBlocking2
 real(8), dimension(:,:), allocatable :: vecAs, edgeVectors, vecBs, edgeNormals
 real(8), dimension(:), allocatable :: AdotNs, NdotKs, vecs, edgeChecks, nfs
 real(8) start, finish
 logical, dimension(:), allocatable :: visibleApertures
-integer(8) numApertures
+integer numApertures
 logical isApertureVisible
 real(8), dimension(:,:), allocatable :: flippedNorm ! variable to hold flipped normals (because this is internal instead of external)
 
@@ -3303,24 +3303,24 @@ subroutine findVisibleFacetsInt_ps(verts, Face1, Norm, Face2, midPoints, isVisib
 ! may need to increase fac to improve consistency
 
 real(8), dimension(:,:), allocatable, intent(in) :: verts, Norm, Midpoints
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1
-integer(8), dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
+integer, dimension(:,:), allocatable, intent(in) :: Face1
+integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 ! logical, dimension(:), allocatable, intent(inout) :: isVisible
 logical, dimension(:), allocatable, intent(inout) :: isVisiblePlusShadows
-integer(8), dimension(:), allocatable, intent(in) :: apertures
+integer, dimension(:), allocatable, intent(in) :: apertures
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
 
 real(8), allocatable, dimension(:,:) :: boundingBoxV
-integer(8), allocatable, dimension(:,:) :: boundingBoxF
-integer(8) boundingBoxFSize
+integer, allocatable, dimension(:,:) :: boundingBoxF
+integer boundingBoxFSize
 real(8), dimension(:,:), allocatable :: boundingBoxMidpoints ! unique vertices, face vertex IDs, face normals, face midpoints
 real(8), dimension(:), allocatable :: boundingBoxFaceAreas
-integer(8), dimension(:), allocatable :: boundingBoxNumFaceVert
-integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
-integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
+integer, dimension(:), allocatable :: boundingBoxNumFaceVert
+integer, dimension(:), allocatable :: F3 ! bounding box IDs
+integer, dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
 real(8), dimension(:), allocatable :: distanceToBB, distanceToFuzzyBB
-integer(8) i, j, k, l, m, BB, numUpFacingIndices, numIndicesToLookAt, noPoints
-integer(8), dimension(:), allocatable :: upFacingIndices, indicesToLookAt
+integer i, j, k, l, m, BB, numUpFacingIndices, numIndicesToLookAt, noPoints
+integer, dimension(:), allocatable :: upFacingIndices, indicesToLookAt
 logical, dimension(:), allocatable :: areBlocking, areBlocking2
 real(8), dimension(:,:), allocatable :: vecAs, edgeVectors, vecBs, edgeNormals
 real(8), dimension(:), allocatable :: AdotNs, NdotKs, vecs, edgeChecks, nfs
@@ -3539,18 +3539,18 @@ end subroutine
 
 subroutine findWithinBeamInt(Face1, Midpoints, isVisible, beamV, beamF1, beamN, beamF2, beamMidpoints, isWithinBeam, distances, beamIDs)
 
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1, beamF1
+integer, dimension(:,:), allocatable, intent(in) :: Face1, beamF1
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints, beamMidpoints
 logical, dimension(:), allocatable, intent(in) :: isVisible
 real(8), dimension(:,:), allocatable, intent(in) :: beamV, beamN
-integer(8), dimension(:), allocatable, intent(in) :: beamF2
+integer, dimension(:), allocatable, intent(in) :: beamF2
 logical, dimension(:), allocatable, intent(inout) :: isWithinBeam
 real(8), dimension(:), allocatable, intent(inout) :: distances
-integer(8), dimension(:), allocatable, intent(inout) :: beamIDs
+integer, dimension(:), allocatable, intent(inout) :: beamIDs
 
 real(8) start, finish
-integer(8), dimension(:), allocatable :: upFacingIndices, indicesToLookAt
-integer(8) i, j, k, l, m, numUpFacingIndices, numIndicesToLookAt, noPoints
+integer, dimension(:), allocatable :: upFacingIndices, indicesToLookAt
+integer i, j, k, l, m, numUpFacingIndices, numIndicesToLookAt, noPoints
 logical, dimension(:), allocatable :: areBlocking
 real(8), dimension(:,:), allocatable :: vecAs, vecBs, edgeNormals, edgeVectors
 real(8), dimension(:), allocatable :: AdotNs, NdotKs, vecs, edgeChecks, nfs
@@ -3688,10 +3688,10 @@ subroutine init(face_ids, isVisible, isVisiblePlusShadows, isWithinBeam, distanc
 ! subroutine init initialises many variables for the beam tracing loop
 
 logical, dimension(:), allocatable, intent(out) :: isVisible, isVisiblePlusShadows, isWithinBeam, isWithinBeam_ps, isShadow
-integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
+integer, dimension(:,:), allocatable, intent(in) :: face_ids
 real(8), dimension(:), allocatable, intent(out) :: distances
 real(8), dimension(:), allocatable, intent(out) :: distances_ps
-integer(8), dimension(:), allocatable, intent(out) :: beamIDs, beamIDs_ps
+integer, dimension(:), allocatable, intent(out) :: beamIDs, beamIDs_ps
 complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_in
 complex(8), dimension(:,:,:), allocatable, intent(out) :: ampl_in_ps
 real(8), intent(out) :: waveno
@@ -3710,8 +3710,8 @@ complex(8), dimension(:,:,:), allocatable, intent(out) :: trans_ampl ! transmitt
 complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl ! reflected amplitude matrices
 complex(8), dimension(:,:,:), allocatable, intent(out) :: refl_ampl_ps ! reflected amplitude matrices
 type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
-integer(8), intent(out) :: interactionCounter ! counts the current number of interactions
+integer, intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer, intent(out) :: interactionCounter ! counts the current number of interactions
 
 ! print*,'========== start sr init'
 

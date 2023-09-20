@@ -10,14 +10,13 @@
    
    contains
    
-   subroutine cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients,job_params)
+   subroutine cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients)
 
       ! saves the remaining orientation numbers to cached file
 
-      integer(8), intent(in) :: i
+      integer, intent(in) :: i
       character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
-      integer(8) j
-      type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
+      integer j
       integer, dimension(:), allocatable, intent(in) :: remaining_orients
       integer, intent(in) ::  num_remaining_orients
 
@@ -603,11 +602,11 @@
       ! saves the job to the cache directory, possibly to be resumed later
       
       real(8), dimension(:,:), allocatable, intent(in) :: vert_in ! unique vertices (unrotated)
-      integer(8), dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
-      integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
-      integer(8), dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
+      integer, dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
+      integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
+      integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
       type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
-      integer(8), intent(in) :: i_loop
+      integer, intent(in) :: i_loop
       type(output_parameters_type), intent(inout) :: output_parameters_total
       real(8), dimension(:,:,:), allocatable , intent(in):: mueller_total ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d_total ! phi-integrated mueller matrices
