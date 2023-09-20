@@ -84,8 +84,7 @@ Main source file. It contains the program entry point. The ABT reads input param
 
 - `-tri_rough` - Sets the standard deviation for roughness derived from the triangulation.
 
-- `-resume` - Resumes a previous job that was saved at an intermediate point. Must be used along with `-cache_id` (see below). This option overrides most input parameters with those read from the cached job.
-- `-cached_id <value>` - Indicates which directory to read cached files from to resume a job. Cached files are saved in `cache/`.
+- `-resume <value>` - Resumes a previous job that was saved at an intermediate point. `value` must be the number of the cache ID. This option overrides most input parameters with those read from the cached job.
 
  ## Examples
 

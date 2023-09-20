@@ -158,6 +158,7 @@ job_params%suppress_2d = .false.
 job_params%tri = .false.
 job_params%tri_edge_length = 1
 job_params%tri_roughness = 0D0
+job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
 
@@ -641,17 +642,14 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             job_params%tri = .true.
 
         case ('-resume')
-            ! print*,'found command line specifier "mt"'
-            print*,'resume from cached data: enabled'
-            job_params%resume = .true.
-
-        case ('-cache_id')
             i = i + 1 ! update counter to read the rotation method
             call get_command_argument(i,arg,status=my_status)
             if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "cache_id"'
+                print*,'error: no option found for "resume"'
                 stop
             else
+                print*,'resume from cached data: enabled'
+                job_params%resume = .true.
                 read(arg,*) job_params%cache_id
                 print*,'job_params%cache_id: ', job_params%cache_id
             end if

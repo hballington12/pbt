@@ -18,15 +18,16 @@ CC = cc # c compiler
 O_EXT = .o # linux
 MOD_EXT = .mod
 
+# objects for sequential code
 objects = 	types_mod$(O_EXT) \
 			misc_submod$(O_EXT) \
 			input_mod$(O_EXT) \
 			beam_loop_mod$(O_EXT) \
 			diff_mod$(O_EXT) \
 			outputs_mod$(O_EXT) \
-			cc_hex_mod$(O_EXT) \
-			mpi_mod$(O_EXT)
+			cc_hex_mod$(O_EXT)
 
+# all modules
 modules = 	types_mod$(MOD_EXT) \
 			misc_submod$(MOD_EXT) \
 			input_mod$(MOD_EXT) \
@@ -43,8 +44,8 @@ modules = 	types_mod$(MOD_EXT) \
 seq: $(SEQ_DIR)main.f90 $(objects) $(TRI_BIN)triangle
 	$(FC) $(FSWITCHES) $(objects) $(SEQ_DIR)main.f90 -o $(SEQ_DIR)abt
 
-mpi: $(MPI_DIR)main.f90 $(objects)
-	mpifort $(FSWITCHES) $(objects) $(MPI_DIR)main.f90 -o $(MPI_DIR)abt
+mpi: $(MPI_DIR)main.f90 $(objects) mpi_mod$(O_EXT)
+	mpifort $(FSWITCHES) $(objects) mpi_mod$(O_EXT) $(MPI_DIR)main.f90 -o $(MPI_DIR)abt
 
 outputs_mod$(O_EXT) : outputs_mod.f90 misc_submod$(O_EXT)
 	$(FC) $(FSWITCHES) -c outputs_mod.f90
