@@ -27,7 +27,7 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i_loop, loop_start
+integer(8) i_loop, loop_start, i
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -75,6 +75,10 @@ real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 real(8) max_area, max_edge_length
 integer my_rank
 integer seed(1:8)
+character(len=255) cache_dir ! cached files directory (if job stops early)
+integer, dimension(:), allocatable :: remaining_orients
+integer num_remaining_orients
+
 
 ! ############################################################################################################
 ! start
@@ -88,7 +92,7 @@ call parse_command_line(job_params)
 
 if(job_params%resume) then
     print*,'attempting to resume job using cache #',job_params%cache_id
-    call resume_job(job_params,loop_start,mueller_total,mueller_1d_total,output_parameters_total)
+    call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
     ! stop
 end if
 
@@ -137,7 +141,21 @@ call init_loop( alpha_vals, &
                 gamma_vals, &
                 job_params)
 
-do i_loop = loop_start, job_params%num_orients 
+! some stuff
+if(job_params%resume) then ! if we are resuming a cached job
+    ! do nothing because we've already read this in sr resume_job
+else ! if we are not resuming a cached job
+    num_remaining_orients = job_params%num_orients ! number of remaining orientations is the total overall
+    allocate(remaining_orients(1:num_remaining_orients)) ! allocate array to hold orientation numbers
+    do i = 1, num_remaining_orients
+        remaining_orients(i) = i
+    end do
+end if
+
+do i = 1, num_remaining_orients
+
+    i_loop = remaining_orients(i)
+    print*,'i_loop: ',i_loop
 
     ! rotate particle
     call PROT_MPI(  vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
@@ -187,13 +205,13 @@ do i_loop = loop_start, job_params%num_orients
                     num_face_vert,             & ! <-  number of verices in each face
                     job_params)
     
-    if(job_params%num_orients .gt. 1) then
-        print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i_loop,' / ',job_params%num_orients,' (total progress: ',dble(i_loop-1)/dble(job_params%num_orients)*100,' %)'
+    if(num_remaining_orients .gt. 1) then ! print progress for this job
+        print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
         ! print*,'total time elapsed: ',omp_get_wtime()-start
         ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
-        if (i_loop .gt. 1) then
+        if (i .gt. 1) then
             print'(A20,F12.4,A5)','est. time remaining: '
-            call PROUST(nint(dble(job_params%num_orients-i_loop+1)*(omp_get_wtime()-start) / dble(i_loop)))
+            call PROUST(nint(dble(num_remaining_orients-i+1)*(omp_get_wtime()-start) / dble(i)))
         end if
     end if
 
@@ -231,7 +249,11 @@ do i_loop = loop_start, job_params%num_orients
 
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
+    print*,'time limit: ',job_params%time_limit
+
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
+        call make_cache_dir("cache/",cache_dir)
+        call cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients,job_params)
         call cache_job( vert_in,                    & ! unrotated vertices
                         face_ids,                   & ! face ids
                         num_face_vert,              & ! num vertices per face
@@ -240,7 +262,8 @@ do i_loop = loop_start, job_params%num_orients
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
                         mueller_total,              & ! total 2d mueller
-                        mueller_1d_total)             ! total 1d mueller
+                        mueller_1d_total,           & ! total 1d mueller
+                        cache_dir)
     end if
 
 end do

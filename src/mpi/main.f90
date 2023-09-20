@@ -308,6 +308,20 @@ do i = my_start, my_end
 
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
+    if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
+
+        
+        ! call cache_job( vert_in,                    & ! unrotated vertices
+        !                 face_ids,                   & ! face ids
+        !                 num_face_vert,              & ! num vertices per face
+        !                 apertures,                  & ! apertures
+        !                 job_params,                 & ! job parameters
+        !                 i_loop,                     & ! current loop index
+        !                 output_parameters_total,    & ! total output parameters
+        !                 mueller_total,              & ! total 2d mueller
+        !                 mueller_1d_total)             ! total 1d mueller
+    end if
+
 end do
 
 print*,'my rank:',my_rank,'finished'

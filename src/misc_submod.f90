@@ -13,15 +13,16 @@ real(8), parameter, public :: pi = 3.14159265358979
 
 contains
 
-subroutine resume_job(job_params,loop_start,mueller_total,mueller_1d_total,output_parameters_total)
+subroutine resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
 
 ! attempts to pull cached files from cache directory
 
 type(job_parameters_type), intent(inout) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
-integer(8), intent(inout) :: loop_start
+integer, intent(out) :: num_remaining_orients
 real(8), dimension(:,:,:), allocatable, intent(out) :: mueller_total ! mueller matrices
 real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d_total ! mueller matrices
 type(output_parameters_type), intent(out) :: output_parameters_total
+integer, dimension(:), allocatable, intent(out) :: remaining_orients
 
 integer(8) cache_id, i, nlines, io, j
 character(len=32) cache_id_string
@@ -44,8 +45,9 @@ write(cache_id_string,*) cache_id
 print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/job_params.txt"
 
 open(10,file="cache/"//trim(adjustl(cache_id_string))//"/job_params.txt") ! open job_params file
-    read(10,*) loop_start
-    loop_start = loop_start + 1 ! add 1 because loop_start was where the last job part finished
+    read(10,*) junk
+    ! read(10,*) loop_start
+    ! loop_start = loop_start + 1 ! add 1 because loop_start was where the last job part finished
     read(10,*) job_params%cfn
     read(10,*) job_params%cft
     read(10,*) job_params%afn
@@ -120,6 +122,26 @@ do i = 1, nlines
 end do
 close(10)
 
+print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/orient_remaining.dat"
+
+open(10,file="cache/"//trim(adjustl(cache_id_string))//"/orient_remaining.dat") ! open job_params file
+nlines = 0
+do  ! scan through the lines in the crystal file...
+    read(10,"(a)",iostat=io)line
+    if (io/=0) exit
+    nlines = nlines + 1
+end do
+! deallocate if necessary, then reallocate theta vals to match cached file
+num_remaining_orients = nlines
+allocate(remaining_orients(1:num_remaining_orients))
+print*,'num orients remaining: ',num_remaining_orients
+rewind(10)
+do i = 1, num_remaining_orients
+    read(10,*) remaining_orients(i)
+    print*,'remaining_orients(i)',remaining_orients(i)
+end do
+close(10)
+
 ! read mueller
 
 print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid_1d"
@@ -156,7 +178,7 @@ do i = 1, size(job_params%theta_vals,1)
 
 close(10)
 
-print*,'read cached files. resuming at loop index',loop_start,"/",job_params%num_orients
+print*,'read cached files. numer of orients remaining: ',num_remaining_orients,"/",job_params%num_orients
 
 end subroutine
 

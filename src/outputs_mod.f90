@@ -10,23 +10,40 @@
    
    contains
    
-   
+   subroutine cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients,job_params)
+
+      ! saves the remaining orientation numbers to cached file
+
+      integer(8), intent(in) :: i
+      character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
+      integer(8) j
+      type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
+      integer, dimension(:), allocatable, intent(in) :: remaining_orients
+      integer, intent(in) ::  num_remaining_orients
+
+      open(10,file=trim(cache_dir)//"/orient_remaining.dat") ! open file
+         do j = i + 1, num_remaining_orients
+            write(10,*) remaining_orients(j)
+         end do
+      close(10)      
+
+   end subroutine
    
    subroutine finalise( ampl_far_beam11,     & ! amplitude matrix (1,1) due to beam diffraction
-      ampl_far_beam12,     & ! amplitude matrix (1,2) due to beam diffraction
-      ampl_far_beam21,     & ! amplitude matrix (2,1) due to beam diffraction
-      ampl_far_beam22,     & ! amplitude matrix (2,2) due to beam diffraction
-      ampl_far_ext_diff11, & ! amplitude matrix (1,1) due to external diffraction
-      ampl_far_ext_diff12, & ! amplitude matrix (1,2) due to external diffraction
-      ampl_far_ext_diff21, & ! amplitude matrix (2,1) due to external diffraction
-      ampl_far_ext_diff22, & ! amplitude matrix (2,2) due to external diffraction
-      energy_out_beam,     & ! beam energy remaining before diffraction
-      energy_out_ext_diff, & ! external diffraction energy remaining before diffraction
-      mueller,             & ! 2d mueller matrix
-      mueller_1d,          & ! 1d mueller matrix
-      energy_abs_beam,     & ! energy absorbed inside the particle
-      output_parameters,   & ! output parameters
-      job_params)
+                        ampl_far_beam12,     & ! amplitude matrix (1,2) due to beam diffraction
+                        ampl_far_beam21,     & ! amplitude matrix (2,1) due to beam diffraction
+                        ampl_far_beam22,     & ! amplitude matrix (2,2) due to beam diffraction
+                        ampl_far_ext_diff11, & ! amplitude matrix (1,1) due to external diffraction
+                        ampl_far_ext_diff12, & ! amplitude matrix (1,2) due to external diffraction
+                        ampl_far_ext_diff21, & ! amplitude matrix (2,1) due to external diffraction
+                        ampl_far_ext_diff22, & ! amplitude matrix (2,2) due to external diffraction
+                        energy_out_beam,     & ! beam energy remaining before diffraction
+                        energy_out_ext_diff, & ! external diffraction energy remaining before diffraction
+                        mueller,             & ! 2d mueller matrix
+                        mueller_1d,          & ! 1d mueller matrix
+                        energy_abs_beam,     & ! energy absorbed inside the particle
+                        output_parameters,   & ! output parameters
+                        job_params)
       
       ! sr finalise is called at the end of each rotation
       ! it combines the beam and external diffraction far-field amplitude matrices to yield the total far-field
@@ -580,7 +597,8 @@
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
                         mueller_total,              & ! total 2d mueller
-                        mueller_1d_total)             ! total 1d mueller
+                        mueller_1d_total,           & ! total 1d mueller
+                        cache_dir)
       
       ! saves the job to the cache directory, possibly to be resumed later
       
@@ -593,11 +611,10 @@
       type(output_parameters_type), intent(inout) :: output_parameters_total
       real(8), dimension(:,:,:), allocatable , intent(in):: mueller_total ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d_total ! phi-integrated mueller matrices
-      
-      character(len=255) cache_dir ! cached files directory (if job stops early)
+      character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
       
       print*,'job exit point detected. saving job files to cache...'
-      call make_cache_dir("cache/",cache_dir)
+      ! call make_cache_dir("cache/",cache_dir)
       print*,'cache directory is "',trim(cache_dir),'"'
       
       call PDAS(  vert_in,        & ! <-  rotated vertices
