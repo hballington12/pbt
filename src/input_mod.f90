@@ -1026,6 +1026,100 @@ subroutine PROT(ifn,rot_method,verts)
 
 end subroutine
 
+subroutine UN_PROT_CC(verts)
+
+    ! unrotates cc_hex particle so it can be rotated into the "off" positions
+
+    real(8), dimension(:,:), allocatable, intent(inout) :: verts ! unique vertices    
+    ! integer offs(1:2)
+    real(8) eulers(1:3)
+    ! real(8) vec(1:3) ! off rotation vector
+    ! real(8) hilf0, hilf1
+    real(8) rot(1:3,1:3)
+    integer i
+    real(8) s1, s2, s3, c1, c2, c3
+    ! real(8) rand
+
+    print*,'========== start sr PROT_CC'
+
+    eulers(1) = 0.0
+    eulers(2) = 90.0
+    eulers(3) = 0.0
+
+    print*,'undoing second pre-rotation...'
+
+    print*,'alpha:',eulers(1)
+    print*,'beta:',eulers(2)
+    print*,'gamma:',eulers(3)
+
+    eulers = eulers*pi/180 ! convert to rad
+
+    ! mishchenko rotation
+    s1 = sin(eulers(1))
+    s2 = sin(eulers(2))
+    s3 = sin(eulers(3))
+    c1 = cos(eulers(1))
+    c2 = cos(eulers(2))
+    c3 = cos(eulers(3))
+
+    ! make rotation matrix
+    rot(1,1) = -c1*c2*s3 + c1*c3
+    rot(1,2) = -s1*c2*c3 - c1*s3
+    rot(1,3) = s2*s1
+    rot(2,1) = c1*c2*s3 + s1*c3
+    rot(2,2) = c1*c2*c3 - s1*s3
+    rot(2,3) = -s2*c1
+    rot(3,1) = s2*s3
+    rot(3,2) = s2*c3
+    rot(3,3) = c2
+
+    do i = 1, size(verts,1) ! for each vertex
+        verts(i,1:3) = matmul(transpose(rot),verts(i,1:3)) ! rotate
+    end do
+
+    ! #########################
+    
+    eulers(1) = 90.0
+    eulers(2) = 0.0
+    eulers(3) = 0.0
+
+    print*,'undoing first pre-rotation...'
+
+    print*,'alpha:',eulers(1)
+    print*,'beta:',eulers(2)
+    print*,'gamma:',eulers(3)
+
+    eulers = eulers*pi/180 ! convert to rad
+
+    ! mishchenko rotation
+    s1 = sin(eulers(1))
+    s2 = sin(eulers(2))
+    s3 = sin(eulers(3))
+    c1 = cos(eulers(1))
+    c2 = cos(eulers(2))
+    c3 = cos(eulers(3))
+
+    ! make rotation matrix
+    rot(1,1) = -c1*c2*s3 + c1*c3
+    rot(1,2) = -s1*c2*c3 - c1*s3
+    rot(1,3) = s2*s1
+    rot(2,1) = c1*c2*s3 + s1*c3
+    rot(2,2) = c1*c2*c3 - s1*s3
+    rot(2,3) = -s2*c1
+    rot(3,1) = s2*s3
+    rot(3,2) = s2*c3
+    rot(3,3) = c2
+
+    do i = 1, size(verts,1) ! for each vertex
+        verts(i,1:3) = matmul(transpose(rot),verts(i,1:3)) ! rotate
+    end do
+
+    ! stop
+
+    print*,'========== end sr PROT_CC'
+
+end subroutine
+
 subroutine PROT_CC(verts)
 
     ! rotates cc_hex particle so that prism axis is aligned with z axis
@@ -1168,6 +1262,10 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         ! call read_input_vals(ifn,"rot off",offs,2)
         ! print*,'off values: ', offs(1:2)
 
+        verts_rot = verts
+
+        call UN_PROT_CC(verts_rot)
+
         if(offs(1) .eq. 30 .and. offs(2) .eq. 0) then
             print*,'off setting: 30x0'
             write(101,*)'off setting: "30x0"'
@@ -1211,8 +1309,8 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
 
         rot = matmul(rot2,rot1)
 
-        do i = 1, size(verts,1) ! for each vertex
-            verts_rot(i,1:3) = matmul(rot,verts(i,1:3)) ! rotate
+        do i = 1, size(verts_rot,1) ! for each vertex
+            verts_rot(i,1:3) = matmul(rot,verts_rot(i,1:3)) ! rotate
         end do
 
         ! print*,'verts(2,1:3)',verts(2,1:3)

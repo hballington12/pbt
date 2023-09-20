@@ -241,7 +241,7 @@
         end subroutine
         
         subroutine save_apertures(  apertures,  &
-            output_dir)
+                                    output_dir)
             
             ! saves the apertures to a file
             

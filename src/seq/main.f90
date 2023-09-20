@@ -126,14 +126,16 @@ if (job_params%tri) then
     ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than threshold
     print*,'================================='
 end if
-! stop
+
 ! write unrotated particle to file (optional)            
 call PDAS(  vert_in,        & ! <-  rotated vertices
             face_ids,       & ! <-  face vertex IDs
             output_dir,     & ! <-  output directory
             num_face_vert,  & ! <-  number of verices in each face
             "unrotated")    ! <-  filename
-! stop
+
+! also write the apertures
+call save_apertures(apertures, output_dir)
 
 call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 call init_loop( alpha_vals, &
