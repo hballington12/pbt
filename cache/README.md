@@ -1,0 +1,1 @@
+This directory contains cached files for jobs that were paused at an intermediate stage.
