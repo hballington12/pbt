@@ -249,8 +249,6 @@ do i = 1, num_remaining_orients
 
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
-    print*,'time limit: ',job_params%time_limit
-
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
         call make_cache_dir("cache/",cache_dir)
         call cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients,job_params)

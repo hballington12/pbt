@@ -631,7 +631,7 @@
       call writeup(mueller_total, mueller_1d_total, cache_dir, output_parameters_total, job_params) ! write to file
       
       print*,'saved job files to cache.'
-      print*,'to resume this job, include "-resume" and "-cache_id '//trim(cache_dir(7:len(cache_dir)))//'" flags when you call abt.'
+      print*,'to resume this job, include the "-resume '//trim(cache_dir(7:len(cache_dir)))//'" flag when you call abt.'
       
       stop
       
