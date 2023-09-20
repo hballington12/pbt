@@ -22,7 +22,7 @@ echo ------------------------------------------------------
 eval `/usr/bin/modulecmd bash load gcc-13.1`
 eval `/usr/bin/modulecmd bash load openmpi-4.0.5`
 
-I_MPI_PIN=off
+export I_MPI_PIN=off
 export OMP_NUM_THREADS=32
 export OMP_STACKSIZE=100M
 ulimit -s unlimited
