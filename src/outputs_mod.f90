@@ -632,9 +632,7 @@
       
       print*,'saved job files to cache.'
       print*,'to resume this job, include the "-resume '//trim(cache_dir(7:len(cache_dir)))//'" flag when you call abt.'
-      
-      stop
-      
+            
    end subroutine
    
 end module outputs_mod

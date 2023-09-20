@@ -33,7 +33,7 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i
+integer(8) i, j, k, i_loop
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -115,6 +115,9 @@ type(output_parameters_type) output_parameters_total
 
 real(8) max_area, max_edge_length
 integer seed(1:8)
+character(len=255) cache_dir ! cached files directory (if job stops early)
+integer, dimension(:), allocatable :: remaining_orients
+integer num_remaining_orients
 
 ! ############################################################################################################
 
@@ -126,11 +129,21 @@ tag = 1
 print*,'========== start main'
 start = omp_get_wtime()
 seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
-call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 
 print*,'my rank: ',my_rank
 
 call parse_command_line(job_params)
+
+if(job_params%resume) then
+    print*,'attempting to resume job using cache #',job_params%cache_id
+    call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
+    if(my_rank .ne. 0) then ! only rank 0 should keep summed parameters from the cache, reset vals for all other processes
+        deallocate(mueller_total)
+        deallocate(mueller_1d_total)
+        ! output parameters are set to 0 in sr summation so no need to do that here
+    end if
+    ! stop
+end if
 
 ! setting up job directory
 ! rank 0 process broadcasts job directory to other processes
@@ -170,37 +183,6 @@ call PDAL2( num_vert,       & !  -> number of unique vertices
             apertures,      &
             job_params)
 
-num_orients = job_params%num_orients 
-n1 = int(num_orients / p)
-n2 = mod(num_orients,  p)
-my_start = my_rank*(n1+1)+1
-my_end = (my_rank+1)*(n1+1)
-if (my_rank .ge. n2) then
-    my_start = my_start - my_rank + n2
-    my_end = my_end - my_rank + n2 - 1
-end if
-print*,'my rank:',my_rank,'start: ',my_start,'end: ',my_end
-
-allocate(alpha_vals(1:num_orients))
-allocate(beta_vals(1:num_orients))
-allocate(gamma_vals(1:num_orients))
-
-if (my_rank .eq. 0) then
-    call init_loop( alpha_vals, &
-                    beta_vals, &
-                    gamma_vals, &
-                    job_params)
-    do dest = 1, p-1
-        call MPI_SEND(alpha_vals,size(alpha_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
-        call MPI_SEND(beta_vals,size(beta_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
-        call MPI_SEND(gamma_vals,size(gamma_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
-    end do
-else
-    call MPI_RECV(alpha_vals,size(alpha_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
-    call MPI_RECV(beta_vals,size(beta_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
-    call MPI_RECV(gamma_vals,size(gamma_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
-end if
-
 max_edge_length = job_params%la*2
 max_area = max_edge_length**2*sqrt(3D0)/4D0
 print*,'area threshold: ',max_area
@@ -222,7 +204,50 @@ if (my_rank .eq. 0) then
                 "unrotated")    ! <-  filename
 end if
 
-do i = my_start, my_end  
+if (my_rank .eq. 0) then
+    call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
+    call init_loop( alpha_vals, &
+                    beta_vals, &
+                    gamma_vals, &
+                    job_params)
+    do dest = 1, p-1
+        call MPI_SEND(alpha_vals,size(alpha_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(beta_vals,size(beta_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(gamma_vals,size(gamma_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
+    end do
+else
+    allocate(alpha_vals(1:job_params%num_orients))
+    allocate(beta_vals(1:job_params%num_orients))
+    allocate(gamma_vals(1:job_params%num_orients))
+    call MPI_RECV(alpha_vals,size(alpha_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
+    call MPI_RECV(beta_vals,size(beta_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
+    call MPI_RECV(gamma_vals,size(gamma_vals,1),MPI_REAL8,0,tag,MPI_COMM_WORLD,status,ierr)
+end if
+
+! some stuff
+if(job_params%resume) then ! if we are resuming a cached job
+    ! do nothing because we've already read this in sr resume_job
+else ! if we are not resuming a cached job
+    num_remaining_orients = job_params%num_orients ! number of remaining orientations is the total overall
+    allocate(remaining_orients(1:num_remaining_orients)) ! allocate array to hold orientation numbers
+    do i = 1, num_remaining_orients
+        remaining_orients(i) = i
+    end do
+end if
+
+n1 = int(num_remaining_orients / p)
+n2 = mod(num_remaining_orients,  p)
+my_start = my_rank*(n1+1)+1
+my_end = (my_rank+1)*(n1+1)
+if (my_rank .ge. n2) then
+    my_start = my_start - my_rank + n2
+    my_end = my_end - my_rank + n2 - 1
+end if
+print*,'my rank:',my_rank,'start: ',my_start,'end: ',my_end
+
+do i = my_start, my_end
+
+    i_loop = remaining_orients(i)
 
     ! rotate particle
     call PROT_MPI(  vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
@@ -230,7 +255,7 @@ do i = my_start, my_end
                     alpha_vals, &
                     beta_vals,  &
                     gamma_vals, &
-                    i,          &
+                    i_loop,          &
                     job_params)
 
     ! fast implementation of the incident beam
@@ -264,12 +289,12 @@ do i = my_start, my_end
                         job_params)
 
     ! if(num_orients .gt. 1) then
-    !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i,' / ',num_orients,' (total progress: ',dble(i-1)/dble(num_orients)*100,' %)'
+    !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i_loop,' / ',num_orients,' (total progress: ',dble(i_loop-1)/dble(num_orients)*100,' %)'
     !     ! print*,'total time elapsed: ',omp_get_wtime()-start
-    !     ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
-    !     if (i .gt. 1) then
+    !     ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i_loop)
+    !     if (i_loop .gt. 1) then
     !         print'(A20,F12.4,A5)','est. time remaining: '
-    !         call PROUST(nint(dble(num_orients-i+1)*(omp_get_wtime()-start) / dble(i)))
+    !         call PROUST(nint(dble(num_orients-i_loop+1)*(omp_get_wtime()-start) / dble(i_loop)))
     !     end if
     ! end if
     
@@ -310,17 +335,73 @@ do i = my_start, my_end
 
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
 
-        
-        ! call cache_job( vert_in,                    & ! unrotated vertices
-        !                 face_ids,                   & ! face ids
-        !                 num_face_vert,              & ! num vertices per face
-        !                 apertures,                  & ! apertures
-        !                 job_params,                 & ! job parameters
-        !                 i_loop,                     & ! current loop index
-        !                 output_parameters_total,    & ! total output parameters
-        !                 mueller_total,              & ! total 2d mueller
-        !                 mueller_1d_total)             ! total 1d mueller
+        print*,'time limit reached. caching job...'
+
+        ! rank 0 makes cache directory and sends to other processes
+        if (my_rank .eq. 0) then
+            call make_cache_dir("cache/",cache_dir)
+            print*,'cache directory is "',trim(cache_dir),'"'
+            print*,'sending...'
+            do dest = 1, p-1
+                CALL MPI_SEND(cache_dir, 255, MPI_CHARACTER, dest, tag, MPI_COMM_WORLD, ierr)
+            end do
+            print*,'sending complete.'
+        else
+            call MPI_RECV(cache_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
+        end if
+
+        ! make remaining orientations file with rank 0 process
+        if(my_rank .eq. 0) then
+            open(unit=10,file=trim(cache_dir)//"/orient_remaining.dat",status="new")
+            close(10)
+        end if
+        ! 1 by 1, write remaining orientations to file...
+        do j = 1, p ! for each process
+            if(my_rank .eq. j-1) then ! if its my turn to write to the file
+                open(unit=10,file=trim(cache_dir)//"/orient_remaining.dat",access="append") ! open file in append mode
+                    ! write my remaining orientations to the file
+                    do k = i+1, my_end ! loop from one after my current loop index to my end index
+                        write(10,*) remaining_orients(k) ! write my remaining orientations to file
+                    end do
+                close(10) ! close file
+                call MPI_BARRIER(MPI_COMM_WORLD) ! meet other processes at meet point
+            else ! if its not my turn to write to file
+                call MPI_BARRIER(MPI_COMM_WORLD) ! do nothing and wait at meet point
+            end if
+        end do
+
+        ! send to rank 0 process and sum
+        call mpi_send_sum(  ierr,                       & ! mpi parameter
+                            tag,                        & ! mpi parameter
+                            p,                          & ! mpi parameter
+                            status,                     & ! mpi parameter
+                            my_rank,                    & ! process rank
+                            mueller_1d_total,           & ! 1d mueller matrix total for each process
+                            mueller_total,              & ! 2d mueller matrix total for each process
+                            output_parameters_total)      ! output parameters total for each process
+
+        ! then rank 0 writes to cached files
+        if(my_rank .eq. 0) then
+            call cache_job( vert_in,                    & ! unrotated vertices
+                            face_ids,                   & ! face ids
+                            num_face_vert,              & ! num vertices per face
+                            apertures,                  & ! apertures
+                            job_params,                 & ! job parameters
+                            i_loop,                     & ! current loop index (unused)
+                            output_parameters_total,    & ! total output parameters
+                            mueller_total,              & ! total 2d mueller
+                            mueller_1d_total,           & ! total 1d mueller
+                            cache_dir)
+        end if
+
+        call MPI_BARRIER(MPI_COMM_WORLD)
+
+        call MPI_FINALIZE(ierr)
+
+        stop
+    
     end if
+
 
 end do
 
@@ -340,24 +421,24 @@ call mpi_send_sum(  ierr,                       & ! mpi parameter
 
 if (my_rank .eq. 0) then
 
-    mueller_total = mueller_total / num_orients
-    mueller_1d_total = mueller_1d_total / num_orients
-    output_parameters_total%abs = output_parameters_total%abs / num_orients
-    output_parameters_total%scatt = output_parameters_total%scatt / num_orients
-    output_parameters_total%ext = output_parameters_total%ext / num_orients
-    output_parameters_total%albedo = output_parameters_total%albedo / num_orients
-    output_parameters_total%asymmetry = output_parameters_total%asymmetry / num_orients
-    output_parameters_total%abs_eff = output_parameters_total%abs_eff / num_orients
-    output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / num_orients
-    output_parameters_total%ext_eff = output_parameters_total%ext_eff / num_orients
-    output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / num_orients
+    mueller_total = mueller_total / job_params%num_orients
+    mueller_1d_total = mueller_1d_total / job_params%num_orients
+    output_parameters_total%abs = output_parameters_total%abs / job_params%num_orients
+    output_parameters_total%scatt = output_parameters_total%scatt / job_params%num_orients
+    output_parameters_total%ext = output_parameters_total%ext / job_params%num_orients
+    output_parameters_total%albedo = output_parameters_total%albedo / job_params%num_orients
+    output_parameters_total%asymmetry = output_parameters_total%asymmetry / job_params%num_orients
+    output_parameters_total%abs_eff = output_parameters_total%abs_eff / job_params%num_orients
+    output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / job_params%num_orients
+    output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%num_orients
+    output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients
     
     ! writing to file
     call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
     call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
 
     ! clean up temporary files
-    call system("rm -r "//trim(output_dir)//"/tmp") ! make directory for temp files
+    call system("rm -r "//trim(output_dir)//"/tmp") ! remove directory for temp files
 
     finish = omp_get_wtime()
     print*,'=========='

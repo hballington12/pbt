@@ -155,7 +155,6 @@ end if
 do i = 1, num_remaining_orients
 
     i_loop = remaining_orients(i)
-    print*,'i_loop: ',i_loop
 
     ! rotate particle
     call PROT_MPI(  vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
@@ -262,6 +261,7 @@ do i = 1, num_remaining_orients
                         mueller_total,              & ! total 2d mueller
                         mueller_1d_total,           & ! total 1d mueller
                         cache_dir)
+        stop
     end if
 
 end do
