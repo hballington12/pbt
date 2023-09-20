@@ -84,6 +84,8 @@ Main source file. It contains the program entry point. The ABT reads input param
 
 - `-tri_rough` - Sets the standard deviation for roughness derived from the triangulation.
 
+- `time_limit <value>` - Sets a time limit (in hours). The abt will save at an intermediate point if this time is surpassed. Use `-resume <value>` to resume the job (see below).
+
 - `-resume <value>` - Resumes a previous job that was saved at an intermediate point. `value` must be the number of the cache ID. This option overrides most input parameters with those read from the cached job.
 
  ## Examples
