@@ -357,15 +357,17 @@ do i = my_start, my_end
         ! 1 by 1, write remaining orientations to file...
         do j = 1, p ! for each process
             if(my_rank .eq. j-1) then ! if its my turn to write to the file
-                open(unit=10,file=trim(cache_dir)//"/orient_remaining.dat",access="append") ! open file in append mode
+                ! print*,'my_rank:',my_rank,'opening file'
+                open(unit=10,file=trim(cache_dir)//"/orient_remaining.dat",status="old",access="append") ! open file in append mode
                     ! write my remaining orientations to the file
                     do k = i+1, my_end ! loop from one after my current loop index to my end index
                         write(10,*) remaining_orients(k) ! write my remaining orientations to file
                     end do
+                ! print*,'my_rank:',my_rank,'wrote to file'
                 close(10) ! close file
-                call MPI_BARRIER(MPI_COMM_WORLD) ! meet other processes at meet point
+                call MPI_BARRIER(MPI_COMM_WORLD,ierr) ! meet other processes at meet point
             else ! if its not my turn to write to file
-                call MPI_BARRIER(MPI_COMM_WORLD) ! do nothing and wait at meet point
+                call MPI_BARRIER(MPI_COMM_WORLD,ierr) ! do nothing and wait at meet point
             end if
         end do
 
@@ -393,7 +395,7 @@ do i = my_start, my_end
                             cache_dir)
         end if
 
-        call MPI_BARRIER(MPI_COMM_WORLD)
+        call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
         call MPI_FINALIZE(ierr)
 
