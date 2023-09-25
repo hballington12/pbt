@@ -440,15 +440,18 @@
                                        ampl21(j,i)*conjg(ampl21(j,i)) - &
                                        ampl22(j,i)*conjg(ampl22(j,i)))) 
             ! ##########################--S13--##########################
+            mueller(j,i,3) =      real(ampl11(j,i)*conjg(ampl12(j,i)) + &
+                                       ampl22(j,i)*conjg(ampl21(j,i))) 
+            ! ##########################--S14--##########################
             mueller(j,i,4) =      imag(ampl11(j,i)*conjg(ampl12(j,i)) - &
                                        ampl22(j,i)*conjg(ampl21(j,i)))
             ! ##########################--S21--##########################
-            mueller(j,i,5) =          real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) + &
+            mueller(j,i,5) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) + &
                                        ampl12(j,i)*conjg(ampl12(j,i)) - &
                                        ampl21(j,i)*conjg(ampl21(j,i)) - &
                                        ampl22(j,i)*conjg(ampl22(j,i))))
             ! ##########################--S22--##########################                                                             
-            mueller(j,i,6) =          real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) - &
+            mueller(j,i,6) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) - &
                                        ampl12(j,i)*conjg(ampl12(j,i)) - &
                                        ampl21(j,i)*conjg(ampl21(j,i)) + &
                                        ampl22(j,i)*conjg(ampl22(j,i))))
