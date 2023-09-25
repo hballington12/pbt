@@ -83,10 +83,10 @@
       allocate(ampl_far22(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
 
       ! far field = beam diffraction - external diffraction
-      ampl_far11 = ampl_far_beam11 - ampl_far_ext_diff11
-      ampl_far12 = ampl_far_beam12 - ampl_far_ext_diff12
-      ampl_far21 = ampl_far_beam21 - ampl_far_ext_diff21
-      ampl_far22 = ampl_far_beam22 - ampl_far_ext_diff22
+      ampl_far11 = ampl_far_beam11 + ampl_far_ext_diff11
+      ampl_far12 = ampl_far_beam12 + ampl_far_ext_diff12
+      ampl_far21 = ampl_far_beam21 + ampl_far_ext_diff21
+      ampl_far22 = ampl_far_beam22 + ampl_far_ext_diff22
       
       print*,'making 2d mueller matrices...'
  
@@ -131,10 +131,10 @@
          ampl_far_ext_diff21 = ampl_far_ext_diff21/sqrt(scatt_ext_diff/energy_out_ext_diff)
          ampl_far_ext_diff22 = ampl_far_ext_diff22/sqrt(scatt_ext_diff/energy_out_ext_diff)
 
-         ampl_far11 = ampl_far_beam11 - ampl_far_ext_diff11
-         ampl_far12 = ampl_far_beam12 - ampl_far_ext_diff12
-         ampl_far21 = ampl_far_beam21 - ampl_far_ext_diff21
-         ampl_far22 = ampl_far_beam22 - ampl_far_ext_diff22
+         ampl_far11 = ampl_far_beam11 + ampl_far_ext_diff11
+         ampl_far12 = ampl_far_beam12 + ampl_far_ext_diff12
+         ampl_far21 = ampl_far_beam21 + ampl_far_ext_diff21
+         ampl_far22 = ampl_far_beam22 + ampl_far_ext_diff22
          
          print*,'remaking 2d mueller matrices...'
     
