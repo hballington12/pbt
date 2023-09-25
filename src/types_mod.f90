@@ -66,6 +66,7 @@ type job_parameters_type
     real(8) time_limit ! job time limit in hours
     logical resume ! enable resume of cached data
     integer cache_id ! cached data to resume from
+    logical scaling ! enable energy scaling for diffraction
 end type job_parameters_type
 
 contains

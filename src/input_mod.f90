@@ -162,6 +162,7 @@ job_params%tri_roughness = 0D0
 job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
+job_params%scaling = .false.
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -641,6 +642,11 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             ! print*,'found command line specifier "mt"'
             print*,'automatic triangulation: enabled'
             job_params%tri = .true.
+
+        case ('-scaling')
+            ! print*,'found command line specifier "mt"'
+            print*,'diffraction energy scaling: enabled'
+            job_params%scaling = .true.
 
         case ('-resume')
             i = i + 1 ! update counter to read the rotation method

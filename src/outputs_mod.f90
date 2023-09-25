@@ -51,8 +51,8 @@
       !  simpne interpolates a 3-point Lagrangian polynomial to the data and integrates that exactly
       ! the 1d mueller matrices are integrated to compute various integrated scattering parameters
       
-      complex(8), dimension(:,:), allocatable, intent(in) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
-      complex(8), dimension(:,:), allocatable, intent(in)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
+      complex(8), dimension(:,:), allocatable, intent(inout) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
+      complex(8), dimension(:,:), allocatable, intent(inout)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
       real(8), dimension(:), allocatable :: theta_vals, phi_vals
       real(8), intent(in) :: energy_out_beam
       real(8), intent(in) :: energy_out_ext_diff
@@ -66,7 +66,7 @@
       complex(8), dimension(:,:), allocatable :: ampl_far11, ampl_far12, ampl_far21, ampl_far22 ! total
       real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
       real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
-      integer i, j
+
       real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext, abs, albedo
       real(8) waveno
       
@@ -81,17 +81,7 @@
       allocate(ampl_far12(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
       allocate(ampl_far21(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
       allocate(ampl_far22(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
-      
-      ! allocate mueller matrix
-      allocate(mueller(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2),1:16)) ! 1:1 is for each element
-      allocate(mueller_beam(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2),1:16)) ! 1:1 is for each element
-      allocate(mueller_ext_diff(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2),1:16)) ! 1:1 is for each element
-      
-      ! allocate 1d mueller matrix
-      allocate(mueller_1d(1:size(ampl_far_beam11,2),1:16)) ! 1:1 is for each element
-      allocate(mueller_beam_1d(1:size(ampl_far_beam11,2),1:16)) ! 1:1 is for each element
-      allocate(mueller_ext_diff_1d(1:size(ampl_far_beam11,2),1:16)) ! 1:1 is for each element
-      
+
       ! far field = beam diffraction - external diffraction
       ampl_far11 = ampl_far_beam11 - ampl_far_ext_diff11
       ampl_far12 = ampl_far_beam12 - ampl_far_ext_diff12
@@ -99,291 +89,19 @@
       ampl_far22 = ampl_far_beam22 - ampl_far_ext_diff22
       
       print*,'making 2d mueller matrices...'
-      
-      ! add to mueller matrices
-      do i = 1, size(ampl_far_beam11,2) ! loop over theta
-         do j = 1, size(ampl_far_beam11,1) ! loop over phi
-            ! Bohren & Huffman
-            ! ##########################--S11--##########################
-            ! s11 beam
-            mueller_beam(j,i,1) =     real(0.5*(ampl_far_beam11(j,i)*conjg(ampl_far_beam11(j,i)) + &
-            ampl_far_beam12(j,i)*conjg(ampl_far_beam12(j,i)) + &
-            ampl_far_beam21(j,i)*conjg(ampl_far_beam21(j,i)) + &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam22(j,i))))    
-            ! s11 ext diff
-            mueller_ext_diff(j,i,1) = real(0.5*(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff11(j,i)) + &
-            ampl_far_ext_diff12(j,i)*conjg(ampl_far_ext_diff12(j,i)) + &
-            ampl_far_ext_diff21(j,i)*conjg(ampl_far_ext_diff21(j,i)) + &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff22(j,i))))   
-            ! s11 total
-            mueller(j,i,1) =          real(0.5*(ampl_far11(j,i)*conjg(ampl_far11(j,i)) + &
-            ampl_far12(j,i)*conjg(ampl_far12(j,i)) + &
-            ampl_far21(j,i)*conjg(ampl_far21(j,i)) + &
-            ampl_far22(j,i)*conjg(ampl_far22(j,i))))   
-            ! ##########################--S12--##########################                                                
-            ! s12 beam
-            mueller_beam(j,i,2) =     real(0.5*(ampl_far_beam11(j,i)*conjg(ampl_far_beam11(j,i)) - &
-            ampl_far_beam12(j,i)*conjg(ampl_far_beam12(j,i)) + &
-            ampl_far_beam21(j,i)*conjg(ampl_far_beam21(j,i)) - &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam22(j,i))))    
-            ! s12 ext diff
-            mueller_ext_diff(j,i,2) = real(0.5*(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff11(j,i)) - &
-            ampl_far_ext_diff12(j,i)*conjg(ampl_far_ext_diff12(j,i)) + &
-            ampl_far_ext_diff21(j,i)*conjg(ampl_far_ext_diff21(j,i)) - &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff22(j,i))))   
-            ! s12 total
-            mueller(j,i,2) =          real(0.5*(ampl_far11(j,i)*conjg(ampl_far11(j,i)) - &
-            ampl_far12(j,i)*conjg(ampl_far12(j,i)) + &
-            ampl_far21(j,i)*conjg(ampl_far21(j,i)) - &
-            ampl_far22(j,i)*conjg(ampl_far22(j,i)))) 
-            ! ##########################--S13--##########################
-            ! s13 beam
-            mueller_beam(j,i,3) =          real(ampl_far_beam11(j,i)*conjg(ampl_far_beam12(j,i)) + &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam21(j,i))) 
-            ! s13 ext diff
-            mueller_ext_diff(j,i,3) =      real(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff12(j,i)) + &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff21(j,i)))   
-            ! s13 total
-            mueller(j,i,3) =               real(ampl_far11(j,i)*conjg(ampl_far12(j,i)) + &
-            ampl_far22(j,i)*conjg(ampl_far21(j,i)))                                                
-            ! ##########################--S14--##########################
-            ! s14 beam
-            mueller_beam(j,i,4) =          imag(ampl_far_beam11(j,i)*conjg(ampl_far_beam12(j,i)) - &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam21(j,i))) 
-            ! s14 ext diff
-            mueller_ext_diff(j,i,4) =      imag(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff12(j,i)) - &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff21(j,i)))   
-            ! s14 total
-            mueller(j,i,4) =               imag(ampl_far11(j,i)*conjg(ampl_far12(j,i)) - &
-            ampl_far22(j,i)*conjg(ampl_far21(j,i)))
-            ! ##########################--S21--##########################
-            ! s21 beam
-            mueller_beam(j,i,5) =     real(0.5*(ampl_far_beam11(j,i)*conjg(ampl_far_beam11(j,i)) + &
-            ampl_far_beam12(j,i)*conjg(ampl_far_beam12(j,i)) - &
-            ampl_far_beam21(j,i)*conjg(ampl_far_beam21(j,i)) - &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam22(j,i))))    
-            ! s21 ext diff
-            mueller_ext_diff(j,i,5) = real(0.5*(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff11(j,i)) + &
-            ampl_far_ext_diff12(j,i)*conjg(ampl_far_ext_diff12(j,i)) - &
-            ampl_far_ext_diff21(j,i)*conjg(ampl_far_ext_diff21(j,i)) - &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff22(j,i))))   
-            ! s21 total
-            mueller(j,i,5) =          real(0.5*(ampl_far11(j,i)*conjg(ampl_far11(j,i)) + &
-            ampl_far12(j,i)*conjg(ampl_far12(j,i)) - &
-            ampl_far21(j,i)*conjg(ampl_far21(j,i)) - &
-            ampl_far22(j,i)*conjg(ampl_far22(j,i))))
-            ! ##########################--S22--##########################                                                             
-            ! s22 beam
-            mueller_beam(j,i,6) =     real(0.5*(ampl_far_beam11(j,i)*conjg(ampl_far_beam11(j,i)) - &
-            ampl_far_beam12(j,i)*conjg(ampl_far_beam12(j,i)) - &
-            ampl_far_beam21(j,i)*conjg(ampl_far_beam21(j,i)) + &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam22(j,i))))    
-            ! s22 ext diff
-            mueller_ext_diff(j,i,6) = real(0.5*(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff11(j,i)) - &
-            ampl_far_ext_diff12(j,i)*conjg(ampl_far_ext_diff12(j,i)) - &
-            ampl_far_ext_diff21(j,i)*conjg(ampl_far_ext_diff21(j,i)) + &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff22(j,i))))   
-            ! s22 total
-            mueller(j,i,6) =          real(0.5*(ampl_far11(j,i)*conjg(ampl_far11(j,i)) - &
-            ampl_far12(j,i)*conjg(ampl_far12(j,i)) - &
-            ampl_far21(j,i)*conjg(ampl_far21(j,i)) + &
-            ampl_far22(j,i)*conjg(ampl_far22(j,i))))
-            ! ##########################--S23--##########################   
-            ! s23 beam
-            mueller_beam(j,i,7) =          real(ampl_far_beam11(j,i)*conjg(ampl_far_beam12(j,i)) - &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam21(j,i))) 
-            ! s23 ext diff
-            mueller_ext_diff(j,i,7) =      real(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff12(j,i)) - &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff21(j,i)))   
-            ! s23 total
-            mueller(j,i,7) =               real(ampl_far11(j,i)*conjg(ampl_far12(j,i)) - &
-            ampl_far22(j,i)*conjg(ampl_far21(j,i)))
-            ! ##########################--S24--##########################   
-            ! s24 beam
-            mueller_beam(j,i,8) =          imag(ampl_far_beam11(j,i)*conjg(ampl_far_beam12(j,i)) + &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam21(j,i))) 
-            ! s24 ext diff
-            mueller_ext_diff(j,i,8) =      imag(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff12(j,i)) + &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff21(j,i)))   
-            ! s24 total
-            mueller(j,i,8) =               imag(ampl_far11(j,i)*conjg(ampl_far12(j,i)) + &
-            ampl_far22(j,i)*conjg(ampl_far21(j,i))) 
-            ! ##########################--S31--##########################   
-            ! s31 beam
-            mueller_beam(j,i,9) =          real(ampl_far_beam11(j,i)*conjg(ampl_far_beam21(j,i)) + &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam12(j,i))) 
-            ! s31 ext diff
-            mueller_ext_diff(j,i,9) =      real(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff21(j,i)) + &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff12(j,i)))   
-            ! s31 total
-            mueller(j,i,9) =               real(ampl_far11(j,i)*conjg(ampl_far21(j,i)) + &
-            ampl_far22(j,i)*conjg(ampl_far12(j,i)))
-            ! ##########################--S32--##########################  
-            ! s32 beam
-            mueller_beam(j,i,10) =         real(ampl_far_beam11(j,i)*conjg(ampl_far_beam21(j,i)) - &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam12(j,i))) 
-            ! s32 ext diff
-            mueller_ext_diff(j,i,10) =     real(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff21(j,i)) - &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff12(j,i)))   
-            ! s32 total
-            mueller(j,i,10) =              real(ampl_far11(j,i)*conjg(ampl_far21(j,i)) - &
-            ampl_far22(j,i)*conjg(ampl_far12(j,i))) 
-            ! ##########################--S33--##########################  
-            ! s33 beam
-            mueller_beam(j,i,11) =         real(ampl_far_beam11(j,i)*conjg(ampl_far_beam22(j,i)) + &
-            ampl_far_beam12(j,i)*conjg(ampl_far_beam21(j,i))) 
-            ! s33 ext diff
-            mueller_ext_diff(j,i,11) =     real(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff22(j,i)) + &
-            ampl_far_ext_diff12(j,i)*conjg(ampl_far_ext_diff21(j,i)))   
-            ! s33 total
-            mueller(j,i,11) =              real(ampl_far11(j,i)*conjg(ampl_far22(j,i)) + &
-            ampl_far12(j,i)*conjg(ampl_far21(j,i)))  
-            ! ##########################--S34--##########################   
-            ! s34 beam
-            mueller_beam(j,i,12) =         imag(ampl_far_beam11(j,i)*conjg(ampl_far_beam22(j,i)) + &
-            ampl_far_beam21(j,i)*conjg(ampl_far_beam12(j,i))) 
-            ! s34 ext diff
-            mueller_ext_diff(j,i,12) =     imag(ampl_far_ext_diff11(j,i)*conjg(ampl_far_ext_diff22(j,i)) + &
-            ampl_far_ext_diff21(j,i)*conjg(ampl_far_ext_diff12(j,i)))   
-            ! s34 total
-            mueller(j,i,12) =              imag(ampl_far11(j,i)*conjg(ampl_far22(j,i)) + &
-            ampl_far21(j,i)*conjg(ampl_far12(j,i))) 
-            ! ##########################--S41--########################## 
-            ! s41 beam
-            mueller_beam(j,i,13) =         imag(ampl_far_beam21(j,i)*conjg(ampl_far_beam11(j,i)) + &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam12(j,i))) 
-            ! s41 ext diff
-            mueller_ext_diff(j,i,13) =     imag(ampl_far_ext_diff21(j,i)*conjg(ampl_far_ext_diff11(j,i)) + &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff12(j,i)))   
-            ! s41 total
-            mueller(j,i,13) =              imag(ampl_far21(j,i)*conjg(ampl_far11(j,i)) + &
-            ampl_far22(j,i)*conjg(ampl_far12(j,i)))  
-            ! ##########################--S42--##########################  
-            ! s42 beam
-            mueller_beam(j,i,14) =         imag(ampl_far_beam21(j,i)*conjg(ampl_far_beam11(j,i)) - &
-            ampl_far_beam22(j,i)*conjg(ampl_far_beam12(j,i))) 
-            ! s42 ext diff
-            mueller_ext_diff(j,i,14) =     imag(ampl_far_ext_diff21(j,i)*conjg(ampl_far_ext_diff11(j,i)) - &
-            ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff12(j,i)))   
-            ! s42 total
-            mueller(j,i,14) =              imag(ampl_far21(j,i)*conjg(ampl_far11(j,i)) - &
-            ampl_far22(j,i)*conjg(ampl_far12(j,i)))  
-            ! ##########################--S43--##########################  
-            ! s43 beam
-            mueller_beam(j,i,15) =         imag(ampl_far_beam22(j,i)*conjg(ampl_far_beam11(j,i)) - &
-            ampl_far_beam12(j,i)*conjg(ampl_far_beam21(j,i))) 
-            ! s43 ext diff
-            mueller_ext_diff(j,i,15) =     imag(ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff11(j,i)) - &
-            ampl_far_ext_diff12(j,i)*conjg(ampl_far_ext_diff21(j,i)))   
-            ! s43 total
-            mueller(j,i,15) =              imag(ampl_far22(j,i)*conjg(ampl_far11(j,i)) - &
-            ampl_far12(j,i)*conjg(ampl_far21(j,i)))  
-            ! ##########################--S44--##########################   
-            ! s44 beam
-            mueller_beam(j,i,16) =         real(ampl_far_beam22(j,i)*conjg(ampl_far_beam11(j,i)) - &
-            ampl_far_beam12(j,i)*conjg(ampl_far_beam21(j,i))) 
-            ! s44 ext diff
-            mueller_ext_diff(j,i,16) =     real(ampl_far_ext_diff22(j,i)*conjg(ampl_far_ext_diff11(j,i)) - &
-            ampl_far_ext_diff12(j,i)*conjg(ampl_far_ext_diff21(j,i)))   
-            ! s44 total
-            mueller(j,i,16) =              real(ampl_far22(j,i)*conjg(ampl_far11(j,i)) - &
-            ampl_far12(j,i)*conjg(ampl_far21(j,i)))     
-            
-            
-         end do
-      end do
-      
+ 
+      call ampl_to_mueller(ampl_far11,ampl_far12,ampl_far21,ampl_far22,mueller)
+      call ampl_to_mueller(ampl_far_beam11,ampl_far_beam12,ampl_far_beam21,ampl_far_beam22,mueller_beam)
+      call ampl_to_mueller(ampl_far_ext_diff11,ampl_far_ext_diff12,ampl_far_ext_diff21,ampl_far_ext_diff22,mueller_ext_diff)
+
       print*,'making 1d mueller matrices...'
       write(101,*)'------------------------------------------------------'
       
-      ! phi integrations...
-      do i = 1, size(theta_vals,1) ! for each theta bin...
-         
-         ! p11
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,1),mueller_1d(i,1)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,1),mueller_beam_1d(i,1)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,1),mueller_ext_diff_1d(i,1)) ! integrate ext diff
-         
-         ! p12
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,2),mueller_1d(i,2)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,2),mueller_beam_1d(i,2)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,2),mueller_ext_diff_1d(i,2)) ! integrate ext diff      
-         
-         ! p13
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,3),mueller_1d(i,3)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,3),mueller_beam_1d(i,3)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,3),mueller_ext_diff_1d(i,3)) ! integrate ext diff          
-         
-         ! p14
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,4),mueller_1d(i,4)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,4),mueller_beam_1d(i,4)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,4),mueller_ext_diff_1d(i,4)) ! integrate ext diff   
-         
-         ! p21
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,5),mueller_1d(i,5)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,5),mueller_beam_1d(i,5)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,5),mueller_ext_diff_1d(i,5)) ! integrate ext diff  
-         
-         ! p22
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,6),mueller_1d(i,6)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,6),mueller_beam_1d(i,6)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,6),mueller_ext_diff_1d(i,6)) ! integrate ext diff  
-         
-         ! p23
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,7),mueller_1d(i,7)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,7),mueller_beam_1d(i,7)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,7),mueller_ext_diff_1d(i,7)) ! integrate ext diff  
-         
-         ! p24
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,8),mueller_1d(i,8)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,8),mueller_beam_1d(i,8)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,8),mueller_ext_diff_1d(i,8)) ! integrate ext diff    
-         
-         ! p31
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,9),mueller_1d(i,9)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,9),mueller_beam_1d(i,9)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,9),mueller_ext_diff_1d(i,9)) ! integrate ext diff  
-         
-         ! p32
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,10),mueller_1d(i,10)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,10),mueller_beam_1d(i,10)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,10),mueller_ext_diff_1d(i,10)) ! integrate ext diff  
-         
-         ! p33
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,11),mueller_1d(i,11)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,11),mueller_beam_1d(i,11)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,11),mueller_ext_diff_1d(i,11)) ! integrate ext diff  
-         
-         ! p34
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,12),mueller_1d(i,12)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,12),mueller_beam_1d(i,12)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,12),mueller_ext_diff_1d(i,12)) ! integrate ext diff   
-         
-         ! p41
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,13),mueller_1d(i,13)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,13),mueller_beam_1d(i,13)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,13),mueller_ext_diff_1d(i,13)) ! integrate ext diff  
-         
-         ! p42
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,14),mueller_1d(i,14)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,14),mueller_beam_1d(i,14)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,14),mueller_ext_diff_1d(i,14)) ! integrate ext diff  
-         
-         ! p43
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,15),mueller_1d(i,15)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,15),mueller_beam_1d(i,15)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,15),mueller_ext_diff_1d(i,15)) ! integrate ext diff  
-         
-         ! p44
-         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,16),mueller_1d(i,16)) ! integrate total
-         call simpne(size(phi_vals,1),phi_vals,mueller_beam(1:size(mueller,1),i,16),mueller_beam_1d(i,16)) ! integrate beam
-         call simpne(size(phi_vals,1),phi_vals,mueller_ext_diff(1:size(mueller,1),i,16),mueller_ext_diff_1d(i,16)) ! integrate ext diff   
-         
-      end do
-      
+      call get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
+
       print*,'calculating integrated parameters...'
-      
-      
       
       ! theta integrations...
       call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt) ! p11*sin(theta)
@@ -398,6 +116,63 @@
       write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
       print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
       
+      if (job_params%scaling) then
+         print'(A40)','applying diffraction energy scaling...'
+
+         ! scale the beam diffraction energy to match near field
+         ampl_far_beam11 = ampl_far_beam11/sqrt(scatt_beam/energy_out_beam)
+         ampl_far_beam12 = ampl_far_beam12/sqrt(scatt_beam/energy_out_beam)
+         ampl_far_beam21 = ampl_far_beam21/sqrt(scatt_beam/energy_out_beam)
+         ampl_far_beam22 = ampl_far_beam22/sqrt(scatt_beam/energy_out_beam)
+
+         ! scale the external diffraction energy to match near field
+         ampl_far_ext_diff11 = ampl_far_ext_diff11/sqrt(scatt_ext_diff/energy_out_ext_diff)
+         ampl_far_ext_diff12 = ampl_far_ext_diff12/sqrt(scatt_ext_diff/energy_out_ext_diff)
+         ampl_far_ext_diff21 = ampl_far_ext_diff21/sqrt(scatt_ext_diff/energy_out_ext_diff)
+         ampl_far_ext_diff22 = ampl_far_ext_diff22/sqrt(scatt_ext_diff/energy_out_ext_diff)
+
+         ampl_far11 = ampl_far_beam11 - ampl_far_ext_diff11
+         ampl_far12 = ampl_far_beam12 - ampl_far_ext_diff12
+         ampl_far21 = ampl_far_beam21 - ampl_far_ext_diff21
+         ampl_far22 = ampl_far_beam22 - ampl_far_ext_diff22
+         
+         print*,'remaking 2d mueller matrices...'
+    
+         call ampl_to_mueller(ampl_far11,ampl_far12,ampl_far21,ampl_far22,mueller)
+         call ampl_to_mueller(ampl_far_beam11,ampl_far_beam12,ampl_far_beam21,ampl_far_beam22,mueller_beam)
+         call ampl_to_mueller(ampl_far_ext_diff11,ampl_far_ext_diff12,ampl_far_ext_diff21,ampl_far_ext_diff22,mueller_ext_diff)
+   
+         print*,'remaking 1d mueller matrices...'
+         write(101,*)'------------------------------------------------------'
+         
+         call get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
+   
+         print*,'recalculating integrated parameters...'
+         
+         ! theta integrations...
+         call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt) ! p11*sin(theta)
+         write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
+         print'(A40,f16.8)','scattering cross section (total):',scatt
+         
+         call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_beam) ! p11*sin(theta)
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
+         
+         call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_ext_diff) ! p11*sin(theta)
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+
+
+
+
+
+
+
+
+      end if
+
       ! ext = abs(2*pi/waveno*real(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
       ! write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (real):',ext 
       ! print'(A40,f16.8)','ext. cross (opt. theorem) real:',ext 
@@ -470,6 +245,57 @@
       
    end subroutine
    
+   subroutine get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
+
+      ! integrates over phi at each theta value to get the 1d mueller matrix from a 2d mueller matrix
+
+      real(8), dimension(:,:,:), allocatable, intent(in) :: mueller
+      real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d
+      real(8), dimension(:), allocatable, intent(in) :: theta_vals, phi_vals
+
+      integer(8) i
+
+      ! allocate 1d mueller matrix
+      allocate(mueller_1d(1:size(theta_vals,1),1:16)) ! 1:1 is for each element
+
+! phi integrations...
+      do i = 1, size(theta_vals,1) ! for each theta bin...
+         ! p11
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,1),mueller_1d(i,1)) ! integrate total
+         ! p12
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,2),mueller_1d(i,2)) ! integrate total
+         ! p13
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,3),mueller_1d(i,3)) ! integrate total
+         ! p14
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,4),mueller_1d(i,4)) ! integrate total
+         ! p21
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,5),mueller_1d(i,5)) ! integrate total
+         ! p22
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,6),mueller_1d(i,6)) ! integrate total
+         ! p23
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,7),mueller_1d(i,7)) ! integrate total
+         ! p24
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,8),mueller_1d(i,8)) ! integrate total
+         ! p31
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,9),mueller_1d(i,9)) ! integrate total
+         ! p32
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,10),mueller_1d(i,10)) ! integrate total
+         ! p33
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,11),mueller_1d(i,11)) ! integrate total
+         ! p34
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,12),mueller_1d(i,12)) ! integrate total
+         ! p41
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,13),mueller_1d(i,13)) ! integrate total
+         ! p42
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,14),mueller_1d(i,14)) ! integrate total
+         ! p43
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,15),mueller_1d(i,15)) ! integrate total
+         ! p44
+         call simpne(size(phi_vals,1),phi_vals,mueller(1:size(mueller,1),i,16),mueller_1d(i,16)) ! integrate total
+      end do
+
+   end subroutine
+
    subroutine writeup(  mueller,    &
       mueller_1d, &
       output_dir, &
@@ -588,6 +414,81 @@
       
    end subroutine
    
+   subroutine ampl_to_mueller(ampl11,ampl12,ampl21,ampl22,mueller)
+
+      ! returns a mueller matrix from an amplitude matrix
+
+      complex(8), dimension(:,:), allocatable, intent(in) :: ampl11, ampl12, ampl21, ampl22 
+      real(8), dimension(:,:,:), allocatable, intent(out) :: mueller
+
+      integer(8) i, j
+
+      ! allocate mueller matrix
+      allocate(mueller(1:size(ampl11,1),1:size(ampl11,2),1:16)) ! 1:16 is for each element
+
+      do i = 1, size(ampl11,2) ! loop over theta
+         do j = 1, size(ampl11,1) ! loop over phi
+            ! Bohren & Huffman
+            ! ##########################--S11--##########################
+            mueller(j,i,1) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) + &
+                                       ampl12(j,i)*conjg(ampl12(j,i)) + &
+                                       ampl21(j,i)*conjg(ampl21(j,i)) + &
+                                       ampl22(j,i)*conjg(ampl22(j,i))))   
+            ! ##########################--S12--##########################                                                
+            mueller(j,i,2) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) - &
+                                       ampl12(j,i)*conjg(ampl12(j,i)) + &
+                                       ampl21(j,i)*conjg(ampl21(j,i)) - &
+                                       ampl22(j,i)*conjg(ampl22(j,i)))) 
+            ! ##########################--S13--##########################
+            mueller(j,i,4) =      imag(ampl11(j,i)*conjg(ampl12(j,i)) - &
+                                       ampl22(j,i)*conjg(ampl21(j,i)))
+            ! ##########################--S21--##########################
+            mueller(j,i,5) =          real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) + &
+                                       ampl12(j,i)*conjg(ampl12(j,i)) - &
+                                       ampl21(j,i)*conjg(ampl21(j,i)) - &
+                                       ampl22(j,i)*conjg(ampl22(j,i))))
+            ! ##########################--S22--##########################                                                             
+            mueller(j,i,6) =          real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) - &
+                                       ampl12(j,i)*conjg(ampl12(j,i)) - &
+                                       ampl21(j,i)*conjg(ampl21(j,i)) + &
+                                       ampl22(j,i)*conjg(ampl22(j,i))))
+            ! ##########################--S23--##########################   
+            mueller(j,i,7) =      real(ampl11(j,i)*conjg(ampl12(j,i)) - &
+                                       ampl22(j,i)*conjg(ampl21(j,i)))
+            ! ##########################--S24--##########################   
+            mueller(j,i,8) =      imag(ampl11(j,i)*conjg(ampl12(j,i)) + &
+                                       ampl22(j,i)*conjg(ampl21(j,i))) 
+            ! ##########################--S31--##########################   
+            mueller(j,i,9) =      real(ampl11(j,i)*conjg(ampl21(j,i)) + &
+                                       ampl22(j,i)*conjg(ampl12(j,i)))
+            ! ##########################--S32--##########################  
+            mueller(j,i,10) =     real(ampl11(j,i)*conjg(ampl21(j,i)) - &
+                                       ampl22(j,i)*conjg(ampl12(j,i))) 
+            ! ##########################--S33--##########################  
+            mueller(j,i,11) =     real(ampl11(j,i)*conjg(ampl22(j,i)) + &
+                                       ampl12(j,i)*conjg(ampl21(j,i)))  
+            ! ##########################--S34--##########################   
+            mueller(j,i,12) =     imag(ampl11(j,i)*conjg(ampl22(j,i)) + &
+                                       ampl21(j,i)*conjg(ampl12(j,i))) 
+            ! ##########################--S41--########################## 
+            mueller(j,i,13) =     imag(ampl21(j,i)*conjg(ampl11(j,i)) + &
+                                       ampl22(j,i)*conjg(ampl12(j,i)))  
+            ! ##########################--S42--##########################  
+            mueller(j,i,14) =     imag(ampl21(j,i)*conjg(ampl11(j,i)) - &
+                                       ampl22(j,i)*conjg(ampl12(j,i)))  
+            ! ##########################--S43--##########################  
+            mueller(j,i,15) =     imag(ampl22(j,i)*conjg(ampl11(j,i)) - &
+                                       ampl12(j,i)*conjg(ampl21(j,i)))  
+            ! ##########################--S44--##########################   
+            mueller(j,i,16) =     real(ampl22(j,i)*conjg(ampl11(j,i)) - &
+                                       ampl12(j,i)*conjg(ampl21(j,i)))     
+            
+            
+         end do
+      end do
+
+   end subroutine
+
    subroutine cache_job(vert_in,                    & ! unrotated vertices
                         face_ids,                   & ! face ids
                         num_face_vert,              & ! num vertices per face
