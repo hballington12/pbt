@@ -163,6 +163,8 @@ job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
 job_params%scaling = .false.
+job_params%beta_lims = (/0D0,360D0/)
+job_params%gamma_lims = (/0D0,360D0/)
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -692,13 +694,57 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             i = i + 1 ! update counter to read the rotation method
             call get_command_argument(i,arg,status=my_status)
             if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "tri_edge"'
+                print*,'error: no option found for "time_limit"'
                 stop
             else
                 read(arg,*) job_params%time_limit
                 print*,'job_params%time_limit: ', job_params%time_limit,' hours'
             end if  
 
+        case ('-beta_min')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "beta_min"'
+                stop
+            else
+                read(arg,*) job_params%beta_lims(1)
+                print*,'job_params%beta_lims(1): ', job_params%beta_lims(1)
+            end if  
+
+        case ('-beta_max')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "beta_max"'
+                stop
+            else
+                read(arg,*) job_params%beta_lims(2)
+                print*,'job_params%beta_lims(2): ', job_params%beta_lims(2)
+            end if  
+
+        case ('-gamma_min')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "gamma_min"'
+                stop
+            else
+                read(arg,*) job_params%gamma_lims(1)
+                print*,'job_params%gamma_lims(1): ', job_params%gamma_lims(1)
+            end if  
+
+        case ('-gamma_max')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "gamma_max"'
+                stop
+            else
+                read(arg,*) job_params%gamma_lims(2)
+                print*,'job_params%gamma_lims(2): ', job_params%gamma_lims(2)
+            end if 
+            
         case default ! if argument was unrecognised
             print '(2a, /)', 'unrecognised command-line option: ', arg
             stop
@@ -822,10 +868,12 @@ subroutine init_loop(   alpha_vals, &
     if (intellirot) then
 
         print*,'number of orientations:',num_orients
-        num_angles = floor(num_orients**(1d0/3d0))
+        num_angles = floor(sqrt(real(num_orients)))
         print*,'number of intelligent euler angles:',num_angles
-        leftover_angles = num_orients - num_angles**3
+        leftover_angles = num_orients - num_angles**2
         print*,'number of (leftover) random euler angles: ',leftover_angles
+
+        ! stop
 
         allocate(intelli_vals(1:num_angles)) ! allocate array to hold intelligent euler angles
         if(num_angles .eq. 1) then
@@ -837,31 +885,30 @@ subroutine init_loop(   alpha_vals, &
                 ! print*,'intelli_vals(i)',intelli_vals(i)
             end do
         end if
-
+        ! stop
         ! loop through and assign intelligent angles
         counter = 0
-        do i = 1, num_angles
-            do j = 1,num_angles
-                do k = 1,num_angles
-                    counter = counter + 1 ! count how many orientations we have set up
-                    alpha_vals(counter) = intelli_vals(i)
-                    beta_vals(counter) = intelli_vals(j)
-                    gamma_vals(counter) = intelli_vals(k)
+        do j = 1,num_angles
+            do k = 1,num_angles
+                counter = counter + 1 ! count how many orientations we have set up
+                alpha_vals(counter) = 0D0
+                beta_vals(counter) = intelli_vals(j)
+                gamma_vals(counter) = intelli_vals(k)
 
-                end do
             end do
         end do
-
+        ! stop
         ! fix numerical errors with a very small amount of extra rotation
         alpha_vals(1:counter) = abs(alpha_vals(1:counter) - 0.0001)
         beta_vals(1:counter) = abs(beta_vals(1:counter) - 0.0001)
         gamma_vals(1:counter) = abs(gamma_vals(1:counter) - 0.0001)
-
+        ! stop
         ! fill in remainining angles with random numbers
         do i = 1, leftover_angles
             counter = counter + 1
             call random_number(rand)
             alpha_vals(counter) = rand
+            alpha_vals(counter) = 0D0
             call random_number(rand)
             beta_vals(counter) = rand
             call random_number(rand)
@@ -875,11 +922,29 @@ subroutine init_loop(   alpha_vals, &
 
     else
         do i = 1, size(alpha_vals,1) ! loop here so that the angles are reproducable regardless of number of orientations
-            call random_number(alpha_vals(i))
+            ! random alpha value
+            ! call random_number(alpha_vals(i))
+            ! for random orientation, alpha has no effect on the 1d patterns, so set it to a constant
+            alpha_vals(i) = 0D0
             call random_number(beta_vals(i))
             call random_number(gamma_vals(i))
         end do
     end if
+
+    ! scaling
+
+    beta_vals = beta_vals * &
+        (job_params%beta_lims(2) - job_params%beta_lims(1))/180D0 + & ! scale it back if needed
+        job_params%beta_lims(1)/180D0 ! shift it to minimum point
+
+        ! print*,'scaling factor: ',(job_params%beta_lims(2) - job_params%beta_lims(1))/360D0     
+        ! print*,'scaling shift: ',job_params%beta_lims(1)/360D0
+        
+    gamma_vals = gamma_vals * &
+        (job_params%gamma_lims(2) - job_params%gamma_lims(1))/360D0 + & ! scale it back if needed
+        job_params%gamma_lims(1)/360D0 ! shift it to minimum point
+
+        ! stop
 
     end subroutine
 
@@ -1362,7 +1427,7 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         rand = alpha_vals(loop_index)    
         eulers(1) = 2*pi*(rand)
 
-        rand = beta_vals(loop_index) 
+        rand = beta_vals(loop_index) ! unscaled by job limits
         eulers(2) = acos(1.0 - 2.0*rand)
 
         rand = gamma_vals(loop_index) 

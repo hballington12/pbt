@@ -22,7 +22,7 @@ subroutine mpi_send_sum(ierr,                       & ! mpi parameter
                         output_parameters_total)      ! output parameters total for each process
 
     ! sends all stuff to rank 0 process, which then sums
-
+ 
     real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d_total ! phi-integrated mueller matrices
     real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller_total ! mueller matrices
     type(output_parameters_type), intent(inout) :: output_parameters_total
