@@ -1357,7 +1357,7 @@
             ! var2 is what is to be concatenated on to
             ! version for integer arrays
             
-            integer, dimension(:,:), allocatable, intent(inout) :: var1
+            integer, dimension(:,:), allocatable, intent(in) :: var1
             integer, dimension(:,:), allocatable, intent(inout) :: var2
             
             integer, dimension(:,:), allocatable :: var1_temp
@@ -1421,7 +1421,7 @@
             ! var2 is what is to be concatenated on to
             ! version for real arrays
             
-            real(8), dimension(:,:), allocatable, intent(inout) :: var1
+            real(8), dimension(:,:), allocatable, intent(in) :: var1
             real(8), dimension(:,:), allocatable, intent(inout) :: var2
             
             real(8), dimension(:,:), allocatable :: var1_temp
@@ -1485,7 +1485,7 @@
             ! var2 is what is to be concatenated on to
             ! version for complex arrays
             
-            complex(8), dimension(:,:), allocatable, intent(inout) :: var1
+            complex(8), dimension(:,:), allocatable, intent(in) :: var1
             complex(8), dimension(:,:), allocatable, intent(inout) :: var2
             
             complex(8), dimension(:,:), allocatable :: var1_temp

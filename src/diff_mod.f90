@@ -797,6 +797,7 @@ module diff_mod
         !$OMP DO
         do j = 1, beam_outbeam_tree_counter
 
+            ! print*,'j',j
             ! progressReal = j*100/beam_outbeam_tree_counter          ! percent completion
             ! if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
             !     progressInt = int(progressReal)           ! update progress counter
@@ -811,6 +812,23 @@ module diff_mod
             ! get far-field contribution from this outbeam
             call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
         
+            if(any(isnan(abs(amplC11s)))) then
+                print*,'OH DEAR: ',j
+                stop
+            end if
+            if(any(isnan(abs(amplC12s)))) then
+                print*,'OH DEAR: ',j
+                stop
+            end if
+            if(any(isnan(abs(amplC21s)))) then
+                print*,'OH DEAR: ',j
+                stop
+            end if
+            if(any(isnan(abs(amplC22s)))) then
+                print*,'OH DEAR: ',j
+                stop
+            end if                                    
+
             !$OMP CRITICAL
             ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
             ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))

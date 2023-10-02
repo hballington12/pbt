@@ -1271,6 +1271,7 @@ complex(8) refl_ampl(1:2,1:2), trans_ampl(1:2,1:2)
 real(8) alpha, A, B
 real(8) a_vec(1:3), b_vec(1:3), c_vec(1:3)
 real(8) intensity_in, intensity_abs, intensity_out
+! real(8) start, finish
 
 ! allocations
 allocate(sufficientlyIlluminated2(1:size(sufficientlyIlluminated,1)))
@@ -1298,9 +1299,9 @@ maxIlluminatedFacets_ps = 0
 totalIlluminatedApertures = 0
 rotationMatrices = 0
 
-! print*,'inside beam recursion: real(ampl(1,2,4418))',real(ampl(1,2,4418))
+! start = omp_get_wtime()
 
-! perform prescan to determine shape of arrays
+! perform prescan to determine shape of arrays (removed)
 prescan = .true.
 do i = 1, num_sufficiently_illuminated_apertures
     aperture_id = sufficiently_illuminated_indices(i)
@@ -1334,6 +1335,8 @@ end do
 
 ! prescan complete, now we know the sizes to allocate for arrays
 
+! maxIlluminatedFacets_ps = size(Face1,1) ! override prescan
+
 ! get total number of illuminating apertures
 sum_suff_ill = 0 
 do i = 1,size(sufficientlyIlluminated,1)
@@ -1344,6 +1347,7 @@ end do
 
 ! print*,'sufficientlyIlluminated',sufficientlyIlluminated
 ! stop
+
 
 ! allocations
 allocate(vk91Int(1:maxIlluminatedFacets_ps,1:sum_suff_ill))
@@ -1642,6 +1646,10 @@ do i = 1, num_sufficiently_illuminated_apertures
 
 end do
 
+! finish = omp_get_wtime()
+
+! print'(A,f16.8,A)',"total beam time elapsed: ",finish-start," secs"
+
 ! stop
 
 end subroutine
@@ -1690,21 +1698,21 @@ logical, intent(in) :: is_multithreaded
 real(8), dimension(:,:,:), allocatable :: propagationVectors2
 real(8), dimension(:,:,:), allocatable :: propagationVectors3
 real(8), dimension(:,:), allocatable :: vk91Int2, vk92Int2, vk93Int2
-real(8), dimension(:), allocatable :: vk91Int1, vk92Int1, vk93Int1
+! real(8), dimension(:), allocatable :: vk91Int1, vk92Int1, vk93Int1
 complex(8), dimension(:,:), allocatable :: trans_ampl_out11_2, trans_ampl_out12_2, trans_ampl_out21_2, trans_ampl_out22_2
-complex(8), dimension(:), allocatable :: trans_ampl_out11_1, trans_ampl_out12_1, trans_ampl_out21_1, trans_ampl_out22_1
+! complex(8), dimension(:), allocatable :: trans_ampl_out11_1, trans_ampl_out12_1, trans_ampl_out21_1, trans_ampl_out22_1
 complex(8), dimension(:,:), allocatable :: refl_ampl_out11_2, refl_ampl_out12_2, refl_ampl_out21_2, refl_ampl_out22_2
 complex(8), dimension(:,:), allocatable :: refl_ampl_out11_3, refl_ampl_out12_3, refl_ampl_out21_3, refl_ampl_out22_3
 real(8), dimension(:,:), allocatable :: vk71Int2, vk72Int2, vk73Int2
 real(8), dimension(:,:), allocatable :: vk71Int3, vk72Int3, vk73Int3
-real(8), dimension(:), allocatable :: vk71Int1, vk72Int1, vk73Int1
+! real(8), dimension(:), allocatable :: vk71Int1, vk72Int1, vk73Int1
 real(8), dimension(:,:), allocatable :: vk121Int2 ,vk122Int2, vk123Int2
-real(8), dimension(:), allocatable :: vk121Int1 ,vk122Int1, vk123Int1
+! real(8), dimension(:), allocatable :: vk121Int1 ,vk122Int1, vk123Int1
 integer, dimension(:,:), allocatable :: FInt2
 integer, dimension(:,:), allocatable :: FInt3
-integer, dimension(:), allocatable :: FInt1
+! integer, dimension(:), allocatable :: FInt1
 integer, dimension(:,:), allocatable :: InteractionInt2
-integer, dimension(:), allocatable :: InteractionInt1
+! integer, dimension(:), allocatable :: InteractionInt1
 
 integer i, j, k, m
 integer, dimension(:), allocatable :: illuminatedFaceIDs
@@ -1713,10 +1721,16 @@ real(8), dimension(:,:), allocatable :: aperturePropagationVectors
 logical, dimension(:), allocatable :: sufficientlyIlluminated
 complex(8), dimension(:,:,:), allocatable :: ampl
 real(8), dimension(:), allocatable :: vk71, vk72, vk73
-integer FTemp, counter
-integer, dimension(:), allocatable :: illuminated_apertures_temp
-integer, dimension(:), allocatable :: unique_illuminated_apertures
-logical, dimension(:), allocatable :: FInt1_mask
+! integer FTemp, counter
+! integer, dimension(:), allocatable :: illuminated_apertures_temp
+! integer, dimension(:), allocatable :: unique_illuminated_apertures
+! logical, dimension(:), allocatable :: FInt1_mask
+real(8), dimension(:), allocatable :: remaining_aperture_energy
+! integer(8) my_aperture_id
+real(8) start, finish
+logical is_first_beam_back ! whether or not this is the first loop iteration back
+
+! start = omp_get_wtime()
 
 ! allocations
 allocate(illuminatedFaceIDs(1:size(F1Mapping,1))) ! allocate array to hold each column of the Face1 Mappings
@@ -1727,253 +1741,97 @@ allocate(vk72(1:size(Face2,1))) ! e-perp direction
 allocate(vk73(1:size(Face2,1))) ! e-perp direction
 allocate(aperturePropagationVectors(1:size(propagationVectors,1),1:3)) ! propagation vectors for each internal field
 allocate(sufficientlyIlluminated(1:size(propagationVectors,1)))
+allocate(remaining_aperture_energy(1:size(propagationVectors,1))) ! energy remaining across each aperture
 
 do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previous recursion
-    illuminatedFaceIDs(1:size(F1Mapping,1)) = F1Mapping(1:size(F1Mapping,1),i) ! extract the column
-    isWithinBeam = .false. ! initialise
-    ampl = 0 ! initialise
-    vk71 = 0 ! initialise
-    vk72 = 0 ! initialise
-    vk73 = 0 ! initialise
-    do j = 1, size(illuminatedFaceIDs,1) ! loop through face IDs
-        if(illuminatedFaceIDs(j) .gt. 0) then ! if face was illuminated (had to change to 0 from nan vs. Matlab code)
-            isWithinBeam(illuminatedFaceIDs(j)) = .true. ! set visible
-            ampl(1,1,illuminatedFaceIDs(j)) = refl_ampl_out11Int(j,i)
-            ampl(1,2,illuminatedFaceIDs(j)) = refl_ampl_out12Int(j,i)
-            ampl(2,1,illuminatedFaceIDs(j)) = refl_ampl_out21Int(j,i)
-            ampl(2,2,illuminatedFaceIDs(j)) = refl_ampl_out22Int(j,i)
-            vk71(illuminatedFaceIDs(j)) = vk71Int(j,i)
-            vk72(illuminatedFaceIDs(j)) = vk72Int(j,i)
-            vk73(illuminatedFaceIDs(j)) = vk73Int(j,i)
-        end if
-    end do
-    aperturePropagationVectors = 0 ! initialise
-    sufficientlyIlluminated = .false. ! initialise
-    do j = 1, size(propagationVectors,1) ! for each aperture
-        aperturePropagationVectors(j,1) = propagationVectors(j,1,i) ! retrieve propagation vector
-        aperturePropagationVectors(j,2) = propagationVectors(j,2,i)
-        aperturePropagationVectors(j,3) = propagationVectors(j,3,i)
-        if(sum(abs(aperturePropagationVectors(j,1:3))) .gt. 0.00001) sufficientlyIlluminated(j) = .true. ! bit of a bodge since cant do nans in fortran
-        ! print*,'aperture: ',j,' sufficientlyIlluminated: ',sufficientlyIlluminated(j)
-    end do
 
-    ! gonna try and put all inputs to the beam_recursion loop into a structure with global counter
+    is_first_beam_back = .false. ! init
+
+    ! step 1: retrieve the parameters needed to propagate the next set of beams
+    ! ampl, vk71, vk72, vk73, isWithinBeam, aperturePropagationVectors, sufficientlyIlluminated
+
+    call get_beam_params(   F1Mapping,                      & ! <-  the face IDs of all illuminated faces from all beams of the previous recursion
+                            isWithinBeam,                   & ! <-> logical array of the faces illuminated by beam i from the previous recursion
+                            ampl,                           & ! <-> amplitude matrix of the faces illuminated by beam i from the previous recursion
+                            vk71,                           & ! <-> e-perp x component of the faces illuminated by beam i from the previous recursion
+                            vk72,                           & ! <-> e-perp y component of the faces illuminated by beam i from the previous recursion
+                            vk73,                           & ! <-> e-perp z component of the faces illuminated by beam i from the previous recursion
+                            aperturePropagationVectors,     & ! <-> propagation vectors of all apertures illuminated by beam i from the previous recursion
+                            sufficientlyIlluminated,        & ! <-> logical array of the apertures which were sufficiently illuminated by beam i from the previous recursion
+                            propagationVectors,             & ! <-  the propagation vectors of all apertures for all beams from the previous recursion
+                            i,                              & ! <-  the beam number from the previous recursion that we wish to propagate the reflected beams of
+                            illuminatedFaceIDs,             & ! <-> the face IDs of all illuminated faces from beam i of the previous recursion
+                            refl_ampl_out11Int,             & ! <-  the amplitude matrix (1,1) of all illuminated faces from all beams of the previous recursion
+                            refl_ampl_out12Int,             & ! <-  the amplitude matrix (1,2) of all illuminated faces from all beams of the previous recursion
+                            refl_ampl_out21Int,             & ! <-  the amplitude matrix (2,1) of all illuminated faces from all beams of the previous recursion
+                            refl_ampl_out22Int,             & ! <-  the amplitude matrix (2,2) of all illuminated faces from all beams of the previous recursion
+                            vk71Int, vk72Int, vk73Int)        ! <-  the e-perp components of all illuminated faces from all beams of the previous recursion
+
+    ! step 2: propagate the next set of beams (all apertures illuminated by a beam from the previous recursion)
 
     ! call beam recursion
-    call beam_recursion(    sufficientlyIlluminated, &
-                            aperturePropagationVectors, apertureMidpoints, apertureNormals, &
-                            verts, Norm, midPoints, Face1, Face2, &
-                            isWithinBeam, &
-                            apertures, &
-                            faceAreas, &
-                            threshold, &
-                            rbi, ibi, waveno, &
-                            vk71, vk72, vk73, &
-                            ampl, &
-                            propagationVectors2, &
-                            vk91Int2, vk92Int2, vk93Int2, &
-                            trans_ampl_out11_2, trans_ampl_out12_2, trans_ampl_out21_2, trans_ampl_out22_2, &
-                            refl_ampl_out11_2, refl_ampl_out12_2, refl_ampl_out21_2, refl_ampl_out22_2, &
-                            vk71Int2 ,vk72Int2, vk73Int2, &
-                            vk121Int2 ,vk122Int2, vk123Int2, &
-                            FInt2, &
-                            is_multithreaded)   
+    call beam_recursion(    sufficientlyIlluminated,                & ! <-  logical array of which apertures were sufficiently illuminated by beam i from the previous recursion
+                            aperturePropagationVectors,             & ! <-  propagation vectors of all apertures illuminated by beam i from the previous recursion
+                            apertureMidpoints,                      & ! <-  midpoints of apertures
+                            apertureNormals,                        & ! <-  average normals of apertures
+                            verts, Norm, midPoints, Face1, Face2,   & ! <-  particle vertices, normals, midpoints, face ids, normal ids
+                            isWithinBeam,                           & ! <-  logical array of the faces illuminated by beam i from the previous recursion
+                            apertures,                              & ! <-  which aperture each face belongs to
+                            faceAreas,                              & ! <-  area of each face
+                            threshold,                              & ! <-  threshold illuminated area, under which new beams will not propagate
+                            rbi, ibi, waveno,                       & ! <-  input parameters
+                            vk71, vk72, vk73,                       & ! <-  e-perp components of the faces illuminated by beam i from the previous recursion
+                            ampl,                                   & ! <-  amplitude matrix of the faces illuminated by beam i from the previous recursion
+                            propagationVectors2,                    & !  -> the propagation vectors of all apertures illuminated from this recursion
+                            vk91Int2, vk92Int2, vk93Int2,           & !  -> the reflected propagation direction components at all faces illuminated from this recursion
+                            trans_ampl_out11_2,                     & !  -> the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
+                            trans_ampl_out12_2,                     & !  -> the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
+                            trans_ampl_out21_2,                     & !  -> the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
+                            trans_ampl_out22_2,                     & !  -> the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
+                            refl_ampl_out11_2,                      & !  -> the reflected amplitude matrix (1,1) at all faces illuminated from this recursion
+                            refl_ampl_out12_2,                      & !  -> the reflected amplitude matrix (1,2) at all faces illuminated from this recursion
+                            refl_ampl_out21_2,                      & !  -> the reflected amplitude matrix (2,1) at all faces illuminated from this recursion
+                            refl_ampl_out22_2,                      & !  -> the reflected amplitude matrix (2,2) at all faces illuminated from this recursion
+                            vk71Int2 ,vk72Int2, vk73Int2,           & !  -> the e-perp components of all faces illuminated from this recursion
+                            vk121Int2 ,vk122Int2, vk123Int2,        & !  -> the transmitted propagation direction components at all faces illuminated from this recursion
+                            FInt2,                                  & !  -> the face IDs of all faces illuminated from this recursion
+                            is_multithreaded)                         ! <-  whether or not the beam recursion should use multithreaded operations (currently disabled)
 
+    ! step 3: keep track of the different interaction numbers (optional)
 
-    ! sort interactionOut array - bit messy but seems to do the job
-    ! allocate an array to hold the interaction counter
-    if(allocated(InteractionInt2)) deallocate(InteractionInt2)
-    allocate(InteractionInt2(1:size(FInt2,1),1:size(FInt2,2)))
-    InteractionInt2 = -1 ! init
+    call get_interaction(   InteractionInt2,    & ! the interaction number of each illuminated face at this recursion
+                            FInt2,              & ! the face IDs of all faces illuminated from this recursion
+                            apertures,          & ! which aperture each face belongs to
+                            interactionCounter)   ! total number of interactions so far
 
+    ! step 4: add outgoing rays to the outbeam tree
 
-    do j = 1, size(FInt2,2) ! for each illuminating aperture
-        counter = 0 ! init counter
-        do k = 1, size(FInt2,1) ! for each of the illuminated facets
-            FTemp = FInt2(k,j) ! get the illuminated face ID
-            if(FTemp .ne. 0) then ! if there was an illuminated face (0 is assumed as padding)
-                counter = counter + 1 ! count the number of illluminated facets for this illuminating aperture
-            end if
-        end do
-        ! print*,'column:',j,'had:',counter,' illuminated facets'
-        if(counter .gt. 0) then ! skip if no illuminated facets
-            if(allocated(illuminated_apertures_temp)) deallocate(illuminated_apertures_temp)
-            allocate(illuminated_apertures_temp(1:counter))
-            do k = 1, size(FInt2,1) ! for each of the illuminated facets
-                FTemp = FInt2(k,j) ! get the illuminated face ID
-                if(FTemp .ne. 0) then ! if there was an illuminated face (0 is assumed as padding)
-                    illuminated_apertures_temp(k) = apertures(FTemp)
-                end if
-            end do
-            call unique_int(illuminated_apertures_temp,unique_illuminated_apertures) ! get an array containing unique illuminated apertures
-            ! print*,'unique_illuminated_apertures',unique_illuminated_apertures
-            do k = 1, size(unique_illuminated_apertures,1) ! for each unique ill. aperture
-                interactionCounter = interactionCounter + 1 ! update interaction counter
-                do m = 1, size(FInt2,1) ! for each illuminated facet
-                    FTemp = FInt2(m,j) ! get the illuminated face ID
-                    if(FTemp .ne. 0) then
-                        if(apertures(FTemp) .eq. unique_illuminated_apertures(k)) InteractionInt2(m,j) = interactionCounter
-                    end if
-                end do
-            end do
-        end if
-    end do
+    call add_to_outbeam_tree(   FInt2,                              & ! <-  the face IDs of all faces illuminated from this recursion
+                                beam_outbeam_tree_counter,          & ! <-> total number of entries in outbeam tree
+                                beam_outbeam_tree,                  & ! <-> outbeam tree
+                                trans_ampl_out11_2,                 & ! <-  the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
+                                trans_ampl_out12_2,                 & ! <-  the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
+                                trans_ampl_out21_2,                 & ! <-  the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
+                                trans_ampl_out22_2,                 & ! <-  the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
+                                vk71Int2, vk72Int2, vk73Int2,       & ! <-  the e-perp components of all faces illuminated from this recursion
+                                vk121Int2, vk122Int2, vk123Int2,    & ! <-  the transmitted propagation direction components at all faces illuminated from this recursion
+                                vk91Int2, vk92Int2, vk93Int2,       & ! <-  the reflected propagation direction components at all faces illuminated from this recursion
+                                InteractionInt2)                      ! <-  the interaction number of each illuminated face at this recursion
 
-    ! do j = 1, size(FInt2,1) ! for each row
-    !     print'(A,I,A,I,I,I)','j',j,'InteractionInt2(j,1:3)',InteractionInt2(j,1),InteractionInt2(j,2),InteractionInt2(j,3)
-    ! end do
+    ! step 5: stitch together some arrays for use in the next recursion of the beam loop
 
-    ! allocations for some array reshaping
-    if(allocated(vk91Int1)) deallocate(vk91Int1)
-    if(allocated(vk92Int1)) deallocate(vk92Int1)
-    if(allocated(vk93Int1)) deallocate(vk93Int1)
-    if(allocated(vk71Int1)) deallocate(vk71Int1)
-    if(allocated(vk72Int1)) deallocate(vk72Int1)
-    if(allocated(vk73Int1)) deallocate(vk73Int1)    
-    if(allocated(vk121Int1)) deallocate(vk121Int1)
-    if(allocated(vk122Int1)) deallocate(vk122Int1)
-    if(allocated(vk123Int1)) deallocate(vk123Int1)
-    if(allocated(FInt1)) deallocate(FInt1)
-    if(allocated(InteractionInt1)) deallocate(InteractionInt1)
-    if(allocated(trans_ampl_out11_1)) deallocate(trans_ampl_out11_1)
-    if(allocated(trans_ampl_out12_1)) deallocate(trans_ampl_out12_1)
-    if(allocated(trans_ampl_out21_1)) deallocate(trans_ampl_out21_1)
-    if(allocated(trans_ampl_out22_1)) deallocate(trans_ampl_out22_1)    
-    allocate(vk91Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(vk92Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(vk93Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(vk71Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(vk72Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(vk73Int1(1:size(FInt2,1)*size(FInt2,2)))  
-    allocate(vk121Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(vk122Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(vk123Int1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(FInt1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(InteractionInt1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(trans_ampl_out11_1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(trans_ampl_out12_1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(trans_ampl_out21_1(1:size(FInt2,1)*size(FInt2,2)))
-    allocate(trans_ampl_out22_1(1:size(FInt2,1)*size(FInt2,2)))  
+    if(.not. allocated(vk71Int3)) is_first_beam_back = .true. ! determine whether this is the first beam back (multithreading support)
 
-
-    ! shape and assign to the 1D arrays
-    vk91Int1 = reshape(vk91Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk92Int1 = reshape(vk92Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk93Int1 = reshape(vk93Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk71Int1 = reshape(vk71Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk72Int1 = reshape(vk72Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk73Int1 = reshape(vk73Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk121Int1 = reshape(vk121Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk122Int1 = reshape(vk122Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    vk123Int1 = reshape(vk123Int2,(/size(FInt2,1)*size(FInt2,2)/))
-    FInt1 = reshape(FInt2,(/size(FInt2,1)*size(FInt2,2)/))
-    InteractionInt1 = reshape(InteractionInt2,(/size(FInt2,1)*size(FInt2,2)/))
-    trans_ampl_out11_1 = reshape(trans_ampl_out11_2,(/size(FInt2,1)*size(FInt2,2)/))
-    trans_ampl_out12_1 = reshape(trans_ampl_out12_2,(/size(FInt2,1)*size(FInt2,2)/))
-    trans_ampl_out21_1 = reshape(trans_ampl_out21_2,(/size(FInt2,1)*size(FInt2,2)/))
-    trans_ampl_out22_1 = reshape(trans_ampl_out22_2,(/size(FInt2,1)*size(FInt2,2)/))
-
-    ! do j = 1, size(vk91Int1,1)
-    !     print*,j,InteractionInt1(j,1)
-    ! end do
-
-    ! trim 1D arrays to account for padding (using -1 entires in FInt1)
-    ! first, create logical mask using FInt1 (0 = false, else = true)
-    if(allocated(FInt1_mask)) deallocate(FInt1_mask)
-    allocate(FInt1_mask(1:size(FInt1,1)))
-    FInt1_mask = .true. ! init as true
-    do j = 1,size(FInt1,1) ! if padding detected
-        if(FInt1(j) .eq. 0) FInt1_mask(j) = .false. ! set false
-        ! print*,j,FInt1_mask(j)
-    end do
-    
-    call trim_int_1d_sr1(FInt1, FInt1_mask)
-    call trim_int_1d_sr1(InteractionInt1, FInt1_mask)
-    call trim_real_1d_sr1(vk91Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk92Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk93Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk71Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk72Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk73Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk121Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk122Int1, FInt1_mask)
-    call trim_real_1d_sr1(vk123Int1, FInt1_mask)
-    call trim_complex_1d_sr1(trans_ampl_out11_1, FInt1_mask)
-    call trim_complex_1d_sr1(trans_ampl_out12_1, FInt1_mask)
-    call trim_complex_1d_sr1(trans_ampl_out21_1, FInt1_mask)
-    call trim_complex_1d_sr1(trans_ampl_out22_1, FInt1_mask)
-
-    ! add stuff to outbeam_tree
-    !print*,'adding to outbeam tree, starting at:',beam_outbeam_tree_counter,' outbeams'
-    do j = 1, size(FInt1,1)
-        beam_outbeam_tree_counter = beam_outbeam_tree_counter + 1
-        if(beam_outbeam_tree_counter .gt. size(beam_outbeam_tree,1)) then
-            print*,'error: need more space in outbeam_tree. please increase in sr init'
-        end if
-        ! print*,j,FInt1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(1,1) = trans_ampl_out11_1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(1,2) = trans_ampl_out12_1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(2,1) = trans_ampl_out21_1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(2,2) = trans_ampl_out22_1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(1) = vk71Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(2) = vk72Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(3) = vk73Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(1) = vk121Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(2) = vk122Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(3) = vk123Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(1) = vk91Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(2) = vk92Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(3) = vk93Int1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%FOut = FInt1(j)
-        beam_outbeam_tree(beam_outbeam_tree_counter)%interactionOut = InteractionInt1(j)
-    end do
-    !print*,'finished adding to outbeam tree, ending at:',beam_outbeam_tree_counter,' outbeams'
-
-    ! test
-    ! if(i .gt. 1) then
-    !     print*,'test: ',maxval(real(refl_ampl_out11_2))
-    !     stop
-    ! end if
-
-    ! now do some sleight manipulation on arrays for next recursion
-    if(i .gt. 1) then ! (nothing to concatenate if i = 1)
-        call cat_int_var(FInt2, FInt3)
-        call cat_real_var(vk71Int2, vk71Int3)
-        call cat_real_var(vk72Int2, vk72Int3)
-        call cat_real_var(vk73Int2, vk73Int3)
-        call cat_complex_var(refl_ampl_out11_2, refl_ampl_out11_3)
-        call cat_complex_var(refl_ampl_out12_2, refl_ampl_out12_3)
-        call cat_complex_var(refl_ampl_out21_2, refl_ampl_out21_3)
-        call cat_complex_var(refl_ampl_out22_2, refl_ampl_out22_3)
-        call cat_prop(propagationVectors2, propagationVectors3) ! concatenate propagation vectors
-    end if
-
-    ! init v3 variables
-    if(i .eq. 1) then
-
-
-        if(allocated(vk71Int3)) deallocate(vk71Int3)
-        if(allocated(vk72Int3)) deallocate(vk72Int3)
-        if(allocated(vk73Int3)) deallocate(vk73Int3)
-        if(allocated(FInt3)) deallocate(FInt3)
-        if(allocated(refl_ampl_out11_3)) deallocate(refl_ampl_out11_3)
-        if(allocated(refl_ampl_out12_3)) deallocate(refl_ampl_out12_3)
-        if(allocated(refl_ampl_out21_3)) deallocate(refl_ampl_out21_3)
-        if(allocated(refl_ampl_out22_3)) deallocate(refl_ampl_out22_3)
-        allocate(vk71Int3(1:size(FInt2,1)*size(FInt2,2),1:1))
-        allocate(vk72Int3(1:size(FInt2,1)*size(FInt2,2),1:1))
-        allocate(vk73Int3(1:size(FInt2,1)*size(FInt2,2),1:1))  
-        allocate(refl_ampl_out11_3(1:size(FInt2,1)*size(FInt2,2),1:1))
-        allocate(refl_ampl_out12_3(1:size(FInt2,1)*size(FInt2,2),1:1))
-        allocate(refl_ampl_out21_3(1:size(FInt2,1)*size(FInt2,2),1:1))
-        allocate(refl_ampl_out22_3(1:size(FInt2,1)*size(FInt2,2),1:1))  
-        allocate(FInt3(1:size(FInt2,1)*size(FInt2,2),1:1))
-
-
-
-
-
-
+    ! ! init v3 variables
+    if(is_first_beam_back) then ! if its the first beam back, we need to allocate first
+        allocate(vk71Int3(1:size(FInt2,1),size(FInt2,2)))
+        allocate(vk72Int3(1:size(FInt2,1),size(FInt2,2)))
+        allocate(vk73Int3(1:size(FInt2,1),size(FInt2,2)))  
+        allocate(refl_ampl_out11_3(1:size(FInt2,1),size(FInt2,2)))
+        allocate(refl_ampl_out12_3(1:size(FInt2,1),size(FInt2,2)))
+        allocate(refl_ampl_out21_3(1:size(FInt2,1),size(FInt2,2)))
+        allocate(refl_ampl_out22_3(1:size(FInt2,1),size(FInt2,2)))  
+        allocate(FInt3(1:size(FInt2,1),size(FInt2,2)))
         FInt3 = FInt2 ! keep track, ready to be concatenated to on the next loop
         vk71Int3 = vk71Int2
         vk72Int3 = vk72Int2
@@ -1983,29 +1841,22 @@ do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previo
         refl_ampl_out21_3 = refl_ampl_out21_2
         refl_ampl_out22_3 = refl_ampl_out22_2
         propagationVectors3 = propagationVectors2       
+    else
+        call cat_int_var(FInt2, FInt3)
+        call cat_real_var(vk71Int2, vk71Int3)
+        call cat_real_var(vk72Int2, vk72Int3)
+        call cat_real_var(vk73Int2, vk73Int3)
+        call cat_complex_var(refl_ampl_out11_2, refl_ampl_out11_3)
+        call cat_complex_var(refl_ampl_out12_2, refl_ampl_out12_3)
+        call cat_complex_var(refl_ampl_out21_2, refl_ampl_out21_3)
+        call cat_complex_var(refl_ampl_out22_2, refl_ampl_out22_3)
+        call cat_prop(propagationVectors2, propagationVectors3) ! concatenate propagation vectors
+        ! stop
     end if
-
-
-
-
-    ! open(10,file="test.txt")
-    ! do j = 1, size(FInt,1)
-    !    ! if(isShadow(i)) then
-    !    !     write(10,'(i1)') 1
-    !    ! else
-    !    !     write(10,'(i1)') 0
-    !    ! end if
-    !    ! write(10,'(f12.8,f12.8,f12.8)') imag(refl_ampl_out21_2(j,1)), imag(refl_ampl_out21_2(j,2)), imag(refl_ampl_out21_2(j,3))
-    !    write(10,'(f12.8,f12.8,f12.8)') vk123Int(j,1),vk123Int(j,2),vk123Int(j,3)
-    ! end do
-    ! close(10)
-
-
-    ! print*,'back from beam_recursion'
-    ! unfinished...
 
 end do
 
+! stop
 
 deallocate(F1Mapping)
 deallocate(vk71Int)
@@ -2048,6 +1899,13 @@ refl_ampl_out21Int(1:size(refl_ampl_out21_3,1),1:size(refl_ampl_out21_3,2)) = re
 refl_ampl_out22Int(1:size(refl_ampl_out22_3,1),1:size(refl_ampl_out22_3,2)) = refl_ampl_out22_3(1:size(refl_ampl_out22_3,1),1:size(refl_ampl_out22_3,2))
 propagationVectors(1:size(propagationVectors3,1),1:size(propagationVectors3,2),1:size(propagationVectors3,3)) = &
     propagationVectors3(1:size(propagationVectors3,1),1:size(propagationVectors3,2),1:size(propagationVectors3,3))
+
+! stop
+
+! finish = omp_get_wtime()
+
+! print*,'=========='
+! print'(A,f16.8,A)',"total time elapsed: ",finish-start," secs"
 
 ! stop
 
@@ -3784,5 +3642,184 @@ ext_cross_section = 0 ! test
 ! print*,'========== end sr init'
 
 end subroutine
+
+subroutine get_beam_params( F1Mapping, &
+                            isWithinBeam, &
+                            ampl, &
+                            vk71, &
+                            vk72, &
+                            vk73, &
+                            aperturePropagationVectors, &
+                            sufficientlyIlluminated, &
+                            propagationVectors, &
+                            i, &
+                            illuminatedFaceIDs, &
+                            refl_ampl_out11Int, &
+                            refl_ampl_out12Int, &
+                            refl_ampl_out21Int, &
+                            refl_ampl_out22Int, &
+                            vk71Int, vk72Int, vk73Int)
+
+real(8), dimension(:,:,:), allocatable, intent(in) :: propagationVectors ! propagation vector of beam emitted from each aperture
+integer, dimension(:,:), allocatable, intent(in) :: F1Mapping ! the face indices of each row of variables to go into main loop
+integer, intent(in) :: i
+complex(8), dimension(:,:), allocatable, intent(in) :: refl_ampl_out11Int ! the amplitude matrix that goes into the main loop
+complex(8), dimension(:,:), allocatable, intent(in) :: refl_ampl_out12Int ! the amplitude matrix that goes into the main loop
+complex(8), dimension(:,:), allocatable, intent(in) :: refl_ampl_out21Int ! the amplitude matrix that goes into the main loop
+complex(8), dimension(:,:), allocatable, intent(in) :: refl_ampl_out22Int ! the amplitude matrix that goes into the main loop
+real(8), dimension(:,:), allocatable, intent(in) :: vk71Int, vk72Int, vk73Int ! reflected e-perp vector
+
+logical, dimension(:), allocatable, intent(inout) :: isWithinBeam
+complex(8), dimension(:,:,:), allocatable, intent(inout) :: ampl
+real(8), dimension(:), allocatable, intent(inout) :: vk71, vk72, vk73
+real(8), dimension(:,:), allocatable, intent(inout) :: aperturePropagationVectors
+logical, dimension(:), allocatable, intent(inout) :: sufficientlyIlluminated
+integer, dimension(:), allocatable, intent(inout) :: illuminatedFaceIDs
+
+integer j
+
+    ! step 1: retrieve the parameters needed to propagate the next set of beams
+    ! ampl, vk71, vk72, vk73, isWithinBeam, aperturePropagationVectors, sufficientlyIlluminated
+
+    illuminatedFaceIDs(1:size(F1Mapping,1)) = F1Mapping(1:size(F1Mapping,1),i) ! extract the column
+    isWithinBeam = .false. ! initialise
+    ampl = 0 ! initialise
+    vk71 = 0 ! initialise
+    vk72 = 0 ! initialise
+    vk73 = 0 ! initialise
+    do j = 1, size(illuminatedFaceIDs,1) ! loop through face IDs
+        if(illuminatedFaceIDs(j) .gt. 0) then ! if face was illuminated (had to change to 0 from nan vs. Matlab code)
+            isWithinBeam(illuminatedFaceIDs(j)) = .true. ! set visible
+            ampl(1,1,illuminatedFaceIDs(j)) = refl_ampl_out11Int(j,i)
+            ampl(1,2,illuminatedFaceIDs(j)) = refl_ampl_out12Int(j,i)
+            ampl(2,1,illuminatedFaceIDs(j)) = refl_ampl_out21Int(j,i)
+            ampl(2,2,illuminatedFaceIDs(j)) = refl_ampl_out22Int(j,i)
+            vk71(illuminatedFaceIDs(j)) = vk71Int(j,i)
+            vk72(illuminatedFaceIDs(j)) = vk72Int(j,i)
+            vk73(illuminatedFaceIDs(j)) = vk73Int(j,i)
+        end if
+    end do
+    aperturePropagationVectors = 0 ! initialise
+    sufficientlyIlluminated = .false. ! initialise
+    do j = 1, size(propagationVectors,1) ! for each aperture
+        aperturePropagationVectors(j,1) = propagationVectors(j,1,i) ! retrieve propagation vector
+        aperturePropagationVectors(j,2) = propagationVectors(j,2,i)
+        aperturePropagationVectors(j,3) = propagationVectors(j,3,i)
+        ! if all propagation components arent set to 0, aperture was sufficiently illuminated
+        if(sum(abs(aperturePropagationVectors(j,1:3))) .gt. 0.00001) sufficientlyIlluminated(j) = .true. ! bit of a bodge since cant do nans in fortran
+    end do
+
+end subroutine
+
+subroutine get_interaction( InteractionInt2, &
+                            FInt2, &
+                            apertures, &
+                            interactionCounter)
+
+    integer, dimension(:,:), allocatable, intent(out) :: InteractionInt2
+    integer, dimension(:,:), allocatable, intent(in) :: FInt2
+    integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
+    integer, intent(inout) :: interactionCounter ! counts the current number of interactions
+
+    integer FTemp, counter
+    integer, dimension(:), allocatable :: illuminated_apertures_temp
+    integer, dimension(:), allocatable :: unique_illuminated_apertures
+    integer j, k, m
+
+    ! sort interactionOut array - bit messy but seems to do the job
+    ! allocate an array to hold the interaction counter
+    if(allocated(InteractionInt2)) deallocate(InteractionInt2)
+    allocate(InteractionInt2(1:size(FInt2,1),1:size(FInt2,2)))
+    InteractionInt2 = -1 ! init
+
+    do j = 1, size(FInt2,2) ! for each illuminating aperture
+        counter = 0 ! init counter
+        do k = 1, size(FInt2,1) ! for each of the illuminated facets
+            FTemp = FInt2(k,j) ! get the illuminated face ID
+            if(FTemp .ne. 0) then ! if there was an illuminated face (0 is assumed as padding)
+                counter = counter + 1 ! count the number of illluminated facets for this illuminating aperture
+            end if
+        end do
+        ! print*,'column:',j,'had:',counter,' illuminated facets'
+        if(counter .gt. 0) then ! skip if no illuminated facets
+            if(allocated(illuminated_apertures_temp)) deallocate(illuminated_apertures_temp)
+            allocate(illuminated_apertures_temp(1:counter))
+            do k = 1, size(FInt2,1) ! for each of the illuminated facets
+                FTemp = FInt2(k,j) ! get the illuminated face ID
+                if(FTemp .ne. 0) then ! if there was an illuminated face (0 is assumed as padding)
+                    illuminated_apertures_temp(k) = apertures(FTemp)
+                end if
+            end do
+            call unique_int(illuminated_apertures_temp,unique_illuminated_apertures) ! get an array containing unique illuminated apertures
+            ! print*,'unique_illuminated_apertures',unique_illuminated_apertures
+            do k = 1, size(unique_illuminated_apertures,1) ! for each unique ill. aperture
+                interactionCounter = interactionCounter + 1 ! update interaction counter
+                do m = 1, size(FInt2,1) ! for each illuminated facet
+                    FTemp = FInt2(m,j) ! get the illuminated face ID
+                    if(FTemp .ne. 0) then
+                        if(apertures(FTemp) .eq. unique_illuminated_apertures(k)) InteractionInt2(m,j) = interactionCounter
+                    end if
+                end do
+            end do
+        end if
+    end do
+
+end subroutine
+
+subroutine add_to_outbeam_tree( FInt2, &
+                                beam_outbeam_tree_counter, &
+                                beam_outbeam_tree, &
+                                trans_ampl_out11_2, &
+                                trans_ampl_out12_2, &
+                                trans_ampl_out21_2, &
+                                trans_ampl_out22_2, &
+                                vk71Int2, vk72Int2, vk73Int2, &
+                                vk121Int2, vk122Int2, vk123Int2, &
+                                vk91Int2, vk92Int2, vk93Int2, &
+                                InteractionInt2)
+
+integer, dimension(:,:), allocatable, intent(in) :: FInt2
+integer, intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
+real(8), dimension(:,:), allocatable, intent(in) :: vk71Int2, vk72Int2, vk73Int2
+real(8), dimension(:,:), allocatable, intent(in) :: vk121Int2 ,vk122Int2, vk123Int2
+real(8), dimension(:,:), allocatable, intent(in) :: vk91Int2, vk92Int2, vk93Int2
+complex(8), dimension(:,:), allocatable, intent(in) :: trans_ampl_out11_2, trans_ampl_out12_2, trans_ampl_out21_2, trans_ampl_out22_2
+integer, dimension(:,:), allocatable, intent(in) :: InteractionInt2
+
+integer j, k
+
+do j = 1, size(FInt2,2) ! looping over illuminated apertures
+    do k = 1, size(FInt2,1) ! looping over faces of the illuminated apertures
+        if(FInt2(k,j) .eq. 0) then ! if we have reached some padding
+            ! do nothing
+        else ! else, add to the outbeam tree
+            beam_outbeam_tree_counter = beam_outbeam_tree_counter + 1
+            if(beam_outbeam_tree_counter .gt. size(beam_outbeam_tree,1)) then
+                print*,'error: need more space in outbeam_tree. please increase in sr init'
+            end if
+                beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(1,1) = trans_ampl_out11_2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(1,2) = trans_ampl_out12_2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(2,1) = trans_ampl_out21_2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(2,2) = trans_ampl_out22_2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(1) = vk71Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(2) = vk72Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(3) = vk73Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(1) = vk121Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(2) = vk122Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(3) = vk123Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(1) = vk91Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(2) = vk92Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(3) = vk93Int2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%FOut = FInt2(k,j)
+                beam_outbeam_tree(beam_outbeam_tree_counter)%interactionOut = InteractionInt2(k,j)
+        end if
+    end do
+end do
+
+! print*,'finished adding to outbeam tree, ending at:',beam_outbeam_tree_counter,' outbeams'
+
+end subroutine
+
 
 end module beam_loop_mod
