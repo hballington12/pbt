@@ -1725,10 +1725,11 @@ real(8), dimension(:), allocatable :: vk71, vk72, vk73
 ! integer, dimension(:), allocatable :: illuminated_apertures_temp
 ! integer, dimension(:), allocatable :: unique_illuminated_apertures
 ! logical, dimension(:), allocatable :: FInt1_mask
-real(8), dimension(:), allocatable :: remaining_aperture_energy
+! real(8), dimension(:), allocatable :: remaining_aperture_energy
 ! integer(8) my_aperture_id
 real(8) start, finish
 logical is_first_beam_back ! whether or not this is the first loop iteration back
+integer num_req_threads ! number of required threads
 
 ! start = omp_get_wtime()
 
@@ -1741,120 +1742,243 @@ allocate(vk72(1:size(Face2,1))) ! e-perp direction
 allocate(vk73(1:size(Face2,1))) ! e-perp direction
 allocate(aperturePropagationVectors(1:size(propagationVectors,1),1:3)) ! propagation vectors for each internal field
 allocate(sufficientlyIlluminated(1:size(propagationVectors,1)))
-allocate(remaining_aperture_energy(1:size(propagationVectors,1))) ! energy remaining across each aperture
 
-do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previous recursion
+! if (is_multithreaded) then ! multi-threaded diffraction
 
-    is_first_beam_back = .false. ! init
+!     ! get desired number of threads
+!     num_req_threads = min(omp_get_max_threads(),size(F1Mapping,2))
+!     ! num_req_threads = 1
+!     !$OMP PARALLEL num_threads(num_req_threads) , PRIVATE( &
+!     !$OMP   i,is_first_beam_back,isWithinBeam,ampl,vk71,vk72,vk73, &
+!     !$OMP   aperturePropagationVectors,sufficientlyIlluminated,illuminatedFaceIDs, &
+!     !$OMP   propagationVectors2,vk91Int2, vk92Int2, vk93Int2, &
+!     !$OMP   trans_ampl_out11_2,trans_ampl_out12_2,trans_ampl_out21_2,trans_ampl_out22_2, &
+!     !$OMP   refl_ampl_out11_2,refl_ampl_out12_2,refl_ampl_out21_2,refl_ampl_out22_2, &
+!     !$OMP   vk71Int2,vk72Int2,vk73Int2,vk121Int2 ,vk122Int2, vk123Int2,FInt2 &
+!     !$OMP )
+!     !$OMP DO
+!     do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previous recursion
 
-    ! step 1: retrieve the parameters needed to propagate the next set of beams
-    ! ampl, vk71, vk72, vk73, isWithinBeam, aperturePropagationVectors, sufficientlyIlluminated
+!         is_first_beam_back = .false. ! init
 
-    call get_beam_params(   F1Mapping,                      & ! <-  the face IDs of all illuminated faces from all beams of the previous recursion
-                            isWithinBeam,                   & ! <-> logical array of the faces illuminated by beam i from the previous recursion
-                            ampl,                           & ! <-> amplitude matrix of the faces illuminated by beam i from the previous recursion
-                            vk71,                           & ! <-> e-perp x component of the faces illuminated by beam i from the previous recursion
-                            vk72,                           & ! <-> e-perp y component of the faces illuminated by beam i from the previous recursion
-                            vk73,                           & ! <-> e-perp z component of the faces illuminated by beam i from the previous recursion
-                            aperturePropagationVectors,     & ! <-> propagation vectors of all apertures illuminated by beam i from the previous recursion
-                            sufficientlyIlluminated,        & ! <-> logical array of the apertures which were sufficiently illuminated by beam i from the previous recursion
-                            propagationVectors,             & ! <-  the propagation vectors of all apertures for all beams from the previous recursion
-                            i,                              & ! <-  the beam number from the previous recursion that we wish to propagate the reflected beams of
-                            illuminatedFaceIDs,             & ! <-> the face IDs of all illuminated faces from beam i of the previous recursion
-                            refl_ampl_out11Int,             & ! <-  the amplitude matrix (1,1) of all illuminated faces from all beams of the previous recursion
-                            refl_ampl_out12Int,             & ! <-  the amplitude matrix (1,2) of all illuminated faces from all beams of the previous recursion
-                            refl_ampl_out21Int,             & ! <-  the amplitude matrix (2,1) of all illuminated faces from all beams of the previous recursion
-                            refl_ampl_out22Int,             & ! <-  the amplitude matrix (2,2) of all illuminated faces from all beams of the previous recursion
-                            vk71Int, vk72Int, vk73Int)        ! <-  the e-perp components of all illuminated faces from all beams of the previous recursion
+!         ! step 1: retrieve the parameters needed to propagate the next set of beams
 
-    ! step 2: propagate the next set of beams (all apertures illuminated by a beam from the previous recursion)
+!         call get_beam_params(   F1Mapping,                      & ! <-  the face IDs of all illuminated faces from all beams of the previous recursion
+!                                 isWithinBeam,                   & ! <-> logical array of the faces illuminated by beam i from the previous recursion
+!                                 ampl,                           & ! <-> amplitude matrix of the faces illuminated by beam i from the previous recursion
+!                                 vk71,                           & ! <-> e-perp x component of the faces illuminated by beam i from the previous recursion
+!                                 vk72,                           & ! <-> e-perp y component of the faces illuminated by beam i from the previous recursion
+!                                 vk73,                           & ! <-> e-perp z component of the faces illuminated by beam i from the previous recursion
+!                                 aperturePropagationVectors,     & ! <-> propagation vectors of all apertures illuminated by beam i from the previous recursion
+!                                 sufficientlyIlluminated,        & ! <-> logical array of the apertures which were sufficiently illuminated by beam i from the previous recursion
+!                                 propagationVectors,             & ! <-  the propagation vectors of all apertures for all beams from the previous recursion
+!                                 i,                              & ! <-  the beam number from the previous recursion that we wish to propagate the reflected beams of
+!                                 illuminatedFaceIDs,             & ! <-> the face IDs of all illuminated faces from beam i of the previous recursion
+!                                 refl_ampl_out11Int,             & ! <-  the amplitude matrix (1,1) of all illuminated faces from all beams of the previous recursion
+!                                 refl_ampl_out12Int,             & ! <-  the amplitude matrix (1,2) of all illuminated faces from all beams of the previous recursion
+!                                 refl_ampl_out21Int,             & ! <-  the amplitude matrix (2,1) of all illuminated faces from all beams of the previous recursion
+!                                 refl_ampl_out22Int,             & ! <-  the amplitude matrix (2,2) of all illuminated faces from all beams of the previous recursion
+!                                 vk71Int, vk72Int, vk73Int)        ! <-  the e-perp components of all illuminated faces from all beams of the previous recursion
 
-    ! call beam recursion
-    call beam_recursion(    sufficientlyIlluminated,                & ! <-  logical array of which apertures were sufficiently illuminated by beam i from the previous recursion
-                            aperturePropagationVectors,             & ! <-  propagation vectors of all apertures illuminated by beam i from the previous recursion
-                            apertureMidpoints,                      & ! <-  midpoints of apertures
-                            apertureNormals,                        & ! <-  average normals of apertures
-                            verts, Norm, midPoints, Face1, Face2,   & ! <-  particle vertices, normals, midpoints, face ids, normal ids
-                            isWithinBeam,                           & ! <-  logical array of the faces illuminated by beam i from the previous recursion
-                            apertures,                              & ! <-  which aperture each face belongs to
-                            faceAreas,                              & ! <-  area of each face
-                            threshold,                              & ! <-  threshold illuminated area, under which new beams will not propagate
-                            rbi, ibi, waveno,                       & ! <-  input parameters
-                            vk71, vk72, vk73,                       & ! <-  e-perp components of the faces illuminated by beam i from the previous recursion
-                            ampl,                                   & ! <-  amplitude matrix of the faces illuminated by beam i from the previous recursion
-                            propagationVectors2,                    & !  -> the propagation vectors of all apertures illuminated from this recursion
-                            vk91Int2, vk92Int2, vk93Int2,           & !  -> the reflected propagation direction components at all faces illuminated from this recursion
-                            trans_ampl_out11_2,                     & !  -> the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
-                            trans_ampl_out12_2,                     & !  -> the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
-                            trans_ampl_out21_2,                     & !  -> the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
-                            trans_ampl_out22_2,                     & !  -> the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
-                            refl_ampl_out11_2,                      & !  -> the reflected amplitude matrix (1,1) at all faces illuminated from this recursion
-                            refl_ampl_out12_2,                      & !  -> the reflected amplitude matrix (1,2) at all faces illuminated from this recursion
-                            refl_ampl_out21_2,                      & !  -> the reflected amplitude matrix (2,1) at all faces illuminated from this recursion
-                            refl_ampl_out22_2,                      & !  -> the reflected amplitude matrix (2,2) at all faces illuminated from this recursion
-                            vk71Int2 ,vk72Int2, vk73Int2,           & !  -> the e-perp components of all faces illuminated from this recursion
-                            vk121Int2 ,vk122Int2, vk123Int2,        & !  -> the transmitted propagation direction components at all faces illuminated from this recursion
-                            FInt2,                                  & !  -> the face IDs of all faces illuminated from this recursion
-                            is_multithreaded)                         ! <-  whether or not the beam recursion should use multithreaded operations (currently disabled)
+!         ! step 2: propagate the next set of beams (all apertures illuminated by a beam from the previous recursion)
 
-    ! step 3: keep track of the different interaction numbers (optional)
+!         call beam_recursion(    sufficientlyIlluminated,                & ! <-  logical array of which apertures were sufficiently illuminated by beam i from the previous recursion
+!                                 aperturePropagationVectors,             & ! <-  propagation vectors of all apertures illuminated by beam i from the previous recursion
+!                                 apertureMidpoints,                      & ! <-  midpoints of apertures
+!                                 apertureNormals,                        & ! <-  average normals of apertures
+!                                 verts, Norm, midPoints, Face1, Face2,   & ! <-  particle vertices, normals, midpoints, face ids, normal ids
+!                                 isWithinBeam,                           & ! <-  logical array of the faces illuminated by beam i from the previous recursion
+!                                 apertures,                              & ! <-  which aperture each face belongs to
+!                                 faceAreas,                              & ! <-  area of each face
+!                                 threshold,                              & ! <-  threshold illuminated area, under which new beams will not propagate
+!                                 rbi, ibi, waveno,                       & ! <-  input parameters
+!                                 vk71, vk72, vk73,                       & ! <-  e-perp components of the faces illuminated by beam i from the previous recursion
+!                                 ampl,                                   & ! <-  amplitude matrix of the faces illuminated by beam i from the previous recursion
+!                                 propagationVectors2,                    & !  -> the propagation vectors of all apertures illuminated from this recursion
+!                                 vk91Int2, vk92Int2, vk93Int2,           & !  -> the reflected propagation direction components at all faces illuminated from this recursion
+!                                 trans_ampl_out11_2,                     & !  -> the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
+!                                 trans_ampl_out12_2,                     & !  -> the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
+!                                 trans_ampl_out21_2,                     & !  -> the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
+!                                 trans_ampl_out22_2,                     & !  -> the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
+!                                 refl_ampl_out11_2,                      & !  -> the reflected amplitude matrix (1,1) at all faces illuminated from this recursion
+!                                 refl_ampl_out12_2,                      & !  -> the reflected amplitude matrix (1,2) at all faces illuminated from this recursion
+!                                 refl_ampl_out21_2,                      & !  -> the reflected amplitude matrix (2,1) at all faces illuminated from this recursion
+!                                 refl_ampl_out22_2,                      & !  -> the reflected amplitude matrix (2,2) at all faces illuminated from this recursion
+!                                 vk71Int2 ,vk72Int2, vk73Int2,           & !  -> the e-perp components of all faces illuminated from this recursion
+!                                 vk121Int2 ,vk122Int2, vk123Int2,        & !  -> the transmitted propagation direction components at all faces illuminated from this recursion
+!                                 FInt2,                                  & !  -> the face IDs of all faces illuminated from this recursion
+!                                 is_multithreaded)                         ! <-  whether or not the beam recursion should use multithreaded operations (currently disabled)
 
-    call get_interaction(   InteractionInt2,    & ! the interaction number of each illuminated face at this recursion
-                            FInt2,              & ! the face IDs of all faces illuminated from this recursion
-                            apertures,          & ! which aperture each face belongs to
-                            interactionCounter)   ! total number of interactions so far
+!         ! step 3: keep track of the different interaction numbers (optional)
+!         !$OMP CRITICAL
+!         call get_interaction(   InteractionInt2,    & ! the interaction number of each illuminated face at this recursion
+!                                 FInt2,              & ! the face IDs of all faces illuminated from this recursion
+!                                 apertures,          & ! which aperture each face belongs to
+!                                 interactionCounter)   ! total number of interactions so far
 
-    ! step 4: add outgoing rays to the outbeam tree
+!         ! step 4: add outgoing rays to the outbeam tree
 
-    call add_to_outbeam_tree(   FInt2,                              & ! <-  the face IDs of all faces illuminated from this recursion
-                                beam_outbeam_tree_counter,          & ! <-> total number of entries in outbeam tree
-                                beam_outbeam_tree,                  & ! <-> outbeam tree
-                                trans_ampl_out11_2,                 & ! <-  the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
-                                trans_ampl_out12_2,                 & ! <-  the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
-                                trans_ampl_out21_2,                 & ! <-  the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
-                                trans_ampl_out22_2,                 & ! <-  the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
-                                vk71Int2, vk72Int2, vk73Int2,       & ! <-  the e-perp components of all faces illuminated from this recursion
-                                vk121Int2, vk122Int2, vk123Int2,    & ! <-  the transmitted propagation direction components at all faces illuminated from this recursion
-                                vk91Int2, vk92Int2, vk93Int2,       & ! <-  the reflected propagation direction components at all faces illuminated from this recursion
-                                InteractionInt2)                      ! <-  the interaction number of each illuminated face at this recursion
+!         call add_to_outbeam_tree(   FInt2,                              & ! <-  the face IDs of all faces illuminated from this recursion
+!                                     beam_outbeam_tree_counter,          & ! <-> total number of entries in outbeam tree
+!                                     beam_outbeam_tree,                  & ! <-> outbeam tree
+!                                     trans_ampl_out11_2,                 & ! <-  the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
+!                                     trans_ampl_out12_2,                 & ! <-  the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
+!                                     trans_ampl_out21_2,                 & ! <-  the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
+!                                     trans_ampl_out22_2,                 & ! <-  the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
+!                                     vk71Int2, vk72Int2, vk73Int2,       & ! <-  the e-perp components of all faces illuminated from this recursion
+!                                     vk121Int2, vk122Int2, vk123Int2,    & ! <-  the transmitted propagation direction components at all faces illuminated from this recursion
+!                                     vk91Int2, vk92Int2, vk93Int2,       & ! <-  the reflected propagation direction components at all faces illuminated from this recursion
+!                                     InteractionInt2)                      ! <-  the interaction number of each illuminated face at this recursion
 
-    ! step 5: stitch together some arrays for use in the next recursion of the beam loop
+!         ! step 5: stitch together some arrays for use in the next recursion of the beam loop
 
-    if(.not. allocated(vk71Int3)) is_first_beam_back = .true. ! determine whether this is the first beam back (multithreading support)
+!         if(.not. allocated(vk71Int3)) is_first_beam_back = .true. ! determine whether this is the first beam back (multithreading support)
 
-    ! ! init v3 variables
-    if(is_first_beam_back) then ! if its the first beam back, we need to allocate first
-        allocate(vk71Int3(1:size(FInt2,1),size(FInt2,2)))
-        allocate(vk72Int3(1:size(FInt2,1),size(FInt2,2)))
-        allocate(vk73Int3(1:size(FInt2,1),size(FInt2,2)))  
-        allocate(refl_ampl_out11_3(1:size(FInt2,1),size(FInt2,2)))
-        allocate(refl_ampl_out12_3(1:size(FInt2,1),size(FInt2,2)))
-        allocate(refl_ampl_out21_3(1:size(FInt2,1),size(FInt2,2)))
-        allocate(refl_ampl_out22_3(1:size(FInt2,1),size(FInt2,2)))  
-        allocate(FInt3(1:size(FInt2,1),size(FInt2,2)))
-        FInt3 = FInt2 ! keep track, ready to be concatenated to on the next loop
-        vk71Int3 = vk71Int2
-        vk72Int3 = vk72Int2
-        vk73Int3 = vk73Int2
-        refl_ampl_out11_3 = refl_ampl_out11_2
-        refl_ampl_out12_3 = refl_ampl_out12_2
-        refl_ampl_out21_3 = refl_ampl_out21_2
-        refl_ampl_out22_3 = refl_ampl_out22_2
-        propagationVectors3 = propagationVectors2       
-    else
-        call cat_int_var(FInt2, FInt3)
-        call cat_real_var(vk71Int2, vk71Int3)
-        call cat_real_var(vk72Int2, vk72Int3)
-        call cat_real_var(vk73Int2, vk73Int3)
-        call cat_complex_var(refl_ampl_out11_2, refl_ampl_out11_3)
-        call cat_complex_var(refl_ampl_out12_2, refl_ampl_out12_3)
-        call cat_complex_var(refl_ampl_out21_2, refl_ampl_out21_3)
-        call cat_complex_var(refl_ampl_out22_2, refl_ampl_out22_3)
-        call cat_prop(propagationVectors2, propagationVectors3) ! concatenate propagation vectors
-        ! stop
-    end if
+!         ! ! init v3 variables
+!         if(is_first_beam_back) then ! if its the first beam back, we need to allocate first
+!             allocate(vk71Int3(1:size(FInt2,1),size(FInt2,2)))
+!             allocate(vk72Int3(1:size(FInt2,1),size(FInt2,2)))
+!             allocate(vk73Int3(1:size(FInt2,1),size(FInt2,2)))  
+!             allocate(refl_ampl_out11_3(1:size(FInt2,1),size(FInt2,2)))
+!             allocate(refl_ampl_out12_3(1:size(FInt2,1),size(FInt2,2)))
+!             allocate(refl_ampl_out21_3(1:size(FInt2,1),size(FInt2,2)))
+!             allocate(refl_ampl_out22_3(1:size(FInt2,1),size(FInt2,2)))  
+!             allocate(FInt3(1:size(FInt2,1),size(FInt2,2)))
+!             FInt3 = FInt2 ! keep track, ready to be concatenated to on the next loop
+!             vk71Int3 = vk71Int2
+!             vk72Int3 = vk72Int2
+!             vk73Int3 = vk73Int2
+!             refl_ampl_out11_3 = refl_ampl_out11_2
+!             refl_ampl_out12_3 = refl_ampl_out12_2
+!             refl_ampl_out21_3 = refl_ampl_out21_2
+!             refl_ampl_out22_3 = refl_ampl_out22_2
+!             propagationVectors3 = propagationVectors2       
+!         else
+!             call cat_int_var(FInt2, FInt3)
+!             call cat_real_var(vk71Int2, vk71Int3)
+!             call cat_real_var(vk72Int2, vk72Int3)
+!             call cat_real_var(vk73Int2, vk73Int3)
+!             call cat_complex_var(refl_ampl_out11_2, refl_ampl_out11_3)
+!             call cat_complex_var(refl_ampl_out12_2, refl_ampl_out12_3)
+!             call cat_complex_var(refl_ampl_out21_2, refl_ampl_out21_3)
+!             call cat_complex_var(refl_ampl_out22_2, refl_ampl_out22_3)
+!             call cat_prop(propagationVectors2, propagationVectors3) ! concatenate propagation vectors
+!             ! stop
+!         end if
+!         !$OMP END CRITICAL
+!     end do
+!     !$OMP END PARALLEL
+! else ! single-threaded
+    do i = 1, size(F1Mapping,2) ! looping over internal fields created by the previous recursion
 
-end do
+        is_first_beam_back = .false. ! init
+
+        ! step 1: retrieve the parameters needed to propagate the next set of beams
+
+        call get_beam_params(   F1Mapping,                      & ! <-  the face IDs of all illuminated faces from all beams of the previous recursion
+                                isWithinBeam,                   & ! <-> logical array of the faces illuminated by beam i from the previous recursion
+                                ampl,                           & ! <-> amplitude matrix of the faces illuminated by beam i from the previous recursion
+                                vk71,                           & ! <-> e-perp x component of the faces illuminated by beam i from the previous recursion
+                                vk72,                           & ! <-> e-perp y component of the faces illuminated by beam i from the previous recursion
+                                vk73,                           & ! <-> e-perp z component of the faces illuminated by beam i from the previous recursion
+                                aperturePropagationVectors,     & ! <-> propagation vectors of all apertures illuminated by beam i from the previous recursion
+                                sufficientlyIlluminated,        & ! <-> logical array of the apertures which were sufficiently illuminated by beam i from the previous recursion
+                                propagationVectors,             & ! <-  the propagation vectors of all apertures for all beams from the previous recursion
+                                i,                              & ! <-  the beam number from the previous recursion that we wish to propagate the reflected beams of
+                                illuminatedFaceIDs,             & ! <-> the face IDs of all illuminated faces from beam i of the previous recursion
+                                refl_ampl_out11Int,             & ! <-  the amplitude matrix (1,1) of all illuminated faces from all beams of the previous recursion
+                                refl_ampl_out12Int,             & ! <-  the amplitude matrix (1,2) of all illuminated faces from all beams of the previous recursion
+                                refl_ampl_out21Int,             & ! <-  the amplitude matrix (2,1) of all illuminated faces from all beams of the previous recursion
+                                refl_ampl_out22Int,             & ! <-  the amplitude matrix (2,2) of all illuminated faces from all beams of the previous recursion
+                                vk71Int, vk72Int, vk73Int)        ! <-  the e-perp components of all illuminated faces from all beams of the previous recursion
+
+        ! step 2: propagate the next set of beams (all apertures illuminated by a beam from the previous recursion)
+
+        call beam_recursion(    sufficientlyIlluminated,                & ! <-  logical array of which apertures were sufficiently illuminated by beam i from the previous recursion
+                                aperturePropagationVectors,             & ! <-  propagation vectors of all apertures illuminated by beam i from the previous recursion
+                                apertureMidpoints,                      & ! <-  midpoints of apertures
+                                apertureNormals,                        & ! <-  average normals of apertures
+                                verts, Norm, midPoints, Face1, Face2,   & ! <-  particle vertices, normals, midpoints, face ids, normal ids
+                                isWithinBeam,                           & ! <-  logical array of the faces illuminated by beam i from the previous recursion
+                                apertures,                              & ! <-  which aperture each face belongs to
+                                faceAreas,                              & ! <-  area of each face
+                                threshold,                              & ! <-  threshold illuminated area, under which new beams will not propagate
+                                rbi, ibi, waveno,                       & ! <-  input parameters
+                                vk71, vk72, vk73,                       & ! <-  e-perp components of the faces illuminated by beam i from the previous recursion
+                                ampl,                                   & ! <-  amplitude matrix of the faces illuminated by beam i from the previous recursion
+                                propagationVectors2,                    & !  -> the propagation vectors of all apertures illuminated from this recursion
+                                vk91Int2, vk92Int2, vk93Int2,           & !  -> the reflected propagation direction components at all faces illuminated from this recursion
+                                trans_ampl_out11_2,                     & !  -> the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
+                                trans_ampl_out12_2,                     & !  -> the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
+                                trans_ampl_out21_2,                     & !  -> the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
+                                trans_ampl_out22_2,                     & !  -> the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
+                                refl_ampl_out11_2,                      & !  -> the reflected amplitude matrix (1,1) at all faces illuminated from this recursion
+                                refl_ampl_out12_2,                      & !  -> the reflected amplitude matrix (1,2) at all faces illuminated from this recursion
+                                refl_ampl_out21_2,                      & !  -> the reflected amplitude matrix (2,1) at all faces illuminated from this recursion
+                                refl_ampl_out22_2,                      & !  -> the reflected amplitude matrix (2,2) at all faces illuminated from this recursion
+                                vk71Int2 ,vk72Int2, vk73Int2,           & !  -> the e-perp components of all faces illuminated from this recursion
+                                vk121Int2 ,vk122Int2, vk123Int2,        & !  -> the transmitted propagation direction components at all faces illuminated from this recursion
+                                FInt2,                                  & !  -> the face IDs of all faces illuminated from this recursion
+                                is_multithreaded)                         ! <-  whether or not the beam recursion should use multithreaded operations (currently disabled)
+
+        ! step 3: keep track of the different interaction numbers (optional)
+
+        call get_interaction(   InteractionInt2,    & ! the interaction number of each illuminated face at this recursion
+                                FInt2,              & ! the face IDs of all faces illuminated from this recursion
+                                apertures,          & ! which aperture each face belongs to
+                                interactionCounter)   ! total number of interactions so far
+
+        ! step 4: add outgoing rays to the outbeam tree
+
+        call add_to_outbeam_tree(   FInt2,                              & ! <-  the face IDs of all faces illuminated from this recursion
+                                    beam_outbeam_tree_counter,          & ! <-> total number of entries in outbeam tree
+                                    beam_outbeam_tree,                  & ! <-> outbeam tree
+                                    trans_ampl_out11_2,                 & ! <-  the transmitted amplitude matrix (1,1) at all faces illuminated from this recursion
+                                    trans_ampl_out12_2,                 & ! <-  the transmitted amplitude matrix (1,2) at all faces illuminated from this recursion
+                                    trans_ampl_out21_2,                 & ! <-  the transmitted amplitude matrix (2,1) at all faces illuminated from this recursion
+                                    trans_ampl_out22_2,                 & ! <-  the transmitted amplitude matrix (2,2) at all faces illuminated from this recursion
+                                    vk71Int2, vk72Int2, vk73Int2,       & ! <-  the e-perp components of all faces illuminated from this recursion
+                                    vk121Int2, vk122Int2, vk123Int2,    & ! <-  the transmitted propagation direction components at all faces illuminated from this recursion
+                                    vk91Int2, vk92Int2, vk93Int2,       & ! <-  the reflected propagation direction components at all faces illuminated from this recursion
+                                    InteractionInt2)                      ! <-  the interaction number of each illuminated face at this recursion
+
+        ! step 5: stitch together some arrays for use in the next recursion of the beam loop
+
+        if(.not. allocated(vk71Int3)) is_first_beam_back = .true. ! determine whether this is the first beam back (multithreading support)
+
+        ! ! init v3 variables
+        if(i .eq. 1) then ! if its the first beam back, we need to allocate first
+            allocate(vk71Int3(1:size(FInt2,1),size(FInt2,2)))
+            allocate(vk72Int3(1:size(FInt2,1),size(FInt2,2)))
+            allocate(vk73Int3(1:size(FInt2,1),size(FInt2,2)))  
+            allocate(refl_ampl_out11_3(1:size(FInt2,1),size(FInt2,2)))
+            allocate(refl_ampl_out12_3(1:size(FInt2,1),size(FInt2,2)))
+            allocate(refl_ampl_out21_3(1:size(FInt2,1),size(FInt2,2)))
+            allocate(refl_ampl_out22_3(1:size(FInt2,1),size(FInt2,2)))  
+            allocate(FInt3(1:size(FInt2,1),size(FInt2,2)))
+            FInt3 = FInt2 ! keep track, ready to be concatenated to on the next loop
+            vk71Int3 = vk71Int2
+            vk72Int3 = vk72Int2
+            vk73Int3 = vk73Int2
+            refl_ampl_out11_3 = refl_ampl_out11_2
+            refl_ampl_out12_3 = refl_ampl_out12_2
+            refl_ampl_out21_3 = refl_ampl_out21_2
+            refl_ampl_out22_3 = refl_ampl_out22_2
+            propagationVectors3 = propagationVectors2       
+        else
+            call cat_int_var(FInt2, FInt3)
+            call cat_real_var(vk71Int2, vk71Int3)
+            call cat_real_var(vk72Int2, vk72Int3)
+            call cat_real_var(vk73Int2, vk73Int3)
+            call cat_complex_var(refl_ampl_out11_2, refl_ampl_out11_3)
+            call cat_complex_var(refl_ampl_out12_2, refl_ampl_out12_3)
+            call cat_complex_var(refl_ampl_out21_2, refl_ampl_out21_3)
+            call cat_complex_var(refl_ampl_out22_2, refl_ampl_out22_3)
+            call cat_prop(propagationVectors2, propagationVectors3) ! concatenate propagation vectors
+            ! stop
+        end if
+    end do
+! end if
 
 ! stop
 
