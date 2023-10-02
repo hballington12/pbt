@@ -747,8 +747,9 @@ module diff_mod
     complex(8), dimension(:,:), allocatable :: area_facs2
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
     real(8) start, finish ! cpu timing variables
-    ! real(8) progressReal
-    integer progressInt 
+    real(8) progressReal
+    real work_done
+    integer progressInt
 
     start = omp_get_wtime()
 
@@ -774,6 +775,7 @@ module diff_mod
     allocate(amplC21s(1:size(xfar,1),1:size(xfar,2)))
     allocate(amplC22s(1:size(xfar,1),1:size(xfar,2)))
     
+    ! init
     area_facs2 = 0
     ampl_far_beam11 = 0
     ampl_far_beam12 = 0
@@ -784,8 +786,9 @@ module diff_mod
     ampl_far_ext_diff21 = 0
     ampl_far_ext_diff22 = 0
     progressInt = 0
+    work_done = 0
 
-    ! print*,'========== start sr diff_main'
+    print*,'start diff beam loop...'
     
     call trim_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter) ! removes very low energy outbeams from the beam tree
 
@@ -797,12 +800,14 @@ module diff_mod
         !$OMP DO
         do j = 1, beam_outbeam_tree_counter
 
-            ! print*,'j',j
-            ! progressReal = j*100/beam_outbeam_tree_counter          ! percent completion
-            ! if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
-            !     progressInt = int(progressReal)           ! update progress counter
-            ! print*,'Completion: ',progressInt,'%'     ! print progress
-            ! end if
+            if(omp_get_thread_num() .eq. 0) then
+                work_done = work_done + 1
+                progressReal = work_done*100/beam_outbeam_tree_counter*omp_get_num_threads()          ! my thread percent completion
+                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
+                    progressInt = int(progressReal)           ! update progress counter
+                    call progress_bar(progressInt, 100)
+                end if
+            end if
     
             ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
             perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
@@ -810,24 +815,7 @@ module diff_mod
             v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
         
             ! get far-field contribution from this outbeam
-            call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
-        
-            if(any(isnan(abs(amplC11s)))) then
-                print*,'OH DEAR: ',j
-                stop
-            end if
-            if(any(isnan(abs(amplC12s)))) then
-                print*,'OH DEAR: ',j
-                stop
-            end if
-            if(any(isnan(abs(amplC21s)))) then
-                print*,'OH DEAR: ',j
-                stop
-            end if
-            if(any(isnan(abs(amplC22s)))) then
-                print*,'OH DEAR: ',j
-                stop
-            end if                                    
+            call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)                                 
 
             !$OMP CRITICAL
             ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
@@ -837,21 +825,25 @@ module diff_mod
             !$OMP END CRITICAL
         
         end do
+        if(omp_get_thread_num() .eq. 0) then
+            print*,''
+            print*,'end diff beam loop...'
+            print*,'start ext diff loop...'
+        end if
         
-        ! if(omp_get_thread_num() .eq. 0) then
-        !     print*,'end diff beam loop...'
-        !     print*,'start ext diff loop...'
-        ! end if
-        
-        ! progressInt = 0
+        work_done = 0
+        progressInt = 0
         !$OMP DO
         do j = 1, size(ext_diff_outbeam_tree,1)
 
-            ! progressReal = j*100/size(ext_diff_outbeam_tree,1)        ! percent completion
-            ! if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
-            !     progressInt = int(progressReal)           ! update progress counter
-            ! print*,'Completion: ',progressInt,'%'     ! print progress
-            ! end if
+            if(omp_get_thread_num() .eq. 0) then
+                work_done = work_done + 1
+                progressReal = work_done*100/size(ext_diff_outbeam_tree,1)*omp_get_num_threads()          ! my thread percent completion
+                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
+                    progressInt = int(progressReal)           ! update progress counter
+                    call progress_bar(progressInt, 100)
+                end if
+            end if
 
             ampl(1:2,1:2) = ext_diff_outbeam_tree(j)%ampl(1:2,1:2)
             perp0(1:3) = ext_diff_outbeam_tree(j)%vk7(1:3)
@@ -869,7 +861,8 @@ module diff_mod
                 
         end do
         !$OMP END PARALLEL
-
+        print*,''
+        print*,'end ext diff loop...'
 
     else ! single-threaded diffraction
 
@@ -878,11 +871,11 @@ module diff_mod
         do j = 1, beam_outbeam_tree_counter
         ! do j = 1, 0 ! disable beam diffraction
 
-            ! progressReal = j*100/beam_outbeam_tree_counter          ! percent completion
-            ! if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
-            !     progressInt = int(progressReal)           ! update progress counter
-            ! print*,'Completion: ',progressInt,'%'     ! print progress
-            ! end if
+            progressReal = j*100/beam_outbeam_tree_counter          ! percent completion
+            if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
+                progressInt = int(progressReal)           ! update progress counter
+            print*,'Completion: ',progressInt,'%'     ! print progress
+            end if
     
             ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
             perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
