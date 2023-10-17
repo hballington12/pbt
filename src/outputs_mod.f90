@@ -82,6 +82,16 @@
       allocate(ampl_far21(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
       allocate(ampl_far22(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
 
+      ! account for 1/waveno factor in Bohren & Huffman eq 3.12
+      ampl_far_beam11 = ampl_far_beam11 * waveno
+      ampl_far_beam12 = ampl_far_beam12 * waveno
+      ampl_far_beam21 = ampl_far_beam21 * waveno
+      ampl_far_beam22 = ampl_far_beam22 * waveno
+      ampl_far_ext_diff11 = ampl_far_ext_diff11 * waveno
+      ampl_far_ext_diff12 = ampl_far_ext_diff12 * waveno
+      ampl_far_ext_diff21 = ampl_far_ext_diff21 * waveno
+      ampl_far_ext_diff22 = ampl_far_ext_diff22 * waveno      
+
       ! far field = beam diffraction - external diffraction
       ampl_far11 = ampl_far_beam11 + ampl_far_ext_diff11
       ampl_far12 = ampl_far_beam12 + ampl_far_ext_diff12
@@ -104,15 +114,15 @@
       print*,'calculating integrated parameters...'
       
       ! theta integrations...
-      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
       write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
       print'(A40,f16.8)','scattering cross section (total):',scatt
       
-      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_beam) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
       write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
       print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
       
-      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals),scatt_ext_diff) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
       write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
       print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
       
