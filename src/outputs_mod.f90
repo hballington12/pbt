@@ -67,8 +67,9 @@
       real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
       real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
 
-      real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext, abs, albedo
+      real(8) scatt, scatt_beam, scatt_ext_diff, asymmetry, asymmetry_beam, asymmetry_ext_diff, ext, absorption, albedo, back_scatt
       real(8) waveno
+      integer(8) i
       
       theta_vals = job_params%theta_vals
       phi_vals = job_params%phi_vals
@@ -183,19 +184,19 @@
 
       end if
 
-      ! ext = abs(2*pi/waveno*real(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
+      ! ext = absorption(2*pi/waveno*real(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
       ! write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (real):',ext 
       ! print'(A40,f16.8)','ext. cross (opt. theorem) real:',ext 
       
-      ! ext = abs(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
+      ! ext = absorption(2*pi/waveno*imag(ampl_far11(1,1) + ampl_far12(1,1) + ampl_far21(1,1) + ampl_far22(1,1))) ! extinction cross section
       ! write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (imag):',ext 
       ! print'(A40,f16.8)','ext. cross (opt. theorem) imag:',ext 
       
-      abs = energy_abs_beam
-      write(101,'(A40,f16.8)')'abs. cross section:',abs
-      print'(A40,f16.8)','abs. cross:',abs 
+      absorption = energy_abs_beam
+      write(101,'(A40,f16.8)')'abs. cross section:',absorption
+      print'(A40,f16.8)','abs. cross:',absorption 
       
-      ext = abs + scatt
+      ext = absorption + scatt
       write(101,'(A40,f16.8)')'ext. cross section:',ext
       print'(A40,f16.8)','ext. cross:',ext 
       
@@ -215,16 +216,27 @@
       write(101,'(A40,f16.8)')'asymmetry parameter (ext diff):',asymmetry_ext_diff  
       print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
       
+      ! calculate back-scattering cross section
+      ! find closest theta value to direct back-scattering
+      i = minloc(abs(theta_vals - 2*pi),1)
+      ! print*,'i = ',i,'(',theta_vals(i)*180D0/pi,')' ! print the value of theta at direct back-scattering
+      ! back_scatt = mueller(1,i,1)*4*pi/waveno**2 ! calculate back-scattering cross section (B&H definition)
+      back_scatt = mueller(1,i,1)/waveno**2 ! calculate back-scattering cross section (intuitive definition)
+      write(101,'(A40,f16.8)')'back scatt. cross section:',back_scatt
+      print'(A40,f16.8)','back scatt. cross:',back_scatt
+
       output_parameters%scatt = scatt
-      output_parameters%abs = abs
+      output_parameters%abs = absorption
       output_parameters%ext = ext
       output_parameters%albedo = albedo
       output_parameters%asymmetry = asymmetry
-      output_parameters%abs_eff = abs / output_parameters%geo_cross_sec
+      output_parameters%abs_eff = absorption / output_parameters%geo_cross_sec
       output_parameters%scatt_eff = scatt / output_parameters%geo_cross_sec
       output_parameters%ext_eff = ext / output_parameters%geo_cross_sec
-      
-      
+      output_parameters%back_scatt = back_scatt
+
+
+
       ! open(10,file="mueller_scatgrid")
       ! do i = 1, size(ampl_far_beam11,2)
       !    do j = 1, size(ampl_far_beam11,1)
@@ -359,6 +371,7 @@
       write(10,'(A30,f16.8)') 'abs. cross section: ',output_parameters_total%abs
       write(10,'(A30,f16.8)') 'scatt. cross section: ',output_parameters_total%scatt
       write(10,'(A30,f16.8)') 'ext. cross section: ',output_parameters_total%ext
+      write(10,'(A30,f16.8)') 'back scatt. cross section: ',output_parameters_total%back_scatt
       write(10,'(A30,f16.8)') 'single scattering albedo: ',output_parameters_total%albedo
       write(10,'(A30,f16.8)') 'asymmetry parameter: ',output_parameters_total%asymmetry
       write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs / output_parameters_total%geo_cross_sec
@@ -403,6 +416,7 @@
          output_parameters_total%scatt_eff = 0 ! init
          output_parameters_total%ext_eff = 0 ! init
          output_parameters_total%geo_cross_sec = 0 ! init
+         output_parameters_total%back_scatt = 0 ! init
       end if
       if(.not. allocated(mueller_1d_total)) then
          allocate(mueller_1d_total(1:size(mueller_1d,1),1:size(mueller_1d,2)))
@@ -414,6 +428,7 @@
       mueller_1d_total = mueller_1d_total + mueller_1d
       output_parameters_total%abs = output_parameters_total%abs + output_parameters%abs
       output_parameters_total%scatt = output_parameters_total%scatt + output_parameters%scatt
+      output_parameters_total%back_scatt = output_parameters_total%back_scatt + output_parameters%back_scatt
       output_parameters_total%ext = output_parameters_total%ext + output_parameters%ext
       output_parameters_total%albedo = output_parameters_total%albedo + output_parameters%albedo
       output_parameters_total%asymmetry = output_parameters_total%asymmetry + output_parameters%asymmetry

@@ -279,6 +279,7 @@ output_parameters_total%abs_eff = output_parameters_total%abs_eff / job_params%n
 output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / job_params%num_orients 
 output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%num_orients 
 output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients 
+output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
 
 ! writing to file
 call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
