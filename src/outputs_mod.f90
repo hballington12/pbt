@@ -220,8 +220,8 @@
       ! find closest theta value to direct back-scattering
       i = minloc(abs(theta_vals - 2*pi),1)
       ! print*,'i = ',i,'(',theta_vals(i)*180D0/pi,')' ! print the value of theta at direct back-scattering
-      ! back_scatt = mueller(1,i,1)*4*pi/waveno**2 ! calculate back-scattering cross section (B&H definition)
-      back_scatt = mueller(1,i,1)/waveno**2 ! calculate back-scattering cross section (intuitive definition)
+      back_scatt = mueller(1,i,1)*4*pi/waveno**2 ! calculate back-scattering cross section (B&H definition)
+      ! back_scatt = mueller(1,i,1)/waveno**2 ! calculate back-scattering cross section (intuitive definition)
       write(101,'(A40,f16.8)')'back scatt. cross section:',back_scatt
       print'(A40,f16.8)','back scatt. cross:',back_scatt
 
