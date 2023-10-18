@@ -204,15 +204,15 @@
       write(101,'(A40,f16.8)')'single-scattering albedo:',albedo
       print'(A40,f16.8)','single-scatt. albedo:',albedo
       
-      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt,asymmetry) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt/(waveno**2),asymmetry) ! p11*sin(theta)
       write(101,'(A40,f16.8)')'asymmetry parameter (total):',asymmetry
       print'(A40,f16.8)','asymmetry parameter (total):',asymmetry
       
-      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam,asymmetry_beam) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam/(waveno**2),asymmetry_beam) ! p11*sin(theta)
       write(101,'(A40,f16.8)')'asymmetry parameter (beam):',asymmetry_beam
       print'(A40,f16.8)','asymmetry parameter (beam):',asymmetry_beam
       
-      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff,asymmetry_ext_diff) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff/(waveno**2),asymmetry_ext_diff) ! p11*sin(theta)
       write(101,'(A40,f16.8)')'asymmetry parameter (ext diff):',asymmetry_ext_diff  
       print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
       
