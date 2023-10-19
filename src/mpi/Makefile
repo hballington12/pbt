@@ -1,7 +1,7 @@
 BIN = ./
-SRC = ./
-SEQ_DIR =./seq/
-MPI_DIR =./mpi/
+SRC = ../
+SEQ_DIR =./
+MPI_DIR =./
 
 # FSWITCHES = -traceback -debug:full -openmp # debug - windows
 # FSWITCHES = -traceback -g -O -qopenmp # debug - linux
@@ -38,42 +38,38 @@ modules = 	types_mod$(MOD_EXT) \
 			cc_hex_mod$(MOD_EXT) \
 			mpi_mod$(MOD_EXT)
 
-.PHONY: seq # sequential target
 .PHONY: mpi # mpi target
 .PHONY: triangle # triangle target
 
-seq: $(SEQ_DIR)main.f90 $(objects) $(TRI_BIN)triangle
-	$(FC) $(FSWITCHES) $(objects) $(SEQ_DIR)main.f90 -o $(SEQ_DIR)abt
+mpi: $(SRC)mpi.f90 $(objects) mpi_mod$(O_EXT)
+	mpifort $(FSWITCHES) $(objects) mpi_mod$(O_EXT) $(SRC)mpi.f90 -o $(MPI_DIR)abt
 
-mpi: $(MPI_DIR)main.f90 $(objects) mpi_mod$(O_EXT)
-	mpifort $(FSWITCHES) $(objects) mpi_mod$(O_EXT) $(MPI_DIR)main.f90 -o $(MPI_DIR)abt
+outputs_mod$(O_EXT) : $(SRC)outputs_mod.f90 misc_submod$(O_EXT)
+	$(FC) $(FSWITCHES) -c $(SRC)outputs_mod.f90
 
-outputs_mod$(O_EXT) : outputs_mod.f90 misc_submod$(O_EXT)
-	$(FC) $(FSWITCHES) -c outputs_mod.f90
+diff_mod$(O_EXT) : $(SRC)diff_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT)
+	$(FC) $(FSWITCHES) -c $(SRC)diff_mod.f90
 
-diff_mod$(O_EXT) : diff_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT)
-	$(FC) $(FSWITCHES) -c diff_mod.f90
+beam_loop_mod$(O_EXT) : $(SRC)beam_loop_mod.f90 input_mod$(O_EXT) misc_submod$(O_EXT) types_mod$(O_EXT)
+	$(FC) $(FSWITCHES) -c $(SRC)beam_loop_mod.f90
 
-beam_loop_mod$(O_EXT) : beam_loop_mod.f90 input_mod$(O_EXT) misc_submod$(O_EXT) types_mod$(O_EXT)
-	$(FC) $(FSWITCHES) -c beam_loop_mod.f90
+input_mod$(O_EXT) : $(SRC)input_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT) cc_hex_mod$(O_EXT)
+	$(FC) $(FSWITCHES) -c $(SRC)input_mod.f90
 
-input_mod$(O_EXT) : input_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT) cc_hex_mod$(O_EXT)
-	$(FC) $(FSWITCHES) -c input_mod.f90
+misc_submod$(O_EXT) : $(SRC)misc_submod.f90
+	$(FC) $(FSWITCHES) -c $(SRC)misc_submod.f90
 
-misc_submod$(O_EXT) : misc_submod.f90
-	$(FC) $(FSWITCHES) -c misc_submod.f90
+types_mod$(O_EXT) : $(SRC)types_mod.f90
+	$(FC) $(FSWITCHES) -c $(SRC)types_mod.f90
 
-types_mod$(O_EXT) : types_mod.f90
-	$(FC) $(FSWITCHES) -c types_mod.f90
+cc_hex_mod$(O_EXT) : $(SRC)cc_hex_mod.f90
+	$(FC) $(FSWITCHES) -c $(SRC)cc_hex_mod.f90
 
-cc_hex_mod$(O_EXT) : cc_hex_mod.f90
-	$(FC) $(FSWITCHES) -c cc_hex_mod.f90
-
-mpi_mod$(O_EXT) : mpi_mod.f90 types_mod$(O_EXT)
-	mpifort $(FSWITCHES) -c mpi_mod.f90
+mpi_mod$(O_EXT) : $(SRC)mpi_mod.f90 types_mod$(O_EXT)
+	mpifort $(FSWITCHES) -c $(SRC)mpi_mod.f90
 
 ./tri/triangle: ./tri/triangle.c
 	$(CC) $(CSWITCHES) ./tri/triangle.c -lm -o ./tri/triangle
 
 clean :
-	rm $(objects) $(modules) $(SEQ_DIR)abt $(MPI_DIR)abt
+	rm $(objects) $(modules) $(MPI_DIR)abt $(MPI_DIR)mpi_mod$(O_EXT)
