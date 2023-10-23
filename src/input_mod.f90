@@ -879,13 +879,13 @@ subroutine init_loop(   alpha_vals, &
         if(num_angles .eq. 1) then
             intelli_vals(1) = 0.5 ! set to middle if less than than 8 orientations specified
         else
-            spacing = 1d0/(num_angles-1)
+            spacing = 1d0/(num_angles)
             do i = 1, num_angles ! for each entry, linear interpolate from 0 to 1
                 intelli_vals(i) = spacing * (i-1)
-                ! print*,'intelli_vals(i)',intelli_vals(i)
+                print*,'intelli_vals(i)',intelli_vals(i)
             end do
         end if
-        ! stop
+        stop
         ! loop through and assign intelligent angles
         counter = 0
         do j = 1,num_angles
