@@ -885,7 +885,7 @@ subroutine init_loop(   alpha_vals, &
                 print*,'intelli_vals(i)',intelli_vals(i)
             end do
         end if
-        stop
+        ! stop
         ! loop through and assign intelligent angles
         counter = 0
         do j = 1,num_angles
