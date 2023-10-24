@@ -870,8 +870,8 @@ subroutine init_loop(   alpha_vals, &
         ! the spacing for beta and gamma must be uniformly distributed
         ! this needs special care if using particle symmetry to reduce the range of angles needed
 
-        print*,'job_params%beta_lims',job_params%beta_lims
-        print*,'job_params%gamma_lims',job_params%gamma_lims
+        ! print*,'job_params%beta_lims',job_params%beta_lims
+        ! print*,'job_params%gamma_lims',job_params%gamma_lims
 
         ! check the validity of beta and gamma lims
         if(job_params%beta_lims(1) .gt. job_params%beta_lims(2)) then
@@ -898,16 +898,16 @@ subroutine init_loop(   alpha_vals, &
         ! stop
 
         w = (job_params%beta_lims(2) - job_params%beta_lims(1)) / 180D0
-        print*,'w=',w
+        ! print*,'w=',w
         h = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
-        print*,'h=',h
+        ! print*,'h=',h
 
         num_beta_angles = floor(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
-        print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
+        ! print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
         print*,'num_beta_angles=',num_beta_angles
 
         num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
-        print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
+        ! print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
         print*,'num_gamma_angles=',num_gamma_angles
 
         leftover_angles = num_orients - num_beta_angles*num_gamma_angles
@@ -930,13 +930,13 @@ subroutine init_loop(   alpha_vals, &
                     beta_spacing / 2D0 + & ! with small shift to avoid normal incidence
                     job_params%beta_lims(1) / 180D0 ! note that beta_lims(1) shouldnt be in the range 0 to 180 deg.
                     
-                print*,'beta_intelli_vals(i)',beta_intelli_vals(i)
+                ! print*,'beta_intelli_vals(i)',beta_intelli_vals(i)
             end do 
             gamma_spacing = h/real(num_gamma_angles)
             do i = 1, num_gamma_angles ! for each entry, linear interpolate from 0 to 1
                 gamma_intelli_vals(i) = gamma_spacing * (i-1) + &
                     job_params%gamma_lims(1) / 360D0 ! note that gamma_lims(1) shouldnt be in the range 0 to 360 deg.
-                print*,'gamma_intelli_vals(i)',gamma_intelli_vals(i)
+                ! print*,'gamma_intelli_vals(i)',gamma_intelli_vals(i)
             end do                        
         end if
         ! stop
@@ -969,9 +969,9 @@ subroutine init_loop(   alpha_vals, &
         end do
 
         ! print intelligent euler angles
-        do i = 1, num_orients
-            print'(A,f6.4,A,f6.4,A,f6.4)','alpha: ',alpha_vals(i),' beta: ',beta_vals(i),' gamma: ',gamma_vals(i)
-        end do
+        ! do i = 1, num_orients
+        !     print'(A,f6.4,A,f6.4,A,f6.4)','alpha: ',alpha_vals(i),' beta: ',beta_vals(i),' gamma: ',gamma_vals(i)
+        ! end do
 
     else
         do i = 1, size(alpha_vals,1) ! loop here so that the angles are reproducable regardless of number of orientations
