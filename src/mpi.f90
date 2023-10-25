@@ -210,6 +210,9 @@ if (my_rank .eq. 0) then
                     beta_vals, &
                     gamma_vals, &
                     job_params)
+    if(job_params%output_eulers) then
+        call output_eulers(alpha_vals,beta_vals,gamma_vals,output_dir,job_params)
+    end if
     do dest = 1, p-1
         call MPI_SEND(alpha_vals,size(alpha_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(beta_vals,size(beta_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)

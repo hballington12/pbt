@@ -165,6 +165,7 @@ job_params%cache_id = -1
 job_params%scaling = .false.
 job_params%beta_lims = (/0D0,360D0/)
 job_params%gamma_lims = (/0D0,360D0/)
+job_params%output_eulers = .false.
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -744,6 +745,11 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 read(arg,*) job_params%gamma_lims(2)
                 print*,'job_params%gamma_lims(2): ', job_params%gamma_lims(2)
             end if 
+
+        case ('-output_eulers')
+            ! print*,'found command line specifier "output_eulers"'
+            job_params%output_eulers = .true.
+            ! do something
             
         case default ! if argument was unrecognised
             print '(2a, /)', 'unrecognised command-line option: ', arg
@@ -902,13 +908,14 @@ subroutine init_loop(   alpha_vals, &
         h = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
         ! print*,'h=',h
 
+
         num_beta_angles = floor(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
         ! print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
-        print*,'num_beta_angles=',num_beta_angles
+        print*,'num_beta_angles=',num_beta_angles,'(',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h),')'
 
         num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
         ! print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
-        print*,'num_gamma_angles=',num_gamma_angles
+        print*,'num_gamma_angles=',num_gamma_angles,'(',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)),')'
 
         leftover_angles = num_orients - num_beta_angles*num_gamma_angles
         print*,'number of (leftover) random euler angles: ',leftover_angles
@@ -927,7 +934,7 @@ subroutine init_loop(   alpha_vals, &
             beta_spacing = w/real(num_beta_angles)
             do i = 1, num_beta_angles ! for each entry, linear interpolate from 0 to 1
                 beta_intelli_vals(i) = beta_spacing * (i-1) + &
-                    beta_spacing / 2D0 + & ! with small shift to avoid normal incidence
+                    beta_spacing / 4D0 + & ! with small shift to avoid normal incidence
                     job_params%beta_lims(1) / 180D0 ! note that beta_lims(1) shouldnt be in the range 0 to 180 deg.
                     
                 ! print*,'beta_intelli_vals(i)',beta_intelli_vals(i)
@@ -952,9 +959,9 @@ subroutine init_loop(   alpha_vals, &
         end do
         ! stop
         ! fix numerical errors with a very small amount of extra rotation (probably not needed anymore following fixes to contour integral fnc)
-        alpha_vals(1:counter) = abs(alpha_vals(1:counter) - 0.0001)
-        beta_vals(1:counter) = abs(beta_vals(1:counter) - 0.0001)
-        gamma_vals(1:counter) = abs(gamma_vals(1:counter) - 0.0001)
+        ! alpha_vals(1:counter) = abs(alpha_vals(1:counter) - 0.0001)
+        ! beta_vals(1:counter) = abs(beta_vals(1:counter) - 0.0001)
+        ! gamma_vals(1:counter) = abs(gamma_vals(1:counter) - 0.0001)
         ! stop
         ! fill in remainining angles with random numbers
         do i = 1, leftover_angles
@@ -997,7 +1004,10 @@ subroutine init_loop(   alpha_vals, &
     !     (job_params%gamma_lims(2) - job_params%gamma_lims(1))/360D0 + & ! scale it back if needed
     !     job_params%gamma_lims(1)/360D0 ! shift it to minimum point
 
-        ! stop
+
+
+
+    ! stop
 
     end subroutine
 

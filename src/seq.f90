@@ -143,6 +143,10 @@ call init_loop( alpha_vals, &
                 gamma_vals, &
                 job_params)
 
+if(job_params%output_eulers) then
+    call output_eulers(alpha_vals,beta_vals,gamma_vals,output_dir,job_params)
+end if
+! stop
 ! some stuff
 if(job_params%resume) then ! if we are resuming a cached job
     ! do nothing because we've already read this in sr resume_job
