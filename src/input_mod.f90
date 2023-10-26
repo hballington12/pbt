@@ -903,19 +903,26 @@ subroutine init_loop(   alpha_vals, &
 
         ! stop
 
-        w = (job_params%beta_lims(2) - job_params%beta_lims(1)) / 180D0
+        h = (job_params%beta_lims(2) - job_params%beta_lims(1)) / 180D0
         ! print*,'w=',w
-        h = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
+        w = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
         ! print*,'h=',h
 
 
-        num_beta_angles = floor(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
+        ! num_beta_angles = floor(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
+        num_gamma_angles = floor((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w))
+        ! num_gamma_angles = floor(sqrt(real(num_orients)))
         ! print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
-        print*,'num_beta_angles=',num_beta_angles,'(',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h),')'
+        ! print*,'num_beta_angles=',num_beta_angles,'(',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h),')'
+        print*,'num_gamma_angles=',num_gamma_angles,'(',(-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w),')'
 
-        num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
+        ! num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
+        num_beta_angles = floor(num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)))
+        ! num_beta_angles = floor(sqrt(real(num_orients)))
         ! print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
-        print*,'num_gamma_angles=',num_gamma_angles,'(',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)),')'
+        ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)),')'
+        print*,'num_beta_angles=',num_beta_angles,'(',num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)),')'
+
 
         leftover_angles = num_orients - num_beta_angles*num_gamma_angles
         print*,'number of (leftover) random euler angles: ',leftover_angles
@@ -931,15 +938,15 @@ subroutine init_loop(   alpha_vals, &
             beta_intelli_vals(1) = 0.5 ! set to middle if less than than 8 orientations specified
             gamma_intelli_vals(1) = 0.5 ! set to middle if less than than 8 orientations specified
         else
-            beta_spacing = w/real(num_beta_angles)
+            beta_spacing = h/real(num_beta_angles-1)
             do i = 1, num_beta_angles ! for each entry, linear interpolate from 0 to 1
                 beta_intelli_vals(i) = beta_spacing * (i-1) + &
-                    beta_spacing / 4D0 + & ! with small shift to avoid normal incidence
+                    ! beta_spacing / 4D0 + & ! with small shift to avoid normal incidence
                     job_params%beta_lims(1) / 180D0 ! note that beta_lims(1) shouldnt be in the range 0 to 180 deg.
                     
                 ! print*,'beta_intelli_vals(i)',beta_intelli_vals(i)
             end do 
-            gamma_spacing = h/real(num_gamma_angles)
+            gamma_spacing = w/real(num_gamma_angles)
             do i = 1, num_gamma_angles ! for each entry, linear interpolate from 0 to 1
                 gamma_intelli_vals(i) = gamma_spacing * (i-1) + &
                     job_params%gamma_lims(1) / 360D0 ! note that gamma_lims(1) shouldnt be in the range 0 to 360 deg.
