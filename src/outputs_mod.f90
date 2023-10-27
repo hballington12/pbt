@@ -383,7 +383,7 @@
       ! write(10,'(A30,f16.8)') 'ext. efficiency: ',output_parameters_total%ext_eff
       close(10)
       
-      ! print*,'finished mueller to file.'
+       print*,'finished mueller to file.'
       
    end subroutine
    
