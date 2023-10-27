@@ -25,7 +25,7 @@ subroutine energy_checks(   beam_outbeam_tree, &
                             energy_out_ext_diff, &
                             energy_abs_beam)
 
-    type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
+    type(outbeamtype), dimension(:), allocatable, intent(in) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     integer, intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     real(8), dimension(:,:), allocatable :: norm ! face normals
     integer, dimension(:), allocatable :: face2 ! face normal ID of each face
@@ -64,12 +64,8 @@ subroutine energy_checks(   beam_outbeam_tree, &
                                 
         if (intensity_out .gt. 1e5) print*,'i_beam:',i,' intensity out: ',intensity_out
         
-        if (isnan(intensity_out)) then
-            print*,'oh dear - nan ibeam = ',i
-            beam_outbeam_tree(i)%ampl = 0
-        else
-            energy_out_beam = energy_out_beam + intensity_out*area*cos_theta
-        end if
+        
+        energy_out_beam = energy_out_beam + intensity_out*area*cos_theta
     end do
 
     energy_out_ext_diff = 0

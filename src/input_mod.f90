@@ -162,10 +162,6 @@ job_params%tri_roughness = 0D0
 job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
-job_params%scaling = .false.
-job_params%beta_lims = (/0D0,360D0/)
-job_params%gamma_lims = (/0D0,360D0/)
-job_params%output_eulers = .false.
 
 ! print*,'command_argument_count(): ',command_argument_count()
 print*,'parsing command line...'
@@ -646,11 +642,6 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             print*,'automatic triangulation: enabled'
             job_params%tri = .true.
 
-        case ('-scaling')
-            ! print*,'found command line specifier "mt"'
-            print*,'diffraction energy scaling: enabled'
-            job_params%scaling = .true.
-
         case ('-resume')
             i = i + 1 ! update counter to read the rotation method
             call get_command_argument(i,arg,status=my_status)
@@ -695,62 +686,13 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             i = i + 1 ! update counter to read the rotation method
             call get_command_argument(i,arg,status=my_status)
             if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "time_limit"'
+                print*,'error: no option found for "tri_edge"'
                 stop
             else
                 read(arg,*) job_params%time_limit
                 print*,'job_params%time_limit: ', job_params%time_limit,' hours'
             end if  
 
-        case ('-beta_min')
-            i = i + 1 ! update counter to read the rotation method
-            call get_command_argument(i,arg,status=my_status)
-            if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "beta_min"'
-                stop
-            else
-                read(arg,*) job_params%beta_lims(1)
-                print*,'job_params%beta_lims(1): ', job_params%beta_lims(1)
-            end if  
-
-        case ('-beta_max')
-            i = i + 1 ! update counter to read the rotation method
-            call get_command_argument(i,arg,status=my_status)
-            if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "beta_max"'
-                stop
-            else
-                read(arg,*) job_params%beta_lims(2)
-                print*,'job_params%beta_lims(2): ', job_params%beta_lims(2)
-            end if  
-
-        case ('-gamma_min')
-            i = i + 1 ! update counter to read the rotation method
-            call get_command_argument(i,arg,status=my_status)
-            if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "gamma_min"'
-                stop
-            else
-                read(arg,*) job_params%gamma_lims(1)
-                print*,'job_params%gamma_lims(1): ', job_params%gamma_lims(1)
-            end if  
-
-        case ('-gamma_max')
-            i = i + 1 ! update counter to read the rotation method
-            call get_command_argument(i,arg,status=my_status)
-            if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "gamma_max"'
-                stop
-            else
-                read(arg,*) job_params%gamma_lims(2)
-                print*,'job_params%gamma_lims(2): ', job_params%gamma_lims(2)
-            end if 
-
-        case ('-output_eulers')
-            ! print*,'found command line specifier "output_eulers"'
-            job_params%output_eulers = .true.
-            ! do something
-            
         case default ! if argument was unrecognised
             print '(2a, /)', 'unrecognised command-line option: ', arg
             stop
@@ -859,10 +801,10 @@ subroutine init_loop(   alpha_vals, &
     logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
     type(job_parameters_type), intent(in) :: job_params ! job parameters
     real(8), dimension(:), allocatable, intent(out) :: alpha_vals, beta_vals, gamma_vals
-    integer num_angles, leftover_angles, num_beta_angles, num_gamma_angles
-    real(8), allocatable, dimension(:) :: intelli_vals, beta_intelli_vals, gamma_intelli_vals
+    integer num_angles, leftover_angles
+    real(8), allocatable, dimension(:) :: intelli_vals
     integer i, j, k, counter
-    real(8) spacing, rand, beta_spacing, gamma_spacing, h, w
+    real(8) spacing, rand
 
     intellirot = job_params%intellirot
     num_orients = job_params%num_orients
@@ -873,148 +815,65 @@ subroutine init_loop(   alpha_vals, &
 
     if (intellirot) then
 
-        ! the spacing for beta and gamma must be uniformly distributed
-        ! this needs special care if using particle symmetry to reduce the range of angles needed
-
-        ! print*,'job_params%beta_lims',job_params%beta_lims
-        ! print*,'job_params%gamma_lims',job_params%gamma_lims
-
-        ! check the validity of beta and gamma lims
-        if(job_params%beta_lims(1) .gt. job_params%beta_lims(2)) then
-            print*,'error: lower beta limit was greater than the upper beta limit'
-            stop
-        else if(job_params%beta_lims(1) .lt. -1D-4 .or. job_params%beta_lims(1) .gt. 180D0) then
-            print*,'error: lower beta limit must lie in the range 0 to 180'
-            stop
-        else if(job_params%beta_lims(2) .lt. -0.0001 .or. job_params%beta_lims(2) .gt. 180D0) then
-            print*,'error: upper beta limit must lie in the range 0 to 180'
-            stop
-        end if
-        if(job_params%gamma_lims(1) .gt. job_params%gamma_lims(2)) then
-            print*,'error: lower gamma limit was greater than the upper gamma limit'
-            stop
-        else if(job_params%gamma_lims(1) .lt. -1D-4 .or. job_params%gamma_lims(1) .gt. 360D0) then
-            print*,'error: lower gamma limit must lie in the range 0 to 180'
-            stop
-        else if(job_params%gamma_lims(2) .lt. -0.0001 .or. job_params%gamma_lims(2) .gt. 360D0) then
-            print*,'error: upper gamma limit must lie in the range 0 to 180'
-            stop
-        end if
-
-        ! stop
-
-        h = (job_params%beta_lims(2) - job_params%beta_lims(1)) / 180D0
-        ! print*,'w=',w
-        w = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
-        ! print*,'h=',h
-
-
-        ! num_beta_angles = floor(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
-        num_gamma_angles = floor((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w))
-        ! num_gamma_angles = floor(sqrt(real(num_orients)))
-        ! print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
-        ! print*,'num_beta_angles=',num_beta_angles,'(',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h),')'
-        print*,'num_gamma_angles=',num_gamma_angles,'(',(-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w),')'
-
-        ! num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
-        num_beta_angles = floor(num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)))
-        ! num_beta_angles = floor(sqrt(real(num_orients)))
-        ! print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
-        ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)),')'
-        print*,'num_beta_angles=',num_beta_angles,'(',num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)),')'
-
-
-        leftover_angles = num_orients - num_beta_angles*num_gamma_angles
+        print*,'number of orientations:',num_orients
+        num_angles = floor(num_orients**(1d0/3d0))
+        print*,'number of intelligent euler angles:',num_angles
+        leftover_angles = num_orients - num_angles**3
         print*,'number of (leftover) random euler angles: ',leftover_angles
 
-        ! stop
-
-        ! stop
-
-
-        allocate(beta_intelli_vals(1:num_beta_angles)) ! allocate array to hold intelligent euler angles
-        allocate(gamma_intelli_vals(1:num_gamma_angles)) ! allocate array to hold intelligent euler angles
+        allocate(intelli_vals(1:num_angles)) ! allocate array to hold intelligent euler angles
         if(num_angles .eq. 1) then
-            beta_intelli_vals(1) = 0.5 ! set to middle if less than than 8 orientations specified
-            gamma_intelli_vals(1) = 0.5 ! set to middle if less than than 8 orientations specified
+            intelli_vals(1) = 0.5 ! set to middle if less than than 8 orientations specified
         else
-            beta_spacing = h/real(num_beta_angles-1)
-            do i = 1, num_beta_angles ! for each entry, linear interpolate from 0 to 1
-                beta_intelli_vals(i) = beta_spacing * (i-1) + &
-                    ! beta_spacing / 4D0 + & ! with small shift to avoid normal incidence
-                    job_params%beta_lims(1) / 180D0 ! note that beta_lims(1) shouldnt be in the range 0 to 180 deg.
-                    
-                ! print*,'beta_intelli_vals(i)',beta_intelli_vals(i)
-            end do 
-            gamma_spacing = w/real(num_gamma_angles)
-            do i = 1, num_gamma_angles ! for each entry, linear interpolate from 0 to 1
-                gamma_intelli_vals(i) = gamma_spacing * (i-1) + &
-                    job_params%gamma_lims(1) / 360D0 ! note that gamma_lims(1) shouldnt be in the range 0 to 360 deg.
-                ! print*,'gamma_intelli_vals(i)',gamma_intelli_vals(i)
-            end do                        
+            spacing = 1d0/(num_angles-1)
+            do i = 1, num_angles ! for each entry, linear interpolate from 0 to 1
+                intelli_vals(i) = spacing * (i-1)
+                ! print*,'intelli_vals(i)',intelli_vals(i)
+            end do
         end if
-        ! stop
+
         ! loop through and assign intelligent angles
         counter = 0
-        do j = 1,num_beta_angles
-            do k = 1,num_gamma_angles
-                counter = counter + 1 ! count how many orientations we have set up
-                alpha_vals(counter) = 0D0
-                beta_vals(counter) = beta_intelli_vals(j)
-                gamma_vals(counter) = gamma_intelli_vals(k)
+        do i = 1, num_angles
+            do j = 1,num_angles
+                do k = 1,num_angles
+                    counter = counter + 1 ! count how many orientations we have set up
+                    alpha_vals(counter) = intelli_vals(i)
+                    beta_vals(counter) = intelli_vals(j)
+                    gamma_vals(counter) = intelli_vals(k)
+
+                end do
             end do
         end do
-        ! stop
-        ! fix numerical errors with a very small amount of extra rotation (probably not needed anymore following fixes to contour integral fnc)
-        ! alpha_vals(1:counter) = abs(alpha_vals(1:counter) - 0.0001)
-        ! beta_vals(1:counter) = abs(beta_vals(1:counter) - 0.0001)
-        ! gamma_vals(1:counter) = abs(gamma_vals(1:counter) - 0.0001)
-        ! stop
+
+        ! fix numerical errors with a very small amount of extra rotation
+        alpha_vals(1:counter) = abs(alpha_vals(1:counter) - 0.0001)
+        beta_vals(1:counter) = abs(beta_vals(1:counter) - 0.0001)
+        gamma_vals(1:counter) = abs(gamma_vals(1:counter) - 0.0001)
+
         ! fill in remainining angles with random numbers
         do i = 1, leftover_angles
             counter = counter + 1
             call random_number(rand)
-            ! alpha_vals(counter) = rand
-            alpha_vals(counter) = 0D0
+            alpha_vals(counter) = rand
             call random_number(rand)
             beta_vals(counter) = rand
             call random_number(rand)
             gamma_vals(counter) = rand                        
         end do
 
-        ! print intelligent euler angles
+        ! ! print intelligent euler angles
         ! do i = 1, num_orients
         !     print'(A,f6.4,A,f6.4,A,f6.4)','alpha: ',alpha_vals(i),' beta: ',beta_vals(i),' gamma: ',gamma_vals(i)
         ! end do
 
     else
         do i = 1, size(alpha_vals,1) ! loop here so that the angles are reproducable regardless of number of orientations
-            ! random alpha value
-            ! call random_number(alpha_vals(i))
-            ! for random orientation, alpha has no effect on the 1d patterns, so set it to a constant
-            alpha_vals(i) = 0D0
+            call random_number(alpha_vals(i))
             call random_number(beta_vals(i))
             call random_number(gamma_vals(i))
         end do
     end if
-
-    ! scaling
-
-    ! beta_vals = beta_vals * &
-    !     (job_params%beta_lims(2) - job_params%beta_lims(1))/180D0 + & ! scale it back if needed
-    !     job_params%beta_lims(1)/180D0 ! shift it to minimum point
-
-        ! print*,'scaling factor: ',(job_params%beta_lims(2) - job_params%beta_lims(1))/360D0     
-        ! print*,'scaling shift: ',job_params%beta_lims(1)/360D0
-        
-    ! gamma_vals = gamma_vals * &
-    !     (job_params%gamma_lims(2) - job_params%gamma_lims(1))/360D0 + & ! scale it back if needed
-    !     job_params%gamma_lims(1)/360D0 ! shift it to minimum point
-
-
-
-
-    ! stop
 
     end subroutine
 
@@ -1497,7 +1356,7 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         rand = alpha_vals(loop_index)    
         eulers(1) = 2*pi*(rand)
 
-        rand = beta_vals(loop_index) ! unscaled by job limits
+        rand = beta_vals(loop_index) 
         eulers(2) = acos(1.0 - 2.0*rand)
 
         rand = gamma_vals(loop_index) 
@@ -2060,7 +1919,7 @@ subroutine PDAL2(   num_vert,       &
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
     type(job_parameters_type), intent(in) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 
-    integer, parameter :: num_face_vert_max_in = 20 ! max number of vertices per face
+    integer, parameter :: num_face_vert_max_in = 42 ! max number of vertices per face
     integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
     integer face_string_length
