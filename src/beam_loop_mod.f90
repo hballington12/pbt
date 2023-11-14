@@ -104,7 +104,7 @@ subroutine energy_checks(   beam_outbeam_tree, &
     print'(A40,f16.8,A2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
 
     print*,'========== end sr energy_checks'
-    ! stop
+    stop
 
 end subroutine
 
@@ -230,6 +230,7 @@ subroutine beam_loop(   Face1, &
     ibi = job_params%ibi
     rec = job_params%rec
     is_multithreaded = job_params%is_multithreaded
+    is_multithreaded = .false.
 
     call make_normals(Face1, verts, Face2, Norm) ! recalculate normals
 
@@ -1498,7 +1499,7 @@ do i = 1, num_sufficiently_illuminated_apertures
             !                                     beam_ampl(2,1,beamIDs_ps(j))*conjg(beam_ampl(2,1,beamIDs_ps(j))) + &
             !                                     beam_ampl(2,2,beamIDs_ps(j))*conjg(beam_ampl(2,2,beamIDs_ps(j)))))                                                
 
-            rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) * exp(-2*waveno*ibi*distances_ps(j)) ! absorption
+            rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) * exp(-2*waveno*ibi*sqrt(distances_ps(j))) ! absorption
 
             ! print*,'absorption factor: ',exp(-2*waveno*ibi*distances_ps(j))**2
             ! print*,'1 - absorption factor: ',(1 - exp(-2*waveno*ibi*distances_ps(j))**2)
@@ -1513,7 +1514,7 @@ do i = 1, num_sufficiently_illuminated_apertures
             intensity_abs = real(0.5*(  beam_ampl(1,1,beamIDs_ps(j))*conjg(beam_ampl(1,1,beamIDs_ps(j))) + &
                                         beam_ampl(1,2,beamIDs_ps(j))*conjg(beam_ampl(1,2,beamIDs_ps(j))) + &
                                         beam_ampl(2,1,beamIDs_ps(j))*conjg(beam_ampl(2,1,beamIDs_ps(j))) + &
-                                        beam_ampl(2,2,beamIDs_ps(j))*conjg(beam_ampl(2,2,beamIDs_ps(j)))))*(1-exp(-2*waveno*ibi*distances_ps(j))**2)
+                                        beam_ampl(2,2,beamIDs_ps(j))*conjg(beam_ampl(2,2,beamIDs_ps(j)))))*(1-exp(-2*waveno*ibi*sqrt(distances_ps(j)))**2)
 
             ! print*,'intensity conservation: ',(intensity_out + intensity_abs)/intensity_in * 100,'%'
 
