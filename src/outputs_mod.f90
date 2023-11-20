@@ -344,7 +344,7 @@
          open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
          do i = 1, size(theta_vals,1)
             do j = 1, size(phi_vals,1)
-               write(10,'(f12.4,f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
+               write(10,'(f12.4,f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)') &
                theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
                mueller(j,i,1), mueller(j,i,2), mueller(j,i,3), mueller(j,i,4), &
                mueller(j,i,5), mueller(j,i,6), mueller(j,i,7), mueller(j,i,8), &
@@ -356,7 +356,7 @@
       end if
       open(10,file=trim(output_dir)//"/"//"mueller_scatgrid_1d")
       do j = 1, size(theta_vals,1)
-         write(10,'(f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
+         write(10,'(f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)') &
          theta_vals(j)*180/pi, &
          mueller_1d(j,1), mueller_1d(j,2), mueller_1d(j,3), mueller_1d(j,4), &
          mueller_1d(j,5), mueller_1d(j,6), mueller_1d(j,7), mueller_1d(j,8), &
@@ -429,6 +429,7 @@
       output_parameters_total%abs = output_parameters_total%abs + output_parameters%abs
       output_parameters_total%scatt = output_parameters_total%scatt + output_parameters%scatt
       output_parameters_total%back_scatt = output_parameters_total%back_scatt + output_parameters%back_scatt
+print*,'output_parameters_total%back_scatt =',output_parameters_total%back_scatt
       output_parameters_total%ext = output_parameters_total%ext + output_parameters%ext
       output_parameters_total%albedo = output_parameters_total%albedo + output_parameters%albedo
       output_parameters_total%asymmetry = output_parameters_total%asymmetry + output_parameters%asymmetry
