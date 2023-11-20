@@ -104,7 +104,7 @@ subroutine energy_checks(   beam_outbeam_tree, &
     print'(A40,f16.8,A2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
 
     print*,'========== end sr energy_checks'
-    stop
+    ! stop
 
 end subroutine
 
