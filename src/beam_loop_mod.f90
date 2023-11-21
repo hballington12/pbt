@@ -1466,12 +1466,12 @@ do i = 1, num_sufficiently_illuminated_apertures
     do j = 1, size(Face2,1) ! for each facet
         if(isWithinBeam2_ps(j)) then
             k = k + 1
-            if(isShadow(j) .eqv. .false.) then
-                call cross(-Norm(Face2(j),1:3),aperturePropagationVectors(aperture_id,1:3),vk7a(1:3))
-            else
+            ! if(isShadow(j) .eqv. .false.) then
+            !     call cross(-Norm(Face2(j),1:3),aperturePropagationVectors(aperture_id,1:3),vk7a(1:3))
+            ! else
                 aperture = apertures(j)
                 call cross(-apertureNormals(aperture,1:3),aperturePropagationVectors(aperture_id,1:3),vk7a(1:3))
-            end if
+            ! end if
 
             call getRotationMatrix( rot,vk7a(1),vk7a(2),vk7a(3), &
                                     beamvk71(beamIDs_ps(j)),beamvk72(beamIDs_ps(j)),beamvk73(beamIDs_ps(j)), &
@@ -1522,12 +1522,12 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)','               (',real(rot_ampl(2,1)),' + ',imag(rot_ampl(2,1)),'i, ',real(rot_ampl(2,2)),' + ',imag(rot_ampl(2,2)),'i)'
 
             ! FRESNEL
-            if(isShadow(j) .eqv. .false.) then
-                theta_i = acos(-rotatedNorm(Face2(j),3)) ! get incident angle
-            else
+            ! if(isShadow(j) .eqv. .false.) then
+            !     theta_i = acos(-rotatedNorm(Face2(j),3)) ! get incident angle
+            ! else
                 aperture = apertures(j) ! probably dont need this line (see above)
                 theta_i = acos(-rotatedapertureNormals(aperture,3)) ! get incident angle                
-            end if
+            ! end if
             if(theta_i .gt. asin(1/rbi)) then ! if tir
                 tir = .true.
                 r_perp = -1
@@ -2318,13 +2318,13 @@ ev3(2) = 0
 ev3(3) = -1
 
 do i = 1, size(Face2,1) ! for each face
-    if(isShadow(i)) then ! if shadow, use aperture normal because Snell's Law unphysical
+    ! if(isShadow(i)) then ! if shadow, use aperture normal because Snell's Law unphysical
         normal(1:3) = apertureNormals(apertures(i),1:3)
         w = -abs(apertureNormals(apertures(i),3)) ! dot product of incidence vector with aperture normal
-    else
-        normal(1:3) = Norm(Face2(i),1:3)
-        w = -abs(Norm(Face2(i),3)) ! dot product of incidence vector with face normal
-    end if
+    ! else
+    !     normal(1:3) = Norm(Face2(i),1:3)
+    !     w = -abs(Norm(Face2(i),3)) ! dot product of incidence vector with face normal
+    ! end if
     if(w .lt. thresh) then
         vk71(i) = 1
         vk72(i) = 0
