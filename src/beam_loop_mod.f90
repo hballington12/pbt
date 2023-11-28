@@ -230,7 +230,7 @@ subroutine beam_loop(   Face1, &
     ibi = job_params%ibi
     rec = job_params%rec
     is_multithreaded = job_params%is_multithreaded
-    is_multithreaded = .false.
+    ! is_multithreaded = .false.
 
     call make_normals(Face1, verts, Face2, Norm) ! recalculate normals
 
