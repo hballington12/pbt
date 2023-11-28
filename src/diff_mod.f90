@@ -800,14 +800,14 @@ module diff_mod
         !$OMP DO
         do j = 1, beam_outbeam_tree_counter
 
-            if(omp_get_thread_num() .eq. 0) then
-                work_done = work_done + 1
-                progressReal = work_done*100/beam_outbeam_tree_counter*omp_get_num_threads()          ! my thread percent completion
-                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
-                    progressInt = int(progressReal)           ! update progress counter
-                    call progress_bar(progressInt, 100)
-                end if
-            end if
+            ! if(omp_get_thread_num() .eq. 0) then
+            !     work_done = work_done + 1
+            !     progressReal = work_done*100/beam_outbeam_tree_counter*omp_get_num_threads()          ! my thread percent completion
+            !     if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
+            !         progressInt = int(progressReal)           ! update progress counter
+            !         call progress_bar(progressInt, 100)
+            !     end if
+            ! end if
     
             ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
             perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
@@ -836,14 +836,14 @@ module diff_mod
         !$OMP DO
         do j = 1, size(ext_diff_outbeam_tree,1)
 
-            if(omp_get_thread_num() .eq. 0) then
-                work_done = work_done + 1
-                progressReal = work_done*100/size(ext_diff_outbeam_tree,1)*omp_get_num_threads()          ! my thread percent completion
-                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
-                    progressInt = int(progressReal)           ! update progress counter
-                    call progress_bar(progressInt, 100)
-                end if
-            end if
+            ! if(omp_get_thread_num() .eq. 0) then
+            !     work_done = work_done + 1
+            !     progressReal = work_done*100/size(ext_diff_outbeam_tree,1)*omp_get_num_threads()          ! my thread percent completion
+            !     if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
+            !         progressInt = int(progressReal)           ! update progress counter
+            !         call progress_bar(progressInt, 100)
+            !     end if
+            ! end if
 
             ampl(1:2,1:2) = ext_diff_outbeam_tree(j)%ampl(1:2,1:2)
             perp0(1:3) = ext_diff_outbeam_tree(j)%vk7(1:3)
