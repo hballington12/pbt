@@ -13,6 +13,25 @@
         
         contains
         
+        subroutine output_eulers(alpha_vals,beta_vals,gamma_vals,output_dir,job_params)
+
+            ! writes the euler angles to a file
+
+        real(8), dimension(:), allocatable, intent(in) :: alpha_vals, beta_vals, gamma_vals    
+        character(len=255), intent(in) :: output_dir ! output directory
+        type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
+
+        integer i
+
+        print*,'outputting eulers to file...'
+        open(unit=10,file=trim(output_dir)//"/"//"eulers.dat")
+        do i = 1, job_params%num_orients
+            write(10,"(f14.8,f14.8,f14.8)") 360D0*alpha_vals(i), 180D0/pi*acos(1-2*beta_vals(i)), 360D0*gamma_vals(i)
+        end do
+        close(10)  
+
+        end subroutine
+
         subroutine resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
             
             ! attempts to pull cached files from cache directory

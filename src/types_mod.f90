@@ -70,6 +70,7 @@ type job_parameters_type
     logical scaling ! enable energy scaling for diffraction
     real(8) beta_lims(1:2) ! min and max beta values for orientation averaging
     real(8) gamma_lims(1:2) ! min and max gamma values for orientation averaging
+    logical output_eulers ! enables an output of the euler angles to a file
 end type job_parameters_type
 
 contains
