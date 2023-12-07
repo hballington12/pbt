@@ -268,7 +268,7 @@ subroutine beam_loop(   Face1, &
     
     call propagateBeam(ampl_in, ampl_in_ps, ampl_beam, isWithinBeam, isWithinBeam_ps, beamIDs, beamIDs_ps, waveno, distances, distances_ps, Face1) ! use distances to propagate fields to the points of intersection
     
-    call getFresnel(Face1, isShadow, Norm, Face2, apertureNormals, apertures, rbi, rperp, rpar, tperp, tpar) ! calculate fresnel coefficients based on facet normals (or aperture normals for shadow facets)
+    call getFresnel(Face1, isShadow, Norm, Face2, apertureNormals, apertures, rbi, rperp, rpar, tperp, tpar, ibi) ! calculate fresnel coefficients based on facet normals (or aperture normals for shadow facets)
     
     call getPropagationVectors(aperturePropagationVectors,sufficientlyIlluminated,apertureNormals,rbi) ! get propagation vectors based on aperture normals
     
@@ -2375,7 +2375,7 @@ end do
 
 end subroutine
 
-subroutine getFresnel(Face1, isShadow, Norm, Face2, apertureNormals, apertures, m, rperp, rpar, tperp, tpar)
+subroutine getFresnel(Face1, isShadow, Norm, Face2, apertureNormals, apertures, rbi, rperp, rpar, tperp, tpar, ibi)
 
 integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 logical, dimension(:), allocatable, intent(in) :: isShadow ! whether the facet was in shadow (down-facing but within the illuminating beam and part of an illuminated aperture)
@@ -2383,7 +2383,8 @@ real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
 integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal of each aperture
 integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
-real(8), intent(in) :: m ! real part of the refractive index
+real(8), intent(in) :: rbi ! real part of the refractive index
+real(8), intent(in) :: ibi ! real part of the refractive index
 complex(8), dimension(:), allocatable, intent(inout) :: rperp ! Fresnel coefficient
 complex(8), dimension(:), allocatable, intent(inout) :: rpar ! Fresnel coefficient
 complex(8), dimension(:), allocatable, intent(inout) :: tperp ! Fresnel coefficient
@@ -2393,6 +2394,9 @@ integer i
 real(8) normal ! z component of face normal
 real(8) theta_i ! incident theta in rads
 real(8) theta_t ! refracted theta in rads
+complex(8) m ! complex refractive index
+
+m = cmplx(rbi,ibi)
 
 ! for external interactions
 do i = 1, size(Face1,1) ! for each face

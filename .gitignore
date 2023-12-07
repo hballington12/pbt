@@ -10,3 +10,4 @@ src/seq/abt
 src/mpi/abt
 src/tri/triangle
 src/tri/showme
+jobs/*
