@@ -828,9 +828,9 @@
                 vert_counter = 0
                 face_counter = 0
                 
-                print*,'face:',i
+                ! print*,'face:',i
                 num_verts = num_face_vert(i)
-                print*,'num verts in this face: ',num_verts
+                ! print*,'num verts in this face: ',num_verts
                 
                 ! rotate into x-y plane
                 if (allocated(v)) deallocate(v)
@@ -861,7 +861,7 @@
                 
                 ! print*,'rot:',rot
                 
-                print*,'rank: ',rank
+                ! print*,'rank: ',rank
                 
                 write(rank_string,*) rank
                 
@@ -886,13 +886,13 @@
                 write(triangle_cmd,*) './src/tri/triangle' // ' -p ',trim(output_dir)//'/tmp/face'//trim(adjustl(rank_string))//'.poly'//' -a'//trim(adjustl(a_string))//" "//trim(adjustl(flags))
                 ! write(triangle_cmd,*) './triangle' // ' -p face.poly -q -Q -B -a'//'0.005'//" "//trim(adjustl(flags))
                 
-                print*,'triangle command: "',trim(adjustl(triangle_cmd)),'"'
+                ! print*,'triangle command: "',trim(adjustl(triangle_cmd)),'"'
                 
                 ! check that triangle has been compiled by the user...
                 inquire(file="./src/tri/triangle", exist=exists)
                 
                 if (exists) then
-                    print*,'triangle executable found'
+                    ! print*,'triangle executable found'
                 else
                     print*,'error: triangle exectuable not found. please compile triangle at ./src/tri or disable triangulation'
                     print*,'reminder: triangulation is forced automatically if the input particle has facets with more than 3 vertices.'
@@ -910,7 +910,7 @@
                 
                 open(unit=10,file=trim(output_dir)//'/tmp/face'//trim(adjustl(rank_string))//'.1.node',status="old") ! open the triangulated node file
                 read(10,*) num_nodes
-                print*,'number of vertices after triangulation: ',num_nodes
+                ! print*,'number of vertices after triangulation: ',num_nodes
                 do j = 1, num_nodes ! read in each node
                     vert_counter = vert_counter + 1 ! update new vertex counter
                     read(10,*) junk, verts_out(vert_counter + vert_counter_total,1), verts_out(vert_counter + vert_counter_total,2), junk, is_vertex_on_boundary
@@ -933,7 +933,7 @@
                 
                 open(unit=10,file=trim(output_dir)//'/tmp/face'//trim(adjustl(rank_string))//'.1.ele',status="old") ! open the triangulated ele file
                 read(10,*) num_faces
-                print*,'number of faces after triangulation: ',num_faces
+                ! print*,'number of faces after triangulation: ',num_faces
                 do j = 1, num_faces ! read in each face
                     face_counter = face_counter + 1 ! update new vertex counter
                     read(10,*) junk, face_ids_out(face_counter + face_counter_total,1), face_ids_out(face_counter + face_counter_total,2), face_ids_out(face_counter + face_counter_total,3)
@@ -953,7 +953,7 @@
                 ! print*,'total vertices read so far: ',vert_counter_total
                 ! print*,'total faces read so far: ',face_counter_total
                 ! print*,'read triangulated face back in'
-                print*,'******************************'
+                ! print*,'******************************'
                 
             end do
             
