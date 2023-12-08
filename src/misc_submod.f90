@@ -13,6 +13,51 @@
         
         contains
         
+        subroutine make_normals(face_ids, verts, norm_ids, norms)
+            
+        ! subroutine make_normals recomputes and returns the normals, as well as the corresponding IDs for each face
+            
+        integer, dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
+        integer, dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
+        real(8), dimension(:,:) ,allocatable, intent(in) :: verts ! unique vertices
+        real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices
+            
+        real(8), dimension(1:3) :: vec12, vec23, normal ! temporary vectors used to find the facet normal
+        real(8) temp_verts(1:3,1:3) ! temporary array to hold the xyz components of the first 3 vertices in each facet
+
+        integer i
+            
+        ! print*,'========== start sr make_normals'
+            
+        ! allocate the arrays for the normals and the IDs
+        !print*,'number of faces: ',size(face_ids,1)
+        allocate(norm_ids(size(face_ids,1)))
+        allocate(norms(size(face_ids,1),3))
+            
+        ! for each face
+        do i = 1,size(face_ids,1)
+            temp_verts(1:3,1:3) = verts(face_ids(i,1:3),1:3) ! get first 3 vertices of facet
+                
+            vec12(1:3) = temp_verts(2,1:3) - temp_verts(1,1:3) ! vector from vertex 1 to vertex 2
+            vec23(1:3) = temp_verts(3,1:3) - temp_verts(2,1:3) ! vector from vertex 2 to vertex 3
+                
+            ! cross product to get facet normal
+            call cross(vec12,vec23,normal)
+                
+            !print*,'i',i
+            !print*,'normal', normal
+                
+            ! save to arrays
+            norm_ids(i) = i
+            norms(i,1:3) = normal(1:3)
+                
+        end do
+            
+            
+        ! print*,'========== end sr make_normals'
+            
+        end subroutine
+
         subroutine output_eulers(alpha_vals,beta_vals,gamma_vals,output_dir,job_params)
 
             ! writes the euler angles to a file

@@ -8,7 +8,7 @@ module diff_mod
     use omp_lib
     
     implicit none
-        
+
     contains
 
     subroutine getRotationMatrix(rot, vk71, vk72, vk73, ev11, ev12, ev13, ev31, ev32, ev33)
@@ -57,14 +57,14 @@ module diff_mod
         sin_rot = w2/help1
       end subroutine random_rotation
 
-    subroutine trim_outbeam_tree(beam_tree,beam_tree_counter)
+    subroutine trim_outbeam_tree(beam_tree,beam_tree_counter,job_params)
 
     ! trims the outbeam tree
     ! outgoing beams are ignored if the amplitude matrix has less than 1e-6 energy
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_tree ! beam_tree to be trimmed
     integer, intent(inout) :: beam_tree_counter ! counts the current number of beam outbeams
-
+    type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
     integer i, j
     type(outbeamtype), dimension(:), allocatable :: beam_tree_temp ! beam_tree temporary copy
     real(8) energy
@@ -84,8 +84,10 @@ module diff_mod
         end if
     end do
 
-    print*,'trimmed outbeam tree from',beam_tree_counter,' to ',j,' outbeams'
-
+    if(job_params%debug >= 2) then
+        print*,'trimmed outbeam tree from',beam_tree_counter,' to ',j,' outbeams'
+    end if
+    
     beam_tree_counter = j ! replace old beam counter with adjusted one
     beam_tree = beam_tree_temp ! replace in beam_tree with trimmed one
 
@@ -746,12 +748,15 @@ module diff_mod
     real(8) v(1:3,1:3) ! vertices of facet to pass to diffraction sr
     complex(8), dimension(:,:), allocatable :: area_facs2
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
-    real(8) start, finish ! cpu timing variables
+    real(8) start, finish, start1, finish1 ! cpu timing variables
     real(8) progressReal
     real work_done
     integer progressInt
 
-    start = omp_get_wtime()
+
+    if(job_params%timing) then
+        start = omp_get_wtime()
+    end if
 
     lambda = job_params%la
     theta_vals = job_params%theta_vals
@@ -788,15 +793,20 @@ module diff_mod
     progressInt = 0
     work_done = 0
 
-    print*,'start diff beam loop...'
-    
-    call trim_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter) ! removes very low energy outbeams from the beam tree
+    if(job_params%debug >= 1) then
+        print*,'start diff beam loop...'
+    end if
+
+    call trim_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,job_params) ! removes very low energy outbeams from the beam tree
 
     if (is_multithreaded) then ! multi-threaded diffraction
 
         ! print*,'multithreading: enabled'
         ! print*,'max threads:',omp_get_max_threads()
-        !$OMP PARALLEL num_threads(omp_get_max_threads()) PRIVATE(amplC11s,amplC12s,amplC21s,amplC22s,ampl,perp0,prop0,v)
+        !$OMP PARALLEL num_threads(omp_get_max_threads()) PRIVATE(amplC11s,amplC12s,amplC21s,amplC22s,ampl,perp0,prop0,v,start1,finish1)
+        if(job_params%timing) then
+            start1 = omp_get_wtime()
+        end if
         !$OMP DO
         do j = 1, beam_outbeam_tree_counter
 
@@ -825,12 +835,19 @@ module diff_mod
             !$OMP END CRITICAL
         
         end do
+
         if(omp_get_thread_num() .eq. 0) then
-            print*,''
-            print*,'end diff beam loop...'
-            print*,'start ext diff loop...'
+            if(job_params%debug >= 1) then
+                print*,'end diff beam loop...'
+            if(job_params%timing) then
+                finish1 = omp_get_wtime()
+                print'(A,f16.8,A)',"beam diffraction took: ",finish1-start1," secs"
+                start1 = omp_get_wtime()
+            end if
+                print*,'start ext diff loop...'
         end if
-        
+        end if
+
         work_done = 0
         progressInt = 0
         !$OMP DO
@@ -860,9 +877,17 @@ module diff_mod
             !$OMP END CRITICAL
                 
         end do
+
+        if(omp_get_thread_num() .eq. 0) then
+            if(job_params%debug >= 1) then
+                print*,'end ext diff loop...'
+                if(job_params%timing) then
+                    finish1 = omp_get_wtime()
+                    print'(A,f16.8,A)',"external diffraction took: ",finish1-start1," secs"
+                end if
+            end if
+        end if
         !$OMP END PARALLEL
-        print*,''
-        print*,'end ext diff loop...'
 
     else ! single-threaded diffraction
 
@@ -1004,12 +1029,12 @@ module diff_mod
     
     
     ! print*,'end ext diff loop...'
-    
-    finish = omp_get_wtime()
-    ! print*,'=========='
-    print'(A,f16.8,A)',"end diffraction - total time taken: ",finish-start," secs"
-    ! print*,'=========='
-
+    if(job_params%debug >= 1) then
+        if(job_params%timing) then
+            finish = omp_get_wtime()
+            print'(A,f16.8,A)',"diffraction took: ",finish-start," secs"
+        end if
+    end if
     ! print*,'========== end sr diff_main'
 
     end subroutine

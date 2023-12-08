@@ -2,6 +2,8 @@
 
 This file contains a summary of the aperture beam tracer (ABT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse.
 
+## Compilation
+
 Compile instructions (gcc-13.0.1 & openmpi-4.0.5)
 
 - `cd src/seq; make` - compiles sequential code
@@ -9,7 +11,7 @@ Compile instructions (gcc-13.0.1 & openmpi-4.0.5)
 
 Example shell scripts for submitting jobs may be found in `template/`
 
-## `./src/seq/abt.f90`
+## Input Flags
 
 Main source file. It contains the program entry point. The ABT reads input parameters from the command line. There are a few required input arguments, as well as a few optional ones. The code will stop if a mandatory argument is missing from the command line. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of most arguments in the command line is not important and the ABT will search through lines from left to right in an attempt to find each argument. A summary of command line arguments is given below:
 
@@ -89,6 +91,18 @@ Main source file. It contains the program entry point. The ABT reads input param
 - `-resume <value>` - Resumes a previous job that was saved at an intermediate point. `value` must be the number of the cache ID. This option overrides most input parameters with those read from the cached job.
 
 - `-scaling` - Forces the diffracted energy in the far-field to be conserved with respect to the near-field energy.
+
+- `-timing` - Enables more detailed output of the timing of different parts of the code
+
+- `-debug <value>` - Controls the level of debugging output:
+
+    - `0` - minimal output
+
+    - `1` - some output (default)
+
+    - `2` - large output
+
+    - `3` - extreme output
 
  ## Examples
 

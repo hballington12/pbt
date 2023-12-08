@@ -71,6 +71,8 @@ type job_parameters_type
     real(8) beta_lims(1:2) ! min and max beta values for orientation averaging
     real(8) gamma_lims(1:2) ! min and max gamma values for orientation averaging
     logical output_eulers ! enables an output of the euler angles to a file
+    integer debug ! level of debugging output (0-3)
+    logical timing ! code timing output
 end type job_parameters_type
 
 contains

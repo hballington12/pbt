@@ -79,9 +79,8 @@ character(len=255) cache_dir ! cached files directory (if job stops early)
 integer, dimension(:), allocatable :: remaining_orients
 integer num_remaining_orients
 
-
 ! ############################################################################################################
-! start
+! start main
 print*,'========== start main'
 start = omp_get_wtime()
 my_rank = 0
@@ -89,6 +88,7 @@ loop_start = 1
 seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
 
 call parse_command_line(job_params)
+
 
 if(job_params%resume) then
     print*,'attempting to resume job using cache #',job_params%cache_id
@@ -127,6 +127,7 @@ if (job_params%tri) then
     print*,'================================='
 end if
 
+! stop
 ! write unrotated particle to file (optional)            
 call PDAS(  vert_in,        & ! <-  rotated vertices
             face_ids,       & ! <-  face vertex IDs
@@ -172,7 +173,7 @@ do i = 1, num_remaining_orients
                     job_params)
 
     ! write rotated particle to file (optional)
-    if (job_params%num_orients  .eq. 1) then
+    if (job_params%num_orients .eq. 1) then
         call PDAS(  vert,       & ! <-  rotated vertices
                     face_ids,   & ! <-  face vertex IDs
                     output_dir, & ! <-  output directory
@@ -213,9 +214,11 @@ do i = 1, num_remaining_orients
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
         ! print*,'total time elapsed: ',omp_get_wtime()-start
         ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
-        if (i .gt. 1) then
-            print'(A20,F12.4,A5)','est. time remaining: '
-            call PROUST(nint(dble(num_remaining_orients-i+1)*(omp_get_wtime()-start) / dble(i)))
+        if(job_params%timing) then
+            if (i .gt. 1) then
+                print'(A20,F12.4,A5)','est. time remaining: '
+                call PROUST(nint(dble(num_remaining_orients-i+1)*(omp_get_wtime()-start) / dble(i)))
+            end if      
         end if
     end if
 
@@ -293,12 +296,12 @@ call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_tota
 call system("rm -r "//trim(output_dir)//"/tmp") ! remove directory for temp files
 
 finish = omp_get_wtime()
-
 print*,'=========='
 print'(A,f16.8,A)',"total time elapsed: ",finish-start," secs"
 write(101,*)'======================================================'
 write(101,'(A,f17.8,A)')" total time elapsed: ",finish-start," secs"
 write(101,*)'======================================================'
+
 print*,'========== end main'
 
 close(101) ! close global non-standard output file

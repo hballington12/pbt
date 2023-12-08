@@ -166,9 +166,11 @@ job_params%scaling = .false.
 job_params%beta_lims = (/0D0,360D0/)
 job_params%gamma_lims = (/0D0,360D0/)
 job_params%output_eulers = .false.
+job_params%debug = 1 ! default value is some debugging output
+job_params%timing = .false. ! default is no timing
 
 ! print*,'command_argument_count(): ',command_argument_count()
-print*,'parsing command line...'
+! print*,'parsing command line...'
 i = 0
 do while (i .lt. command_argument_count()) ! looping over command line args
     i = i + 1 ! update counter
@@ -750,7 +752,24 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             ! print*,'found command line specifier "output_eulers"'
             job_params%output_eulers = .true.
             ! do something
+
+        case ('-debug')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "debug"'
+                stop
+            else
+                read(arg,*) job_params%debug
+                print*,'job_params%debug: ', job_params%debug
+            end if 
             
+        case ('-timing')
+            ! print*,'found command line specifier "timing"'
+            job_params%timing = .true.
+            print*,'timing: enabled'
+            ! do something
+
         case default ! if argument was unrecognised
             print '(2a, /)', 'unrecognised command-line option: ', arg
             stop
@@ -1388,12 +1407,13 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
     eulers = job_params%eulers
     offs = job_params%offs
 
-    print*,'========== start sr PROT_MPI'
-    write(101,*)'======================================================'
-    write(101,*)'======================================================'
-    write(101,*)'orientation: ',loop_index,' / ',num_orients
-
-    print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
+    if(job_params%debug >= 1) then 
+        print*,'========== start sr PROT_MPI'
+        write(101,*)'======================================================'
+        write(101,*)'======================================================'
+        write(101,*)'orientation: ',loop_index,' / ',num_orients
+        print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
+    end if
 
     allocate(verts_rot(1:size(verts,1),1:size(verts,2))) ! allocate array for rotated vertices
 
@@ -1503,12 +1523,14 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         rand = gamma_vals(loop_index) 
         eulers(3) = 2*pi*(rand)
 
-        print*,'alpha:',eulers(1)*180.0/pi
-        write(101,*)'alpha:',eulers(1)*180.0/pi
-        print*,'beta: ',eulers(2)*180.0/pi
-        write(101,*)'beta: ',eulers(2)*180.0/pi
-        print*,'gamma:',eulers(3)*180.0/pi
-        write(101,*)'gamma:',eulers(3)*180.0/pi
+        if(job_params%debug >= 1) then 
+            print*,'alpha:',eulers(1)*180.0/pi
+            write(101,*)'alpha:',eulers(1)*180.0/pi
+            print*,'beta: ',eulers(2)*180.0/pi
+            write(101,*)'beta: ',eulers(2)*180.0/pi
+            print*,'gamma:',eulers(3)*180.0/pi
+            write(101,*)'gamma:',eulers(3)*180.0/pi
+        end if
 
         ! mishchenko rotation
         s1 = sin(eulers(1))
@@ -1535,8 +1557,9 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
     end if
 
     ! stop
-
-    print*,'========== end sr PROT_MPI'
+    if(job_params%debug >= 1) then 
+        print*,'========== end sr PROT_MPI'
+    end if
 
 end subroutine
 
@@ -1851,51 +1874,6 @@ end subroutine
 !print*,'========== end sr midPointsAndAreas'
 !
 !end subroutine
-
-subroutine make_normals(face_ids, verts, norm_ids, norms)
-    
-! subroutine make_normals recomputes and returns the normals, as well as the corresponding IDs for each face
-    
-integer, dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
-integer, dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
-real(8), dimension(:,:) ,allocatable, intent(in) :: verts ! unique vertices
-real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices
-    
-real(8), dimension(1:3) :: vec12, vec23, normal ! temporary vectors used to find the facet normal
-real(8) temp_verts(1:3,1:3) ! temporary array to hold the xyz components of the first 3 vertices in each facet
-
-integer i
-    
-! print*,'========== start sr make_normals'
-    
-! allocate the arrays for the normals and the IDs
-!print*,'number of faces: ',size(face_ids,1)
-allocate(norm_ids(size(face_ids,1)))
-allocate(norms(size(face_ids,1),3))
-    
-! for each face
-do i = 1,size(face_ids,1)
-    temp_verts(1:3,1:3) = verts(face_ids(i,1:3),1:3) ! get first 3 vertices of facet
-        
-    vec12(1:3) = temp_verts(2,1:3) - temp_verts(1,1:3) ! vector from vertex 1 to vertex 2
-    vec23(1:3) = temp_verts(3,1:3) - temp_verts(2,1:3) ! vector from vertex 2 to vertex 3
-        
-    ! cross product to get facet normal
-    call cross(vec12,vec23,normal)
-        
-    !print*,'i',i
-    !print*,'normal', normal
-        
-    ! save to arrays
-    norm_ids(i) = i
-    norms(i,1:3) = normal(1:3)
-        
-end do
-    
-    
-! print*,'========== end sr make_normals'
-    
-end subroutine
 
 subroutine SDATIN(  ifn,                & ! input filename
                     la,                 & ! wavelength

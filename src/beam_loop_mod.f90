@@ -5,7 +5,6 @@ module beam_loop_mod
 
 use misc_submod
 use types_mod
-use input_mod
 use omp_lib
 
 implicit none
@@ -23,7 +22,8 @@ subroutine energy_checks(   beam_outbeam_tree, &
                             energy_in, &
                             ext_diff_outbeam_tree, &
                             energy_out_ext_diff, &
-                            energy_abs_beam)
+                            energy_abs_beam, &
+                            job_params)
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     integer, intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
@@ -35,6 +35,7 @@ subroutine energy_checks(   beam_outbeam_tree, &
     real(8), intent(out) :: energy_abs_beam
     real(8), intent(out) :: energy_out_ext_diff
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
+    type(job_parameters_type), intent(in) ::  job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
     integer i
     integer face_id
@@ -45,7 +46,9 @@ subroutine energy_checks(   beam_outbeam_tree, &
     complex(8) ampl(1:2,1:2)
     real(8) area
 
-    print*,'========== start sr energy_checks'
+    if(job_params%debug >= 1) then
+        print*,'========== start sr energy_checks'
+    end if
 
     energy_out_beam = 0
     energy_abs_beam = ext_cross_section
@@ -62,14 +65,13 @@ subroutine energy_checks(   beam_outbeam_tree, &
                                 ampl(2,1)*conjg(ampl(2,1)) + &
                                 ampl(2,2)*conjg(ampl(2,2))))
                                 
-        if (intensity_out .gt. 1e5) print*,'i_beam:',i,' intensity out: ',intensity_out
-        
         if (isnan(intensity_out)) then
             print*,'oh dear - nan ibeam = ',i
             beam_outbeam_tree(i)%ampl = 0
         else
             energy_out_beam = energy_out_beam + intensity_out*area*cos_theta
         end if
+        
     end do
 
     energy_out_ext_diff = 0
@@ -88,22 +90,24 @@ subroutine energy_checks(   beam_outbeam_tree, &
         energy_out_ext_diff = energy_out_ext_diff + intensity_out*area*cos_theta
     end do
 
-    write(101,*)'------------------------------------------------------'
-    write(101,'(A41,f16.8)')'energy in (ill. geom. cross sec.): ', energy_in
-    write(101,'(A41,f16.8)')'beam energy out: ',energy_out_beam
-    write(101,'(A41,f16.8)')'absorbed beam energy: ',ext_cross_section
-    write(101,'(A41,f16.8)')'ext diff energy out: ',energy_out_ext_diff
-    write(101,'(A41,f16.8,A2)')'beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
-    write(101,'(A41,f16.8,A2)')'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
+    if(job_params%debug >= 1) then
+        write(101,*)'------------------------------------------------------'
+        write(101,'(A41,f16.8)')'energy in (ill. geom. cross sec.): ', energy_in
+        write(101,'(A41,f16.8)')'beam energy out: ',energy_out_beam
+        write(101,'(A41,f16.8)')'absorbed beam energy: ',ext_cross_section
+        write(101,'(A41,f16.8)')'ext diff energy out: ',energy_out_ext_diff
+        write(101,'(A41,f16.8,A2)')'beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
+        write(101,'(A41,f16.8,A2)')'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
 
-    print'(A40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
-    print'(A40,f16.8)','beam energy out: ',energy_out_beam
-    print'(A40,f16.8)','absorbed beam energy: ',ext_cross_section
-    print'(A40,f16.8)','ext diff energy out: ',energy_out_ext_diff
-    print'(A40,f16.8,A2)','beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
-    print'(A40,f16.8,A2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
+        print'(A40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
+        print'(A40,f16.8)','beam energy out: ',energy_out_beam
+        print'(A40,f16.8)','absorbed beam energy: ',ext_cross_section
+        print'(A40,f16.8)','ext diff energy out: ',energy_out_ext_diff
+        print'(A40,f16.8,A2)','beam energy conservation: ',(energy_out_beam+ext_cross_section)/energy_in*100,' %'
+        print'(A40,f16.8,A2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
 
-    print*,'========== end sr energy_checks'
+        print*,'========== end sr energy_checks'
+    end if
     ! stop
 
 end subroutine
@@ -152,7 +156,7 @@ subroutine beam_loop(   Face1, &
 
     real(8), dimension(:,:), allocatable :: Norm ! face normals
     integer, dimension(:), allocatable :: Face2 ! face normal ID of each face
-    real(8) start, finish ! cpu timing variables
+    real(8) start, finish, start1, finish1 ! cpu timing variables
     integer i
 
     ! sr makeAreas
@@ -223,7 +227,13 @@ subroutine beam_loop(   Face1, &
     real(8), intent(out) :: energy_abs_beam
     real(8), intent(out) :: energy_out_ext_diff
 
-    start = omp_get_wtime()
+    if(job_params%timing) then
+        start = omp_get_wtime()
+    endif
+
+    if(job_params%debug >= 1) then
+        print*,'start beam loop...'
+    end if
 
     la = job_params%la
     rbi = job_params%rbi
@@ -262,7 +272,7 @@ subroutine beam_loop(   Face1, &
     
     call getIlluminatedGeoCrossSection(faceAreas, isWithinBeam, Norm, Face2, illuminatedGeoCrossSection) ! get illuminated geometric cross section using particle in current orientation
 
-    call getThreshold(la,threshold) ! get minimum illuminatino required to create a new beam
+    call getThreshold(la,threshold,job_params) ! get minimum illuminatino required to create a new beam
     
     call getSufficientlyIlluminated(illuminatedApertureAreas,threshold,sufficientlyIlluminated) ! get logical array containing which apertures were sufficiently illuminated
     
@@ -298,7 +308,14 @@ subroutine beam_loop(   Face1, &
     
     ! main loop
     do i = 1, rec ! for each beam recursion
-       print*,'internal recursion #',i
+        if(job_params%debug >= 2) then
+            print*,'internal recursion #',i
+        end if
+        if(job_params%timing) then
+            if(job_params%debug >= 1) then
+                start1 = omp_get_wtime()
+            end if
+        end if
        call internal_recursion_outer(   F1Mapping, &
                                         propagationVectors, &
                                         verts, Norm, midPoints, Face1, Face2, &
@@ -311,15 +328,26 @@ subroutine beam_loop(   Face1, &
                                         refl_ampl_out11Int, refl_ampl_out12Int, refl_ampl_out21Int, refl_ampl_out22Int, &
                                         interactionCounter, &
                                         is_multithreaded)
+        if(job_params%timing) then
+            if(job_params%debug >= 2) then
+                finish1 = omp_get_wtime()
+                print'(A,I3,A,f16.8,A)',"recursion",i," - time elapsed: ",finish1-start1," secs"
+                write(101,'(A,I3,A,f16.8,A)')"recursion",i," - time elapsed: ",finish1-start1," secs"
+            end if
+        end if
     end do
 
-    finish = omp_get_wtime()
-    print*,'=========='
-    print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"
-    print*,'=========='
-    write(101,*)'=========='
-    write(101,'(A,f16.8,A)')"end beam loop - time elapsed: ",finish-start," secs"
-    write(101,*)'=========='    
+    if(job_params%debug >= 1) then
+        if(job_params%timing) then
+            finish = omp_get_wtime()
+            print*,'=========='
+            print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"
+            ! print*,'=========='
+            write(101,*)'=========='
+            write(101,'(A,f16.8,A)')"end beam loop - time elapsed: ",finish-start," secs"
+            ! write(101,*)'=========='    
+        end if
+    end if
 
     call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, verts, Face1)    
 
@@ -332,7 +360,8 @@ subroutine beam_loop(   Face1, &
                         illuminatedGeoCrossSection, &
                         ext_diff_outbeam_tree, &
                         energy_out_ext_diff, &
-                        energy_abs_beam)
+                        energy_abs_beam, &
+                        job_params)
 
     output_parameters%geo_cross_sec = illuminatedGeoCrossSection
 
@@ -2482,16 +2511,19 @@ end do
 
 end subroutine
 
-subroutine getThreshold(la,threshold)
+subroutine getThreshold(la,threshold,job_params)
 
 real(8), intent(out) :: threshold
 real(8), intent(in) :: la
+type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! print*,'========== start sr getThreshold'
 
 threshold = (2*la)**2
 threshold = 0
-print*,'threshold: ',threshold
+if(job_params%debug >= 1) then
+    print*,'threshold: ',threshold
+end if
 
 ! print*,'========== end sr getThreshold'
 
@@ -2854,7 +2886,7 @@ call midPointsAndAreas(boundingBoxF, boundingBoxV, boundingBoxMidpoints, boundin
 !end do
 
 num_verts_max = maxval(num_face_vert)
-print*,'max number of vertices: ', num_verts_max
+! print*,'max number of vertices: ', num_verts_max
 
 allocate(F3(1:size(Face1,1))) ! array to hold index of bounding box that each face belongs to
 allocate(F4(1:size(Face1,1),1:num_verts_max)) ! array to hold index of fuzzy bounding box that each face belongs to
