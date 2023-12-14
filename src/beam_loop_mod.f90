@@ -2462,7 +2462,7 @@ real(8) theta_i ! incident theta in rads
 real(8) theta_t ! refracted theta in rads
 complex(8) m ! complex refractive index
 
-m = cmplx(rbi,ibi)
+m = cmplx(rbi,ibi,8)
 
 ! for external interactions
 do i = 1, size(Face1,1) ! for each face

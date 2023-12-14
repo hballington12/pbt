@@ -139,6 +139,10 @@ logical found_afn ! only required if c_method is read
 logical found_cft ! only required if c_method is read
 
 ! init and set default values
+la = 0.532
+rbi = 1.31
+ibi = 0D0
+rec = 8
 found_la = .false.
 found_rbi = .false.
 found_ibi = .false.
@@ -148,15 +152,41 @@ found_cfn = .false.
 found_afn = .false.
 found_cft = .false.
 num_orients = 1
-is_multithreaded = .false.
+is_multithreaded = .true.
 intellirot = .false.
-job_name = 'my_job'
-rot_method = "none"
+c_method = "cc_hex"
+cc_hex_params%l = 20D0
+cc_hex_params%hr = 5D0
+cc_hex_params%nfhr = 6
+cc_hex_params%pfl = 10D0
+cc_hex_params%nfpl = 12
+cc_hex_params%pher = 1
+cc_hex_params%pper = 1
+cc_hex_params%nscales = 1
+allocate(cc_hex_params%cls(1:cc_hex_params%nscales))
+allocate(cc_hex_params%sds(1:cc_hex_params%nscales))
+cc_hex_params%cls = 1
+cc_hex_params%sds = 0
+rot_method = "euler"
+eulers = (/20D0,30D0,40D0/)
+job_name = 'job'
 afn = "(null)"
 cfn = "(null)"
 cft = "(null)"
+theta_vals_in(1:2) = (/0D0,180D0/)
+theta_vals_counter = 2
+theta_splits_in(1) = 1D0
+phi_vals_in(1:2) = (/0D0,360D0/)
+phi_splits_in(1) = 1D0
+phi_vals_counter = 2
+call make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter)
+theta_vals = theta_vals*pi/180d0
+call make_angles(phi_vals,phi_vals_in,phi_splits_in,phi_vals_counter)
+phi_vals = phi_vals*pi/180d0
+
+
 job_params%suppress_2d = .false.
-job_params%tri = .false.
+job_params%tri = .true.
 job_params%tri_edge_length = 1
 job_params%tri_roughness = 0D0
 job_params%time_limit = 1e6
@@ -168,6 +198,7 @@ job_params%gamma_lims = (/0D0,360D0/)
 job_params%output_eulers = .false.
 job_params%debug = 1 ! default value is some debugging output
 job_params%timing = .false. ! default is no timing
+
 
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'
@@ -193,10 +224,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 select case (arg) ! parse rot specifier
                 case('none')
                     read(arg,*) rot_method
-                    print*,'rot_method: ', trim(rot_method)
+                    ! print*,'rot_method: ', trim(rot_method)
                 case('euler')
                     read(arg,*) rot_method
-                    print*,'rot_method: ', trim(rot_method)
+                    ! print*,'rot_method: ', trim(rot_method)
 
                     i = i + 1 ! update counter to read the first euler angle
                     call get_command_argument(i,arg,status=my_status)
@@ -216,7 +247,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else
                         read(arg,*) eulers(2)
-                        print*,'beta: ',eulers(2)
+                        ! print*,'beta: ',eulers(2)
                     end if
 
                     i = i + 1 ! update counter to read the second euler angle
@@ -226,12 +257,12 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else
                         read(arg,*) eulers(3)
-                        print*,'gamma: ',eulers(3)
+                        ! print*,'gamma: ',eulers(3)
                     end if
                 
                 case('off')
                     read(arg,*) rot_method
-                    print*,'rot_method: ', trim(rot_method)
+                    ! print*,'rot_method: ', trim(rot_method)
                     i = i + 1 ! update counter to read the first off value
                     call get_command_argument(i,arg,status=my_status)
                     if (my_status .eq. 1) then ! if no argument found
@@ -239,7 +270,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else
                         read(arg,*) offs(1)
-                        print*,'off(1): ',offs(1)
+                        ! print*,'off(1): ',offs(1)
                     end if
 
                     i = i + 1 ! update counter to read the second off value
@@ -262,7 +293,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else
                         read(arg,*) num_orients ! do something
-                        print*,'number of orientations: ',num_orients
+                        ! print*,'number of orientations: ',num_orients
                     end if
 
                 case default
@@ -280,7 +311,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,*) la
-                print*,'lambda: ',la
+                ! print*,'lambda: ',la
                 found_la = .true.
             end if
 
@@ -293,7 +324,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,*) rbi
-                print*,'rbi: ',rbi
+                ! print*,'rbi: ',rbi
                 found_rbi = .true.
             end if
 
@@ -306,7 +337,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,*) ibi
-                print*,'ibi: ',ibi
+                ! print*,'ibi: ',ibi
                 found_ibi = .true.
             end if
 
@@ -321,10 +352,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 select case (arg)
                     case('read')
                         read(arg,*) c_method
-                        print*,'c_method: ', trim(c_method)
+                        ! print*,'c_method: ', trim(c_method)
                     case('cc_hex')
                         read(arg,*) c_method
-                        print*,'c_method: ', trim(c_method)
+                        ! print*,'c_method: ', trim(c_method)
                     case default
                         print*,'invalid cmethod'
                         stop
@@ -340,7 +371,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%l
-                print*,'cc_hex_params%l: ', cc_hex_params%l
+                ! print*,'cc_hex_params%l: ', cc_hex_params%l
             end if
 
         case ('-cc_hex_hr')
@@ -351,7 +382,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%hr
-                print*,'cc_hex_params%hr: ', cc_hex_params%hr
+                ! print*,'cc_hex_params%hr: ', cc_hex_params%hr
             end if            
 
         case ('-cc_hex_nfhr')
@@ -362,7 +393,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%nfhr
-                print*,'cc_hex_params%nfhr: ', cc_hex_params%nfhr
+                ! print*,'cc_hex_params%nfhr: ', cc_hex_params%nfhr
             end if  
 
         case ('-cc_hex_pfl')
@@ -373,7 +404,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%pfl
-                print*,'cc_hex_params%pfl: ', cc_hex_params%pfl
+                ! print*,'cc_hex_params%pfl: ', cc_hex_params%pfl
             end if  
 
         case ('-cc_hex_nfpl')
@@ -384,7 +415,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%nfpl
-                print*,'cc_hex_params%nfpl: ', cc_hex_params%nfpl
+                ! print*,'cc_hex_params%nfpl: ', cc_hex_params%nfpl
             end if  
 
         case ('-cc_hex_pher')
@@ -395,7 +426,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%pher
-                print*,'cc_hex_params%pher: ', cc_hex_params%pher
+                ! print*,'cc_hex_params%pher: ', cc_hex_params%pher
             end if  
 
         case ('-cc_hex_pper')
@@ -406,7 +437,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%pper
-                print*,'cc_hex_params%pper: ', cc_hex_params%pper
+                ! print*,'cc_hex_params%pper: ', cc_hex_params%pper
             end if  
 
         case ('-cc_hex_nscales')
@@ -417,7 +448,9 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) cc_hex_params%nscales
-                print*,'cc_hex_params%nscales: ', cc_hex_params%nscales
+                ! print*,'cc_hex_params%nscales: ', cc_hex_params%nscales
+                if(allocated(cc_hex_params%cls)) deallocate(cc_hex_params%cls)
+                if(allocated(cc_hex_params%sds)) deallocate(cc_hex_params%sds)
                 allocate(cc_hex_params%cls(1:cc_hex_params%nscales))
                 allocate(cc_hex_params%sds(1:cc_hex_params%nscales))
             end if  
@@ -436,7 +469,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else
                         read(arg,*) cc_hex_params%cls(j)
-                        print*,'cc_hex_params%cls(',j,'): ', cc_hex_params%cls(j)
+                        ! print*,'cc_hex_params%cls(',j,'): ', cc_hex_params%cls(j)
                     end if
                 end do
 
@@ -454,7 +487,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                     stop
                 else
                     read(arg,*) cc_hex_params%sds(j)
-                    print*,'cc_hex_params%sds(',j,'): ', cc_hex_params%sds(j)
+                    ! print*,'cc_hex_params%sds(',j,'): ', cc_hex_params%sds(j)
                 end if
             end do
 
@@ -471,11 +504,11 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 select case (arg)
                 case('obj')
                     read(arg,*) cft
-                    print*,'cft: ', trim(cft)
+                    ! print*,'cft: ', trim(cft)
                     found_cft = .true.
                 case('mrt')
                     read(arg,*) cft
-                    print*,'cft: ', trim(cft)
+                    ! print*,'cft: ', trim(cft)
                     found_cft = .true.
                 case default
                     print*,'error: invalid particle file type'
@@ -492,8 +525,12 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,*) cfn
-                print*,'cfn: ', trim(cfn)
+                ! print*,'cfn: ', trim(cfn)
                 found_cfn = .true.
+
+
+
+
             end if
 
         case ('-afn')
@@ -505,7 +542,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,*) afn
-                print*,'afn: ', trim(afn)
+                ! print*,'afn: ', trim(afn)
                 found_afn = .true.
             end if
 
@@ -518,7 +555,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,*) rec
-                print*,'rec: ', rec
+                ! print*,'rec: ', rec
                 found_rec = .true.
             end if
 
@@ -531,7 +568,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,'(A)') job_name
-                print*,'job name: ', trim(job_name)
+                ! print*,'job name: ', trim(job_name)
             end if
 
         case ('-theta')
@@ -539,7 +576,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             theta_vals_counter = 0 ! number of theta values read
             theta_splits_counter = 0 ! number of theta splits read
             j = 0 ! counts the number of values read
-            print*,'theta values:'
+            ! print*,'theta values:'
             do while (.not. finished) ! while we havent reached
                 i = i + 1 ! update counter to read the rotation method
                 j = j + 1
@@ -573,9 +610,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                     end if
                 end if 
             end do
-            print*,'theta values read: ',theta_vals_in(1:theta_vals_counter)
-            print*,'theta splits read: ',theta_splits_in(1:theta_splits_counter)
+            ! print*,'theta values read: ',theta_vals_in(1:theta_vals_counter)
+            ! print*,'theta splits read: ',theta_splits_in(1:theta_splits_counter)
 
+            if(allocated(theta_vals)) deallocate(theta_vals)
             call make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter)
             ! convert theta vals to rad
             theta_vals = theta_vals*pi/180d0
@@ -585,7 +623,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             phi_vals_counter = 0 ! number of phi values read
             phi_splits_counter = 0 ! number of phi splits read
             j = 0 ! counts the number of values read
-            print*,'phi values:'
+            ! print*,'phi values:'
             do while (.not. finished) ! while we havent reached
                 i = i + 1 ! update counter to read the rotation method
                 j = j + 1
@@ -619,9 +657,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                     end if
                 end if 
             end do
-            print*,'phi values read: ',phi_vals_in(1:phi_vals_counter)
-            print*,'phi splits read: ',phi_splits_in(1:phi_splits_counter)
+            ! print*,'phi values read: ',phi_vals_in(1:phi_vals_counter)
+            ! print*,'phi splits read: ',phi_splits_in(1:phi_splits_counter)
             ! stop
+            if(allocated(phi_vals)) deallocate(phi_vals)
             call make_angles(phi_vals,phi_vals_in,phi_splits_in,phi_vals_counter)
             ! convert phi vals to rad
             phi_vals = phi_vals*pi/180d0
@@ -634,9 +673,23 @@ do while (i .lt. command_argument_count()) ! looping over command line args
 
         case ('-mt')
             ! print*,'found command line specifier "mt"'
-            print*,'multithreading: enabled'
-            is_multithreaded = .true.
-            ! do something
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "mt"'
+                stop
+            else
+                print*,'arg: "',trim(arg),'"'
+                if(trim(arg) == "0") then
+                    is_multithreaded = .false.
+                    ! print*,'multithreading: disabled'
+                else if(trim(arg) == "1") then
+                    is_multithreaded = .true.
+                    ! print*,'multithreading: enabled'
+                else
+                    error stop "invalid argument for flag -mt"
+                end if
+            end if
 
         case ('-no2d')
             ! print*,'found command line specifier "mt"'
@@ -645,7 +698,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
 
         case ('-tri')
             ! print*,'found command line specifier "mt"'
-            print*,'automatic triangulation: enabled'
+            ! print*,'automatic triangulation: enabled'
             job_params%tri = .true.
 
         case ('-scaling')
@@ -779,17 +832,21 @@ end do ! end loop over command line args
 
 ! check for missing required arguments
 if (found_la .eqv. .false.) then
-    print*,'error: missing required argument "lambda"'
-    stop
+    ! print*,'error: missing required argument "lambda"'
+    ! print*,'using default lambda value: 0.532'
+    ! stop
 else if (found_rbi .eqv. .false.) then
-    print*,'error: missing required argument "rbi"'
-    stop
+    ! print*,'error: missing required argument "rbi"'
+    ! print*,'using default rbi value: 1.31'
+    ! stop
 else if (found_ibi .eqv. .false.) then
-    print*,'error: missing required argument "ibi"'
-    stop
+    ! print*,'error: missing required argument "ibi"'
+    ! print*,'using default ibi value: 0'
+    ! stop
 else if (found_rec .eqv. .false.) then
-    print*,'error: missing required argument "rec"'
-    stop
+    ! print*,'error: missing required argument "rec"'
+    ! print*,'using default rec value: 8'
+    ! stop
 else if (found_c_method .eqv. .false.) then
     print*,'error: missing required argument "cmethod"'
     stop
@@ -808,6 +865,46 @@ else if (found_c_method .eqv. .true.) then
         end if
     end if
 end if
+
+! if cfn found but cft not found, attempt to guess filetype from the extension
+if (found_cft .eqv. .false. .and. found_cfn .eqv. .true.) then
+    ! if particle filename is long enough, look for file extensions...
+    if(len(trim(cfn)) .gt. 4) then
+        if(cfn(len(trim(cfn))-3:len(trim(cfn))) .eq. ".obj") then
+            cft = "obj"
+            if(job_params%debug >= 2) then
+                print*,'guessed obj particle file type'
+            end if
+            found_cft = .true.
+        else if(cfn(len(trim(cfn))-3:len(trim(cfn))) .eq. ".cry") then
+            cft = "mrt"
+            if(job_params%debug >= 2) then
+                print*,'guessed mrt file type'
+            end if
+            found_cft = .true.
+        end if
+    end if
+    if(len(trim(cfn)) .gt. 8) then
+        if(cfn(len(trim(cfn))-7:len(trim(cfn))) .eq. ".crystal") then
+            cft = "mrt"
+            if(job_params%debug >= 2) then
+                print*,'guessed mrt file type'
+            end if
+            found_cft = .true.
+        end if
+    end if
+
+    ! if no file extension was recognised, stop
+    if(found_cft .eqv. .false.) then
+        print*,'error: a particle filename was given (-cfn) but the filetype could not be identified. &
+        & supported file types are wavefront (obj) (.obj extension) and macke ray tracing (mrt) style (.cry &
+        & or .crystal extensions). it is advised to specify the filetype explicitly using the -cft flag (eg. "-cft obj")'
+        error stop ""
+    end if
+end if
+
+! if cfn given and cft given (or guessed), set particle input method to read
+if (found_cft .eqv. .true. .and. found_cfn .eqv. .true.) c_method = "read"
 
 job_params%cfn = cfn
 job_params%cft = cft
@@ -828,7 +925,31 @@ job_params%cc_hex_params = cc_hex_params
 job_params%theta_vals = theta_vals
 job_params%phi_vals = phi_vals
 
-print*,'c_method: ',job_params%c_method
+print*,'job settings:'
+
+print*,'wavelength: ',job_params%la
+print*,'refractive index (real): ',job_params%rbi
+print*,'refractive index (imag): ',job_params%ibi
+print*,'beam recursions: ',job_params%rec
+print*,'particle rotation method: ',job_params%rot_method
+print*,'number of orientations: ',job_params%num_orients
+print*,'intelligent orientations: ',job_params%intellirot
+print*,'particle input method: ',job_params%c_method
+print*,'job_name: ',job_params%job_name
+print*,'multithreading: ',job_params%is_multithreaded
+print*,'logging level: ',job_params%debug,'/ 3'
+print*,'extra timings: ',job_params%timing
+print*,'automatic triangulation: ',job_params%tri
+if(found_cfn) print*,'particle filename: ',job_params%cfn
+if(found_cft) print*,'particle filetype: ',job_params%cft
+
+
+
+print*,'=========='
+
+! stop
+
+
 
     end subroutine
 
@@ -2026,23 +2147,23 @@ subroutine PDAL2(   num_vert,       &
     character(len=100) cft ! particle filetype
     character(100) afn ! apertures filename
     integer, intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
-    ! integer, intent(out) :: num_norm ! number of face normals
+    integer :: num_norm ! number of face normals
     integer, dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
-    ! integer, dimension(:), allocatable, intent(out) :: norm_ids ! face normal ID of each face
+    integer, dimension(:), allocatable :: norm_ids ! face normal ID of each face
     real(8), dimension(:,:) ,allocatable, intent(out) :: verts ! unique vertices
-    ! real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices, face vertex IDs, face normals
+    real(8), dimension(:,:) ,allocatable :: norms ! unique vertices, face vertex IDs, face normals
     integer, dimension(:,:) ,allocatable :: face_ids_temp ! temporary array to hold face vertex IDs
     integer, dimension(:,:) ,allocatable, intent(out) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
     character(100) c_method ! method of particle file input
     integer, dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
-    type(job_parameters_type), intent(in) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+    type(job_parameters_type), intent(inout) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 
     integer, parameter :: num_face_vert_max_in = 24 ! max number of vertices per face
     integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
     integer face_string_length
-    integer entry_count
+    integer entry_count, delim_count, digits_to_read
     logical is_current_char_slash
     integer vertex_count
     integer num_face_vert_max
@@ -2111,7 +2232,7 @@ subroutine PDAL2(   num_vert,       &
             m = 1 ! reset counting variable
             num_vert = 0 ! rest number of unique vertices
             num_face = 0 ! rest number of faces
-            ! num_norm = 0 ! rest number of face normals
+            num_norm = 0 ! rest number of face normals
             
             open(unit = 10, file = cfn, status = 'old')
             
@@ -2123,8 +2244,8 @@ subroutine PDAL2(   num_vert,       &
                 !enddo
                 if (line(1:2) .eq. 'v ') then 
                     num_vert = num_vert + 1 ! count the number of unique vertices
-                ! else if (line(1:2) .eq. 'vn') then
-                !     num_norm = num_norm + 1 ! count the number of unique normals
+                else if (line(1:2) .eq. 'vn') then
+                    num_norm = num_norm + 1 ! count the number of unique normals
                 else if (line(1:2) .eq. 'f ') then
                     num_face = num_face + 1 ! count the number of faces
                 end if
@@ -2132,25 +2253,30 @@ subroutine PDAL2(   num_vert,       &
             
             rewind(10)
             
+            ! allocate and init
             allocate(verts(num_vert,3)) ! allocate an array for the crystal vertex coorindates
             allocate(num_face_vert(num_face)) ! allocate array for the number of vertices in each face
-            ! allocate(norm_ids(num_face)) ! allocate array for the face normal ID of each face
+            allocate(norm_ids(num_face)) ! allocate array for the face normal ID of each face
             allocate(face_ids_temp(num_face,num_face_vert_max_in)) ! allocate an array for the vertex IDs in each face
-            ! allocate(norms(num_norm,3)) ! allocate an array for the face normals
-            
+            allocate(norms(num_norm,3)) ! allocate an array for the face normals
+            verts = 0
+            num_face_vert = 0
+            norm_ids = 0
+            face_ids_temp = 0
+            norms = 0
+
+            ! print*,'num_norm',num_norm
             num_face_vert = 0 ! initialise
 
             do  ! reading through the lines in the crystal file...
                 read(10,"(a)",iostat=io)line
                 if (io/=0) exit
-                !do i = 1, len(line)
-                    !if (line(i:i) == "/") line(i:i) = " "   ! replace "/" with " "
-                !enddo
                 if (line(1:2) .eq. 'v ') then 
                     read(line(2:), *) verts(j,1:3)  ! read all items
                     j = j + 1
                 else if (line(1:2) .eq. 'vn') then
-                    ! read(line(3:), *) norms(m,1:3)  ! read all items
+                    read(line(3:), *) norms(m,1:3)  ! read all items
+                    ! print*,'norms(m,1:3)',norms(m,1:3)
                     m = m + 1
                 else if (line(1:2) .eq. 'f ') then
                     ! print*,'last 2 chars of line: "',line(len(line)-1:len(line)),'"'
@@ -2158,51 +2284,51 @@ subroutine PDAL2(   num_vert,       &
                         print*,'Too many vertices in face: ',k,'. Please increase max_line_length'
                         stop
                     end if
-                    ! print*,'line(2:)',line(2:40)
-                    o = 3 ! counter to move along the line, starting after 'f' prefix
                     vertex_count = 0 ! number of vertices in this face starts at 0
-                    ! print*,'length of line',len(line)
-                    do o = 3,len(line)
-                        if(line(o:o) .eq. ' ') then
-                            ! if (entry_count .gt. 0) then
-                            !     entry_count = entry_count + 1
-                            !     if (vertex_count .eq. 1) then ! use the normal from vertex #1 (can be changed but for now, these are always the same)
-                            !         ! print*,'str length',face_string_length
-                            !         ! print*,'number in position',entry_count,' has ',face_string_length,' characters'
-                            !         ! print*,'face ',k,', normal has index #',line(o-face_string_length:o-1)
-                            !         read(line(o-face_string_length:o-1),*) norm_ids(k)
-                            !     end if
-                            ! end if
-
-                            entry_count = 0
-                            face_string_length = 0
-                        else if (line(o:o) .eq. '/') then
-                            is_current_char_slash = .true.
-                            entry_count = entry_count + 1
-                            if (entry_count .gt. 0) then
-                            ! print*,'number in position',entry_count,' has ',face_string_length,' characters'
-                                if (entry_count .eq. 1) then
-                                    vertex_count = vertex_count + 1
-                                    if (vertex_count .gt. num_face_vert_max_in) then
-                                        print*,'face',k,' has',vertex_count, &
-                                            ' vertices which is greater than the max value of',num_face_vert_max_in
-                                        print*,'Please increase the max vertices per face "num_face_vert_max_in"'
-                                        stop
-                                    end if
-                                    ! print*,'face ',k,', vertex: ',vertex_count,' has index #',line(o-1-face_string_length:o-1)
-                                    read(line(o-1-face_string_length:o-1),*) face_ids_temp(k,vertex_count)
+                    delim_count = 0 ! init delim counter
+                    do o = 2,len(trim(line)) ! for each character after the "f" character in this line
+                        if(line(o:o) .eq. ' ') then ! if its a space...
+                            if (delim_count == 2) then ! if the delim counter was 2
+                                ! print*,'found normal id: ',line(o-digits_to_read:o-1)
+                                ! if we're reading the first vertex, save the normal id
+                                read(line(o-digits_to_read:o-1),*) norm_ids(k) ! read the previous digits as the normal id
+                            end if
+                            delim_count = 0 ! set the delimiter counter to 0
+                            digits_to_read = 0 ! set the digits to read counter to 0
+                            vertex_count = vertex_count + 1 ! update the vertex counter
+                            ! print*,'updating vertex counter to: ',vertex_count
+                            if (vertex_count .gt. num_face_vert_max_in) then ! stop if there are too many vertices
+                                print*,'face',k,' has',vertex_count, &
+                                    ' vertices which is greater than the max value of',num_face_vert_max_in
+                                print*,'Please increase the max vertices per face "num_face_vert_max_in"'
+                                stop
+                            end if
+                        else if (line(o:o) .eq. '/') then ! if its a slash delimiter...
+                            if (delim_count == 0) then ! if the delim counter was 0
+                                ! print*,'found vertex id: ',line(o-digits_to_read:o-1)
+                                read(line(o-digits_to_read:o-1),*) face_ids_temp(k,vertex_count) ! read the previous digits as the vertex id
+                            end if
+                            ! if the delim counter was 1, do nothing (ignore material properties)
+                            delim_count = delim_count + 1 ! update delimiter counter
+                            ! print*,'updating delim counter to: ',delim_count 
+                            digits_to_read = 0 ! set the digits to read counter to 0
+                        else ! if its something useful...
+                            digits_to_read = digits_to_read + 1 ! update digits to read counter so we can read it later
+                            if(o == len(trim(line))) then ! if we are at the end of the line, there is no trailing space
+                                ! therefore, force read either vertex id or normal id, depending on the delim count
+                                ! print*,'end of line reached'
+                                if (delim_count == 0) then ! if the delim counter was 0, we need to read the previous digits as the vertex id
+                                    ! print*,'found vertex id: ',line(o+1-digits_to_read:o+1-1)
+                                    read(line(o+1-digits_to_read:o+1-1),*) face_ids_temp(k,vertex_count)
+                                else if (delim_count == 2) then ! if the delim counter was 2, we need to read the previous digits as the normal id
+                                    ! print*,'found normal id: ',line(o+1-digits_to_read:o+1-1)
+                                    ! but do nothing because we only use the normal from the first vertex
                                 end if
                             end if
-                            face_string_length = 0
-                        else
-                            face_string_length = face_string_length + 1
-
                         end if
                     end do
-                    num_face_vert(k) = vertex_count
-                    ! print*,'face',k,' has',num_face_vert(k),' vertices'
-                    ! print*,face_ids_temp(k,1:vertex_count)
-                    k = k + 1
+                    num_face_vert(k) = vertex_count ! save the total number of vertices in this face
+                    k = k + 1 ! counts total number of faces
                 end if
             end do
             
@@ -2217,6 +2343,7 @@ subroutine PDAL2(   num_vert,       &
             print*,'number of unique vertices: ',num_vert
             
             print*,'number of unique faces: ',num_face
+            print*,'number of normals: ',num_norm
             
             !print*,'number of unique normals: ',num_norm
             print*,'max vertices per face: ',num_face_vert_max
@@ -2228,8 +2355,8 @@ subroutine PDAL2(   num_vert,       &
             !     print*,num_face_vert(i)
             ! end do
 
-            !! print the normal IDs of each face
-            ! print*,'num_face_vert array:'
+            ! ! print the normal IDs of each face
+            ! print*,'norm id array:'
             ! do i = 1, num_face
             !     print*,norm_ids(i)
             ! end do
@@ -2261,6 +2388,15 @@ subroutine PDAL2(   num_vert,       &
             !do i = 1, num_face
             !    print*,'Face ',i,' has midpoint: ',Midpoints(i,1:3)
             !end do
+
+            if(num_norm == 0 .and. job_params%debug >= 1) then
+                print*,'warning: no normals found in wavefront file.'
+                print*,'this code is therefore unable to check that vertices are correctly ordered.'
+                print*,'the user should ensure that the vertex ids in each face should be in an anti-clockwise order as viewed externally.'
+                print*,'poor energy conservation in the beam loop my result if this is not taken care of.'
+            end if
+
+            ! stop
 
         else if (trim(cft) .eq. 'mrt') then ! if macke ray-tracing style geometry file
 
@@ -2381,9 +2517,11 @@ subroutine PDAL2(   num_vert,       &
     write(101,*)'max vertices per face:',num_face_vert_max
 
     if (num_face_vert_max .gt. 3) then
-        print*,'error: max vertices per facet greater than 3 is currently not supported.'
-        ! stop
-        print*,'continuing regardless...'
+        if(job_params%debug >= 1) then
+            print*,'warning: max vertices per facet greater than 3 detected. particle must be triangulated to proceed.'
+            print*,' attempting automatic triangulation...'
+        end if
+        job_params%tri = .true.        
     end if
 
     call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas (for doing some checks in the following sr)
