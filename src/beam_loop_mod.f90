@@ -226,6 +226,9 @@ subroutine beam_loop(   Face1, &
     real(8), intent(out) :: energy_out_beam
     real(8), intent(out) :: energy_abs_beam
     real(8), intent(out) :: energy_out_ext_diff
+    
+    ! storage checks
+    real(8) total_storage
 
     if(job_params%timing) then
         start = omp_get_wtime()
@@ -364,6 +367,40 @@ subroutine beam_loop(   Face1, &
                         job_params)
 
     output_parameters%geo_cross_sec = illuminatedGeoCrossSection
+
+    ! get storage size:
+    ! double precision is 8 bytes (64 bits)
+    if(job_params%debug >= 1) then
+        total_storage = real((  sizeof(verts) + &
+                                sizeof(F1Mapping) + &
+                                sizeof(propagationVectors) + &
+                                sizeof(Norm) + &
+                                sizeof(midPoints) + &
+                                sizeof(faceAreas) + &
+                                sizeof(vk71Int) + &
+                                sizeof(beam_outbeam_tree) + &
+                                sizeof(refl_ampl_out11Int) + &
+                                sizeof(ext_diff_outbeam_tree)))/1048576D0
+        print'(A,f10.2,A)','beam loop estimated memory usage (per mpi process):',total_storage,' MB'
+    end if
+
+    if(job_params%debug >= 2) then
+        print'(A)','memory usage breakdown (per mpi process):'
+        print'(A,f10.2,A)','particle vertices: ',real(sizeof(verts))/1048576D0,' MB'
+        print'(A,f10.2,A)','particle illuminated faces: ',real(sizeof(F1Mapping))/1048576D0,' MB'
+        print'(A,f10.2,A)','beam propagation vecs: ',real(sizeof(propagationVectors))/1048576D0,' MB'
+        print'(A,f10.2,A)','particle normals: ',real(sizeof(Norm))/1048576D0,' MB'
+        print'(A,f10.2,A)','particle midpoints: ',real(sizeof(midPoints))/1048576D0,' MB'
+        print'(A,f10.2,A)','particle face areas: ',real(sizeof(faceAreas))/1048576D0,' MB'
+        print'(A,f10.2,A)','perp. field vecs: ',real(sizeof(vk71Int))/1048576D0,' MB'
+        print'(A,f10.2,A)','outbeam tree: ',real(sizeof(beam_outbeam_tree))/1048576D0,' MB'
+        print'(A,f10.2,A)','amplitude matrices: ',real(sizeof(refl_ampl_out11Int))/1048576D0,' MB'
+        print'(A,f10.2,A)','external diff beamtree: ',real(sizeof(ext_diff_outbeam_tree))/1048576D0,' MB'
+        print'(A)','note: this is an underestimate of the total memory usage.'
+        print'(A)',' =========='
+    end if
+
+    ! stop
 
 end subroutine
 

@@ -2038,7 +2038,7 @@ subroutine PDAL2(   num_vert,       &
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
     type(job_parameters_type), intent(in) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
 
-    integer, parameter :: num_face_vert_max_in = 20 ! max number of vertices per face
+    integer, parameter :: num_face_vert_max_in = 24 ! max number of vertices per face
     integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
     integer face_string_length
