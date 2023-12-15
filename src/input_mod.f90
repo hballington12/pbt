@@ -11,6 +11,109 @@ implicit none
 
 contains
 
+subroutine validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
+
+    ! sr validate_vertices uses normals read from a .obj file to ensure that vertices
+    ! are ordered in an anti-clockwise order as viewed from outside the particle
+
+    ! for each face:
+    ! rotate the face such that the normal is upward-facing
+    ! compute the vector from the first vertex to each of the other vertices
+    ! compute the angle between each vector and the positive x-axis
+    ! order each vector by angle
+
+    real(8), dimension(:,:) ,allocatable, intent(in) :: verts ! unique vertices
+    real(8), dimension(:,:) ,allocatable, intent(in) :: norms ! unique vertices, face vertex IDs, face normals
+    integer, dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+    integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
+    integer, dimension(:), allocatable, intent(in) :: norm_ids ! face normal ID of each face
+
+    integer i, j ! counters
+    integer num_verts ! number of vertices in a given face
+    real(8), dimension(:,:), allocatable :: vecs ! edge vectors for a given face
+    real(8), dimension(:), allocatable :: angles ! edge vectors for a given face
+    real(8), dimension(:,:), allocatable :: rotated_verts ! vertices of 1 face after rotating into xy plane with normal facing upwards
+    real(8) v0(1:3,1:3) ! xyz coords of the first 3 vertices in the face
+    real(8) rot(1:3,1:3) ! a rotation matrix
+    real(8) com(1:3) ! centre of mass
+    real(8) norm(1:3) ! face normal calculated from vertices
+    real(8) rot_norm(1:3) ! rotated normal read from file
+    integer, dimension(:), allocatable :: mapping ! mapping for quicksort algorithm
+    integer, dimension(:), allocatable :: face_ids_temp ! temp array to hold face ids
+    logical is_upwards
+
+    ! print*,'======'
+
+    allocate(face_ids_temp(1:maxval(num_face_vert)))
+
+    do i = 1, size(face_ids,1) ! for each face
+    ! do i = 1, 1
+        ! print*,'face: ',i
+        num_verts = num_face_vert(i)
+        ! save the face_ids temporarily
+        face_ids_temp(1:num_verts) = face_ids(i,1:num_verts)
+
+        if(allocated(vecs)) deallocate(vecs)
+        allocate(vecs(1:num_verts-1,1:2)) ! allocate array to hold the vectors from the first vertex to each of the other vertices
+
+        if(allocated(angles)) deallocate(angles)
+        allocate(angles(1:num_verts-1)) ! allocate array to hold the vectors from the first vertex to each of the other vertices
+
+        if(allocated(rotated_verts)) deallocate(rotated_verts)
+        allocate(rotated_verts(1:num_verts,1:3))
+
+        v0(1,1:3) = verts(face_ids(i,1),1:3) ! position of first vertex
+        v0(2,1:3) = verts(face_ids(i,2),1:3) ! position of second vertex
+        v0(3,1:3) = verts(face_ids(i,3),1:3) ! position of third vertex
+
+        com = sum(v0,1)/3D0;
+
+        v0(1,1:3) = v0(1,1:3) - com(1:3)
+        v0(2,1:3) = v0(2,1:3) - com(1:3)
+        v0(3,1:3) = v0(3,1:3) - com(1:3)
+
+        call get_rotation_matrix3(transpose(v0),rot) ! get rotation matrix to rotate into xy plane
+
+        rot_norm = matmul(rot,norms(norm_ids(i),1:3))
+
+        ! rotate vertices into xy plane
+        do j = 1, num_verts
+            rotated_verts(j,1:3) = matmul(rot,verts(face_ids(i,j),1:3))
+        end do
+
+        if(dot_product(rot_norm,(/0D0,0D0,1D0/)) >= 0.99) then
+            ! fine, do nothing
+        else if(dot_product(rot_norm,(/0D0,0D0,1D0/)) <= -0.99) then
+            rotated_verts = - rotated_verts
+        else
+            print*,'error: bad normal found. check that all particle facets are planar'
+            stop
+        end if
+
+        do j = 1, num_verts-1 ! for each vertex in this face (excluding the first vertex)
+            vecs(j,1:2) = rotated_verts(j+1,1:2) - rotated_verts(1,1:2) ! get edge vector from 1st vertex to jth vertex
+            angles(j) = atan2(vecs(j,2),vecs(j,1)) ! get anti-clockwise angle from +ive x-axis to vector
+            if (angles(j) .gt. 0) angles(j) = 2*pi-angles(j) ! remap atan function
+        end do
+
+        ! sort angles from lowest to highest ! modified with credit: A. Penttil� (see misc module)
+        call Qsort_real(angles,mapping)
+
+        do j = 2, num_verts ! reorder vertices
+            face_ids(i,j) = face_ids_temp(mapping(j-1)+1)
+        end do
+
+        ! print*,'reordering:'
+        ! do j = 1, num_verts
+        !     print*,face_ids_temp(j),' --> ',face_ids(i,j)
+        ! end do
+
+    end do
+
+    ! stop
+
+end subroutine
+
 subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_counter)
 
     ! sr read_theta,vals reads and makes the phi values
@@ -2389,11 +2492,14 @@ subroutine PDAL2(   num_vert,       &
             !    print*,'Face ',i,' has midpoint: ',Midpoints(i,1:3)
             !end do
 
-            if(num_norm == 0 .and. job_params%debug >= 1) then
+            if(num_norm == 0 .and. job_params%debug >= 1) then ! if no normals read, give warning
                 print*,'warning: no normals found in wavefront file.'
                 print*,'this code is therefore unable to check that vertices are correctly ordered.'
                 print*,'the user should ensure that the vertex ids in each face should be in an anti-clockwise order as viewed externally.'
                 print*,'poor energy conservation in the beam loop my result if this is not taken care of.'
+            else ! else, if some normals read, perform checks to see if vertices need reordering
+                if(job_params%debug >= 1) print*,'validating vertex ordering...'
+                call validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
             end if
 
             ! stop
