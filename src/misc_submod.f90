@@ -13,6 +13,112 @@
         
         contains
         
+        ! credit: 
+        !! A. Penttil�, Fortran 95 implementation of the Quicksort algorithm (computer code),
+        !! http://wiki.helsinki.fi/display/~aipentti@helsinki.fi/Collection+of+codes (2012).
+        ! PRIVATE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Internal implementation, do not call with size 1 array
+        RECURSIVE SUBROUTINE Qsort_real_rec(vec, left, right, map)
+        IMPLICIT NONE
+            REAL(8), DIMENSION(:), INTENT(INOUT) :: vec
+            INTEGER, DIMENSION(:), allocatable, INTENT(INOUT) :: map ! hb modification: mapping
+            INTEGER, INTENT(IN) :: left, right
+            INTEGER :: n, pivot
+
+            n = right-left+1
+            IF(MOD(n,2) == 0) THEN
+            pivot = left-1 + n/2
+            ELSE
+            pivot = left-1 + (n+1)/2
+            END IF
+
+            pivot = partition_real_privat(vec, pivot, left, right, map)
+
+            IF(left < pivot-1) CALL Qsort_real_rec(vec, left, pivot-1, map)
+            IF(right > pivot+1) CALL Qsort_real_rec(vec, pivot+1, right, map)
+      
+        END SUBROUTINE Qsort_real_rec
+
+        ! credit: 
+        !! A. Penttil�, Fortran 95 implementation of the Quicksort algorithm (computer code),
+        !! http://wiki.helsinki.fi/display/~aipentti@helsinki.fi/Collection+of+codes (2012).
+        ! INTERFACE!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Interface for real quicksort
+        SUBROUTINE Qsort_real(vec, map, LOW, HIGH)
+        IMPLICIT NONE
+        REAL(8), DIMENSION(:), INTENT(INOUT) :: vec
+        INTEGER, DIMENSION(:), allocatable, INTENT(OUT) :: map ! hb modification: mapping
+        INTEGER, INTENT(IN), OPTIONAL :: LOW, HIGH
+        INTEGER :: n, left, right, i
+
+        IF(PRESENT(LOW)) THEN
+        left = LOW
+        ELSE
+        left = 1
+        END IF
+        IF(PRESENT(HIGH)) THEN
+        right = HIGH
+        ELSE
+        right = SIZE(vec)
+        END IF
+
+        IF(left >= right) RETURN
+
+        ALLOCATE(map(1:size(vec)))
+        do i = 1, size(vec)
+            map(i) = i
+        end do
+
+        CALL Qsort_real_rec(vec, left, right, map)
+
+
+        END SUBROUTINE Qsort_real
+
+        ! credit: 
+        !! A. Penttil�, Fortran 95 implementation of the Quicksort algorithm (computer code),
+        !! http://wiki.helsinki.fi/display/~aipentti@helsinki.fi/Collection+of+codes (2012).
+        ! PRIVATE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+        ! Internal implementation of partition real array,
+        ! do not call with left >= right
+        FUNCTION partition_real_privat(vec, pivot, left, right, map) RESULT(new_pivot)
+            IMPLICIT NONE
+        REAL(8), DIMENSION(:), INTENT(INOUT) :: vec
+        INTEGER, DIMENSION(:), allocatable, INTENT(INOUT) :: map ! hb modification: mapping
+        INTEGER, INTENT(IN) :: left, right
+        INTEGER :: new_pivot, pivot
+        INTEGER :: i
+        REAL(8) :: rtemp, rpv_value
+        integer map_val, map_tmp
+
+        rpv_value = vec(pivot)
+        vec(pivot) = vec(right)
+        vec(right) = rpv_value
+        ! hb modify
+        map_val = map(pivot)
+        map(pivot) = map(right)
+        map(right) = map_val
+
+        new_pivot = left
+        DO i=left,right-1
+            IF(vec(i) < rpv_value) THEN
+            rtemp = vec(i)
+            map_tmp = map(i)
+            vec(i) = vec(new_pivot)
+            map(i) = map(new_pivot)
+            vec(new_pivot) = rtemp
+            map(new_pivot) = map_tmp
+            new_pivot = new_pivot+1
+            END IF
+        END DO
+        rtemp = vec(new_pivot)
+        map_tmp = map(new_pivot)
+        vec(new_pivot) = vec(right)
+        map(new_pivot) = map(right)
+        vec(right) = rtemp
+        map(right) = map_tmp
+
+        END FUNCTION partition_real_privat
+
         subroutine make_normals(face_ids, verts, norm_ids, norms)
             
         ! subroutine make_normals recomputes and returns the normals, as well as the corresponding IDs for each face
