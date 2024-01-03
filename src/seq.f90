@@ -22,6 +22,7 @@ implicit none
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
+! test
 
 ! ############################################################################################################
 
