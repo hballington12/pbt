@@ -36,22 +36,21 @@ subroutine validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
     real(8) v0(1:3,1:3) ! xyz coords of the first 3 vertices in the face
     real(8) rot(1:3,1:3) ! a rotation matrix
     real(8) com(1:3) ! centre of mass
-    real(8) norm(1:3) ! face normal calculated from vertices
+    ! real(8) norm(1:3) ! face normal calculated from vertices
     real(8) rot_norm(1:3) ! rotated normal read from file
     integer, dimension(:), allocatable :: mapping ! mapping for quicksort algorithm
     integer, dimension(:), allocatable :: face_ids_temp ! temp array to hold face ids
-    logical is_upwards
+    ! logical is_upwards
 
     ! print*,'======'
 
     allocate(face_ids_temp(1:maxval(num_face_vert)))
 
     do i = 1, size(face_ids,1) ! for each face
-    ! do i = 1, 1
-        ! print*,'face: ',i
-        num_verts = num_face_vert(i)
-        ! save the face_ids temporarily
-        face_ids_temp(1:num_verts) = face_ids(i,1:num_verts)
+        
+        num_verts = num_face_vert(i) ! get no. vertices in face
+    
+        face_ids_temp(1:num_verts) = face_ids(i,1:num_verts) ! save the face_ids temporarily
 
         if(allocated(vecs)) deallocate(vecs)
         allocate(vecs(1:num_verts-1,1:2)) ! allocate array to hold the vectors from the first vertex to each of the other vertices
@@ -66,25 +65,24 @@ subroutine validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
         v0(2,1:3) = verts(face_ids(i,2),1:3) ! position of second vertex
         v0(3,1:3) = verts(face_ids(i,3),1:3) ! position of third vertex
 
-        com = sum(v0,1)/3D0;
+        com = sum(v0,1)/3D0; ! get centre of mass
 
-        v0(1,1:3) = v0(1,1:3) - com(1:3)
+        v0(1,1:3) = v0(1,1:3) - com(1:3) ! move vertices to origin, ready for rotation matrix calc
         v0(2,1:3) = v0(2,1:3) - com(1:3)
         v0(3,1:3) = v0(3,1:3) - com(1:3)
 
         call get_rotation_matrix3(transpose(v0),rot) ! get rotation matrix to rotate into xy plane
 
-        rot_norm = matmul(rot,norms(norm_ids(i),1:3))
+        rot_norm = matmul(rot,norms(norm_ids(i),1:3)) ! rotate normal as read from file
 
-        ! rotate vertices into xy plane
         do j = 1, num_verts
-            rotated_verts(j,1:3) = matmul(rot,verts(face_ids(i,j),1:3))
+            rotated_verts(j,1:3) = matmul(rot,verts(face_ids(i,j),1:3)) ! rotate vertices into xy plane
         end do
 
         if(dot_product(rot_norm,(/0D0,0D0,1D0/)) >= 0.99) then
-            ! fine, do nothing
+            rotated_verts = - rotated_verts ! flip the vertices if facing down
         else if(dot_product(rot_norm,(/0D0,0D0,1D0/)) <= -0.99) then
-            rotated_verts = - rotated_verts
+            ! rotated_verts = - rotated_verts
         else
             print*,'error: bad normal found. check that all particle facets are planar'
             stop
@@ -96,17 +94,16 @@ subroutine validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
             if (angles(j) .gt. 0) angles(j) = 2*pi-angles(j) ! remap atan function
         end do
 
-        ! sort angles from lowest to highest ! modified with credit: A. Penttil� (see misc module)
-        call Qsort_real(angles,mapping)
+        call Qsort_real(angles,mapping) ! sort angles from lowest to highest ! modified with credit: A. Penttil� (see misc module)
 
-        do j = 2, num_verts ! reorder vertices
-            face_ids(i,j) = face_ids_temp(mapping(j-1)+1)
+        do j = 2, num_verts 
+            face_ids(i,j) = face_ids_temp(mapping(j-1)+1) ! reorder vertices
         end do
 
-        ! print*,'reordering:'
-        ! do j = 1, num_verts
-        !     print*,face_ids_temp(j),' --> ',face_ids(i,j)
-        ! end do
+        print*,'reordering:'
+        do j = 1, num_verts
+            print*,face_ids_temp(j),' --> ',face_ids(i,j)
+        end do
 
     end do
 
@@ -968,9 +965,8 @@ else if (found_c_method .eqv. .true.) then
         end if
     end if
 end if
-
 ! if cfn found but cft not found, attempt to guess filetype from the extension
-if (found_cft .eqv. .false. .and. found_cfn .eqv. .true.) then
+if (.not. found_cft .and. found_cfn) then
     ! if particle filename is long enough, look for file extensions...
     if(len(trim(cfn)) .gt. 4) then
         if(cfn(len(trim(cfn))-3:len(trim(cfn))) .eq. ".obj") then
@@ -1007,7 +1003,7 @@ if (found_cft .eqv. .false. .and. found_cfn .eqv. .true.) then
 end if
 
 ! if cfn given and cft given (or guessed), set particle input method to read
-if (found_cft .eqv. .true. .and. found_cfn .eqv. .true.) c_method = "read"
+if (found_cft .and. found_cfn) c_method = "read"
 
 job_params%cfn = cfn
 job_params%cft = cft
@@ -2499,7 +2495,7 @@ subroutine PDAL2(   num_vert,       &
                 print*,'poor energy conservation in the beam loop my result if this is not taken care of.'
             else ! else, if some normals read, perform checks to see if vertices need reordering
                 if(job_params%debug >= 1) print*,'validating vertex ordering...'
-                call validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
+                ! call validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
             end if
 
             ! stop

@@ -43,6 +43,10 @@ real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
 integer, dimension(:), allocatable :: num_face_vert ! number of vertices in each face
 integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
 
+! sr make_normals
+integer, dimension(:) ,allocatable :: norm_ids ! face vertex IDs
+real(8), dimension(:,:) ,allocatable :: norms ! unique vertices
+
 ! sr makeIncidentBeam
 real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
 real(8), allocatable, dimension(:,:) :: beamN ! beam normals
@@ -127,13 +131,17 @@ if (job_params%tri) then
     print*,'================================='
 end if
 
+call make_normals(face_ids, vert_in, norm_ids, norms)
+
 ! stop
 ! write unrotated particle to file (optional)            
 call PDAS(  vert_in,        & ! <-  rotated vertices
             face_ids,       & ! <-  face vertex IDs
             output_dir,     & ! <-  output directory
             num_face_vert,  & ! <-  number of verices in each face
-            "unrotated")    ! <-  filename
+            "unrotated",    & ! <-  filename
+            norms,          &
+            norm_ids)
 
 ! also write the apertures
 call save_apertures(apertures, output_dir)
@@ -174,11 +182,11 @@ do i = 1, num_remaining_orients
 
     ! write rotated particle to file (optional)
     if (job_params%num_orients .eq. 1) then
-        call PDAS(  vert,       & ! <-  rotated vertices
-                    face_ids,   & ! <-  face vertex IDs
-                    output_dir, & ! <-  output directory
+        call PDAS(  vert,           & ! <-  rotated vertices
+                    face_ids,       & ! <-  face vertex IDs
+                    output_dir,     & ! <-  output directory
                     num_face_vert,  & ! <-  number of verices in each face
-                    "rotated")    ! <-  filename
+                    "rotated")
     end if
 
     ! fast implementation of the incident beam

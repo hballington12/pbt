@@ -1240,10 +1240,12 @@
         end subroutine
         
         subroutine PDAS(verts, &
-            face_ids, &
-            output_dir, &
-            num_face_vert,  & ! <-  number of verices in each face
-            filename)
+                        face_ids, &
+                        output_dir, &
+                        num_face_vert,  & ! <-  number of verices in each face
+                        filename, &
+                        norms, &
+                        norm_ids)
             
             ! writes rotated particle to file
             ! to do: add Macke-style output
@@ -1253,13 +1255,24 @@
             character(len=*), intent(in) :: output_dir
             character(len=*), intent(in) :: filename
             integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
+            integer, dimension(:) ,allocatable, intent(in), optional :: norm_ids ! face vertex IDs
+            real(8), dimension(:,:) ,allocatable, intent(in), optional :: norms ! unique vertices
+
             
-            integer num_verts, num_faces, i, j, k
+            integer num_verts, num_faces, i, j, k, num_norms
             character(100) my_string, my_string2
+            logical output_norms
             
             print*,'========== start sr PDAS'
             
+            if(present(norms)) then
+                output_norms = .true.
+            else
+                output_norms = .false.
+            end if
+
             num_verts = size(verts,1)
+            if(output_norms) num_norms = size(norms,1)
             num_faces = size(face_ids,1)
             
             print*,'writing rotated particle to file...'
@@ -1295,6 +1308,11 @@
                 
                 write(10,'(A1,f16.8,f16.8,f16.8)') "v ", verts(i,1), verts(i,2), verts(i,3)
             end do
+            if(output_norms) then
+                do i = 1, num_norms
+                    write(10,'(A1,f16.8,f16.8,f16.8)') "vn ", norms(i,1), norms(i,2), norms(i,3)
+                end do
+            end if
             do i = 1, num_faces
                 my_string = "f "
                 call StripSpaces(my_string)
