@@ -286,7 +286,7 @@ phi_vals = phi_vals*pi/180d0
 
 
 job_params%suppress_2d = .false.
-job_params%tri = .true.
+job_params%tri = .false.
 job_params%tri_edge_length = 1
 job_params%tri_roughness = 0D0
 job_params%time_limit = 1e6
