@@ -37,7 +37,7 @@ module cc_hex_mod
         ! HB integration with abt
         integer, dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
         real(8), dimension(:,:), allocatable, intent(out) :: vertices
-        integer, dimension(:,:), allocatable, intent(out) :: face_ids
+        integer(8), dimension(:,:), allocatable, intent(out) :: face_ids
         integer face_counter, vert_counter ! counter for tracking number of faces
         integer k1
         

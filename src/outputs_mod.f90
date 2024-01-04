@@ -533,8 +533,8 @@
       ! saves the job to the cache directory, possibly to be resumed later
       
       real(8), dimension(:,:), allocatable, intent(in) :: vert_in ! unique vertices (unrotated)
-      integer, dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
-      integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
+      integer(8), dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
+      integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
       integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
       type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
       integer, intent(in) :: i_loop

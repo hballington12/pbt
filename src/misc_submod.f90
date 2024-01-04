@@ -123,7 +123,7 @@
             
         ! subroutine make_normals recomputes and returns the normals, as well as the corresponding IDs for each face
             
-        integer, dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
+        integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
         integer, dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
         real(8), dimension(:,:) ,allocatable, intent(in) :: verts ! unique vertices
         real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices
@@ -649,9 +649,9 @@
             ! needs fixing to accommodate multiple collinear vertices lying along 1 edge
             
             real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
-            integer, dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs
-            integer, intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
-            integer, dimension(:), allocatable, intent(inout) :: num_face_vert ! number of vertices in each face
+            integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs
+            integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
+            integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert ! number of vertices in each face
             integer, dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
             
             integer i, j ,k
@@ -789,8 +789,8 @@
             ! add the vertex to a new vertex array and appropriately assign the face_ids
             
             real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
-            integer, dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
-            integer, intent(inout) :: num_vert ! number of unique vertices, number of faces
+            integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+            integer(8), intent(inout) :: num_vert ! number of unique vertices, number of faces
             real(8), intent(in) :: distance_threshold ! max distance between two vertices for them to be merged
             
             logical, dimension(:), allocatable :: has_vertex_been_checked ! whether this vertex has been checked for merge
@@ -901,9 +901,9 @@
             ! returns the subdivided surface
             
             real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
-            integer, dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
-            integer, intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
-            integer, dimension(:), allocatable, intent(inout) :: num_face_vert
+            integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+            integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
+            integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert
             character(len=*) flags
             real(8), intent(in) :: max_edge_length
             integer, dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
@@ -911,18 +911,18 @@
             character(len=255), intent(in) :: output_dir ! output directory
             type(geometry_type), intent(inout) :: geometry
 
-            integer i, j, junk, vert_counter, vert_counter_total, face_counter, face_counter_total
+            integer(8) i, j, junk, vert_counter, vert_counter_total, face_counter, face_counter_total
             real(8), dimension(:,:), allocatable :: v, v0, v1 ! vertices of facet (after lr flip)
             ! integer, dimension(:), allocatable :: my_array ! points some numbers to some other numbers
             real(8) com(1:3) ! facet centre of mass
             real(8) rot(1:3,1:3) ! rotation matrix
             ! integer, dimension(:), allocatable :: num_face_vert_out
-            integer, dimension(:), allocatable :: apertures_temp ! apertures asignments for each facet
+            integer(8), dimension(:), allocatable :: apertures_temp ! apertures asignments for each facet
             
-            integer num_verts
-            integer num_nodes, num_faces
+            integer(8) num_verts
+            integer(8) num_nodes, num_faces
             real(8) verts_out(1:1000000,1:3) ! vertices after triangulation
-            integer face_ids_out(1:1000000,1:3) ! face_ids after triangulation
+            integer(8) face_ids_out(1:1000000,1:3) ! face_ids after triangulation
             integer apertures_out(1:1000000) ! apertures after triangulation
             
             ! real(8), dimension(:,:), allocatable :: verts_out_final
@@ -934,21 +934,29 @@
             logical exists ! for checking if directories or files exist
             integer rank ! for avoiding clashes between processes of different rank
             character(len=16) rank_string
-            
-            allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
-            apertures_temp = apertures ! save the input apertures
+            real(8), dimension(:,:) ,allocatable :: norms ! unique vertices, face vertex IDs, face normals
+            integer, dimension(:), allocatable :: norm_ids ! face normal ID of each face
+            real(8), dimension(:), allocatable :: faceAreas ! area of each facet
+            real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
+    
+
+
+            ! allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
+            allocate(apertures_temp(1:geometry%num_faces)) ! make an array to hold the input apertures
+            apertures_temp = geometry%face(:)%aperture ! save the input apertures
             
             vert_counter_total = 0
             face_counter_total = 0
             
-            do i = 1, num_face ! for each face
+            do i = 1, geometry%num_faces ! for each face
                 ! do i = 1, 1 ! for each face
                 
                 vert_counter = 0
                 face_counter = 0
                 
                 ! print*,'face:',i
-                num_verts = num_face_vert(i)
+                ! num_verts = num_face_vert(i)
+                num_verts = geometry%face(i)%num_verts
                 ! print*,'num verts in this face: ',num_verts
                 
                 ! rotate into x-y plane
@@ -960,9 +968,9 @@
                 allocate(v1(1:3,1:num_verts))
                 
                 do j = 1,num_verts
-                    v(1,j) = verts(face_ids(i,j),1)
-                    v(2,j) = verts(face_ids(i,j),2)
-                    v(3,j) = verts(face_ids(i,j),3)
+                    v(1,j) = geometry%verts(geometry%face(i)%vert_ids(j),1)
+                    v(2,j) = geometry%verts(geometry%face(i)%vert_ids(j),2)
+                    v(3,j) = geometry%verts(geometry%face(i)%vert_ids(j),3)
                     ! print*,v(1:3,j)
                 end do
                 
@@ -984,8 +992,7 @@
                 
                 write(rank_string,*) rank
                 
-                
-                call write_face_poly(num_verts,v1,face_ids,i,rank_string,output_dir)
+                call write_face_poly(num_verts,v1,i,rank_string,output_dir,geometry)
                 
                 ! stop
                 
@@ -1083,6 +1090,7 @@
             num_vert = vert_counter_total
             num_face = face_counter_total
             
+            ! now deallocate the old arrays and reassign
             deallocate(verts)
             deallocate(face_ids)
             deallocate(num_face_vert)
@@ -1104,11 +1112,41 @@
                 apertures(i) = apertures_out(i)
             end do
             
-            
-            
-            
-            
-            
+            ! recompute normals
+            call make_normals(face_ids, verts, norm_ids, norms) ! recompute normals
+            call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas, num_face_vert)
+
+            ! update the geometry data structure
+
+            deallocate(geometry%verts)
+            deallocate(geometry%norms)
+            deallocate(geometry%face)
+
+            geometry%num_verts = vert_counter_total
+            geometry%num_faces = face_counter_total
+            geometry%num_norms = size(norms,1)
+
+            allocate(geometry%verts(1:vert_counter_total,1:3))
+            allocate(geometry%norms(1:geometry%num_norms,1:3))
+            allocate(geometry%face(1:face_counter_total))
+
+            do i = 1, geometry%num_verts
+                geometry%verts(i,1:3) = verts_out(i,1:3)
+            end do
+
+            do i = 1, geometry%num_faces
+                allocate(geometry%face(i)%vert_ids(1:3))
+                geometry%face(i)%vert_ids(:) = face_ids_out(i,:)
+                geometry%face(i)%aperture = apertures_out(i)
+                geometry%face(i)%norm_id = norm_ids(i)
+                geometry%face(i)%area = faceAreas(i)
+                geometry%face(i)%midpoint(:) = Midpoints(i,:)
+            end do
+
+            do i = 1, geometry%num_norms
+                geometry%norms(i,1:3) = norms(i,1:3)
+            end do
+
         end subroutine
         
         subroutine get_rotation_matrix3(v0,rot)
@@ -1207,18 +1245,18 @@
             
         end subroutine
         
-        subroutine write_face_poly(num_verts,v1,face_ids,i,rank_string,output_dir)
+        subroutine write_face_poly(num_verts,v1,i,rank_string,output_dir,geometry)
             
             ! writes a face to a temporary file, ready for triangulation
             
-            integer, dimension(:), allocatable :: my_array ! points some numbers to some other numbers
-            integer, intent(in) :: num_verts
+            integer(8), dimension(:), allocatable :: my_array ! points some numbers to some other numbers
+            integer(8), intent(in) :: num_verts
             real(8), dimension(:,:), allocatable, intent(in) :: v1
-            integer, dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
             character(len=16), intent(in) :: rank_string
             character(len=255), intent(in) :: output_dir ! output directory
+            type(geometry_type), intent(in) :: geometry
             
-            integer j, i
+            integer(8) j, i
             
             ! print*,'my rank string: ',trim(adjustl(rank_string))
             ! stop
@@ -1229,7 +1267,8 @@
             write(10,'(I3,I3,I3,I3)') num_verts, 2, 1, 0 ! vertex header
             do j = 1, num_verts ! write vertices of this face
                 write(10,'(I3,F16.8,F16.8)') j, v1(1,j), v1(2,j)
-                my_array(j) = face_ids(i,j)
+                ! my_array(j) = face_ids(i,j)
+                my_array(j) = geometry%face(i)%vert_ids(j)
                 ! print*,'my_array(j)',my_array(j)
                 ! print*,'v1:',v1(1,j), v1(2,j)
             end do
@@ -1239,10 +1278,10 @@
                     ! print*,'face_ids(i,j)',face_ids(i,j)
                     ! print*,'findloc(my_array,face_ids(i,j))',findloc(my_array,face_ids(i,j))
                     ! write(10,'(I3,I3,I3)') j, face_ids(i,j), face_ids(i,1)
-                    write(10,'(I3,I3,I3)') j, findloc(my_array,face_ids(i,j)), findloc(my_array,face_ids(i,1))
+                    write(10,'(I3,I3,I3)') j, findloc(my_array,geometry%face(i)%vert_ids(j)), findloc(my_array,geometry%face(i)%vert_ids(1))
                 else
                     ! write(10,'(I3,I3,I3)') j, face_ids(i,j), face_ids(i,j+1)
-                    write(10,'(I3,I3,I3)') j, findloc(my_array,face_ids(i,j)), findloc(my_array,face_ids(i,j+1))
+                    write(10,'(I3,I3,I3)') j, findloc(my_array,geometry%face(i)%vert_ids(j)), findloc(my_array,geometry%face(i)%vert_ids(j+1))
                 end if
             end do
             write(10,'(I3)') 0 ! number of holes
@@ -1262,7 +1301,7 @@
             character(len=*), intent(in) :: filename
             type(geometry_type) geometry
             
-            integer num_verts, num_faces, i, j, k, num_norms
+            integer(8) num_verts, num_faces, i, j, k, num_norms
             character(100) my_string, my_string2
             logical output_norms
             
@@ -1890,15 +1929,15 @@
         ! assumes triangle facets
         ! to do: extend to quads
         
-        integer, dimension(:,:) ,allocatable, intent(in) :: face_ids
+        integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids
         real(8), dimension(:,:), allocatable, intent(in) :: verts
         real(8), dimension(:,:), allocatable, intent(out) :: midpoints
         real(8), dimension(:), allocatable, intent(out) :: face_areas
         real(8), dimension(1:3) :: vec_a, vec_b, a_cross_b
         real(8) temp_area
-        integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
+        integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
         
-        integer i,j, num_verts
+        integer(8) i,j, num_verts
         
         !print*,'========== start sr midPointsAndAreas'
         

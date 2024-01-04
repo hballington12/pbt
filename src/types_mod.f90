@@ -95,7 +95,7 @@ type beam_type
 end type beam_type
 
 type facet_type
-
+    ! facet type: information about each facet of the particle geometry
     integer(8), dimension(:), allocatable :: vert_ids
     integer(8) norm_id
     real(8) midpoint(1:3)

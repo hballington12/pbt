@@ -1910,7 +1910,7 @@ subroutine readApertures(afn,apertures, face_ids)
 
 integer, dimension(:), allocatable, intent(out) :: apertures
 character(100), intent(in) :: afn ! crystal filename
-integer, dimension(:,:), allocatable, intent(in) :: face_ids
+integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
 
 integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
 character(max_line_length) line ! a line in a file
@@ -1958,8 +1958,8 @@ subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, verts, beamMidpoints, 
 ! the width and length of the wavefront is set larger than the maximum x and y vertex values of the particle (full illumination)
 
 real(8), allocatable, intent(out), dimension(:,:) :: beamV, beamN
-integer, allocatable, intent(out), dimension(:,:) :: beamF1
-integer, allocatable, intent(out), dimension(:) :: beamF2
+integer(8), allocatable, intent(out), dimension(:,:) :: beamF1
+integer(8), allocatable, intent(out), dimension(:) :: beamF2
 real(8), dimension(:,:) ,allocatable, intent(in) :: verts
 real(8), dimension(:,:) ,allocatable, intent(out) :: beamMidpoints
 ! integer, dimension(:,:) ,allocatable, intent(in) :: face_ids
@@ -2246,14 +2246,14 @@ subroutine PDAL2(   num_vert,       &
     character(len=100) cfn ! particle filename
     character(len=100) cft ! particle filetype
     character(100) afn ! apertures filename
-    integer, intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
+    integer(8), intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
     integer :: num_norm ! number of face normals
-    integer, dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
+    integer(8), dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
     integer, dimension(:), allocatable :: norm_ids ! face normal ID of each face
     real(8), dimension(:,:) ,allocatable, intent(out) :: verts ! unique vertices
     real(8), dimension(:,:) ,allocatable :: norms ! unique vertices, face vertex IDs, face normals
     integer, dimension(:,:) ,allocatable :: face_ids_temp ! temporary array to hold face vertex IDs
-    integer, dimension(:,:) ,allocatable, intent(out) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+    integer(8), dimension(:,:) ,allocatable, intent(out) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
     character(100) c_method ! method of particle file input
     integer, dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates

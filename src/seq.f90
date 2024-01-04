@@ -37,12 +37,12 @@ character(len=255) :: output_dir ! output directory
 type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
-integer num_vert ! number of unique vertices
-integer num_face !  number of faces
-integer, dimension(:,:), allocatable :: face_ids ! face vertex IDs
+integer(8) num_vert ! number of unique vertices
+integer(8) num_face !  number of faces
+integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
 real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
 real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
-integer, dimension(:), allocatable :: num_face_vert ! number of vertices in each face
+integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
 integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
 type(geometry_type) geometry ! particle geometry data structure
 
@@ -54,8 +54,8 @@ real(8), dimension(:,:) ,allocatable :: norms ! unique vertices
 real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
 real(8), allocatable, dimension(:,:) :: beamN ! beam normals
 real(8), allocatable, dimension(:,:) :: beamMidpoints ! beam  midpoints
-integer, allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
-integer, allocatable, dimension(:) :: beamF2 ! beam face normal indices
+integer(8), allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
+integer(8), allocatable, dimension(:) :: beamF2 ! beam face normal indices
 complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of incident beam
 
 ! sr beam_loop
