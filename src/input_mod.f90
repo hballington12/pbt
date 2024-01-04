@@ -2223,7 +2223,8 @@ subroutine PDAL2(   num_vert,       &
                     verts,          &
                     num_face_vert,  &
                     apertures,      &
-                    job_params)
+                    job_params,     &
+                    geometry, norm_ids, norms)
 
 ! subroutine PDAL2 reads a file containing the particle geometry
 ! accepted file types: "obj" - .obj files, "mrt" - macke ray-tracing style
@@ -2257,6 +2258,7 @@ subroutine PDAL2(   num_vert,       &
     integer, dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
     type(job_parameters_type), intent(inout) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
+    type(geometry_type), intent(out) :: geometry ! the particle geometry data structure
 
     integer, parameter :: num_face_vert_max_in = 24 ! max number of vertices per face
     integer, parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
@@ -2629,6 +2631,41 @@ subroutine PDAL2(   num_vert,       &
     call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas (for doing some checks in the following sr)
 
     call area_stats(faceAreas)
+
+    call make_normals(face_ids, verts, norm_ids, norms) ! recompute normals
+
+
+    ! now put everything into a data strucute (work in progress)
+    ! vertices
+    allocate(geometry%verts(1:num_vert,1:3))
+    geometry%num_verts = num_vert
+    do i = 1, geometry%num_verts
+        geometry%verts(i,:) = verts(i,:)
+    end do
+
+    ! faces
+    allocate(geometry%face(1:num_face))
+    geometry%num_faces = num_face
+    do i = 1, geometry%num_faces
+        allocate(geometry%face(i)%vert_ids(1:num_face_vert(i)))
+        do j = 1, num_face_vert(i)
+            geometry%face(i)%vert_ids(j) = face_ids(i,j)
+        end do
+        geometry%face(i)%midpoint(:) = Midpoints(i,:)
+        geometry%face(i)%area = faceAreas(i)
+        geometry%face(i)%aperture = apertures(i)
+        geometry%face(i)%norm_id = norm_ids(i)
+        geometry%face(i)%num_verts = num_face_vert(i)
+    end do
+
+    ! do norms here later...
+    geometry%num_norms = size(norms,1)
+    allocate(geometry%norms(1:geometry%num_norms,1:3))
+    do i = 1, geometry%num_norms
+        geometry%norms(i,:) = norms(i,:)
+    end do
+
+    ! allocate(geometry%norms(1:num_norm,1:3))
 
     print*,'========== end sr PDAL2'
     ! stop

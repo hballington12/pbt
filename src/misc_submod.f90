@@ -410,20 +410,21 @@
             
         end subroutine
         
-        subroutine save_apertures(  apertures,  &
+        subroutine save_apertures(  geometry,  &
                                     output_dir)
             
             ! saves the apertures to a file
             
             character(len=255), intent(in) :: output_dir ! cached files directory (if job stops early)
-            integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
-            
+            ! integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
+            type(geometry_type), intent(in) :: geometry
+
             integer i
             
             open(10,file=trim(output_dir)//"/apertures.dat") ! open pertures file
             
-            do i = 1,size(apertures,1)
-                write(10,*) apertures(i)
+            do i = 1, geometry%num_faces
+                write(10,*) geometry%face(i)%aperture
             end do
             
             close(10)
@@ -883,7 +884,18 @@
             
         end subroutine
         
-        subroutine triangulate(verts,face_ids,num_vert,num_face,num_face_vert,max_edge_length,flags,apertures,roughness,rank,output_dir)
+        subroutine triangulate( verts, &
+                                face_ids, &
+                                num_vert, &
+                                num_face, &
+                                num_face_vert, &
+                                max_edge_length, &
+                                flags, &
+                                apertures, &
+                                roughness, &
+                                rank, &
+                                output_dir, &
+                                geometry)
             
             ! calls triangle to triangulate and subdivide a surface
             ! returns the subdivided surface
@@ -897,7 +909,8 @@
             integer, dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
             real(8), intent(in) :: roughness
             character(len=255), intent(in) :: output_dir ! output directory
-            
+            type(geometry_type), intent(inout) :: geometry
+
             integer i, j, junk, vert_counter, vert_counter_total, face_counter, face_counter_total
             real(8), dimension(:,:), allocatable :: v, v0, v1 ! vertices of facet (after lr flip)
             ! integer, dimension(:), allocatable :: my_array ! points some numbers to some other numbers
@@ -1239,25 +1252,15 @@
             
         end subroutine
         
-        subroutine PDAS(verts, &
-                        face_ids, &
-                        output_dir, &
-                        num_face_vert,  & ! <-  number of verices in each face
+        subroutine PDAS(output_dir, &
                         filename, &
-                        norms, &
-                        norm_ids)
+                        geometry)
             
             ! writes rotated particle to file
-            ! to do: add Macke-style output
             
-            real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
-            integer, dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
             character(len=*), intent(in) :: output_dir
             character(len=*), intent(in) :: filename
-            integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
-            integer, dimension(:) ,allocatable, intent(in), optional :: norm_ids ! face vertex IDs
-            real(8), dimension(:,:) ,allocatable, intent(in), optional :: norms ! unique vertices
-
+            type(geometry_type) geometry
             
             integer num_verts, num_faces, i, j, k, num_norms
             character(100) my_string, my_string2
@@ -1265,91 +1268,51 @@
             
             print*,'========== start sr PDAS'
             
-            if(present(norms)) then
-                output_norms = .true.
-            else
-                output_norms = .false.
-            end if
-
-            num_verts = size(verts,1)
-            if(output_norms) num_norms = size(norms,1)
-            num_faces = size(face_ids,1)
+            num_verts = geometry%num_verts
+            num_norms = geometry%num_norms
+            num_faces = geometry%num_faces
             
             print*,'writing rotated particle to file...'
-            
-            write(my_string,*) 'v '
-            write(my_string2,*) verts(1,1)
-            
-            ! print*,'my_string: ',my_string
-            ! print*,'my_string: ',my_string2
-            
-            call StripSpaces(my_string2)
-            
-            ! print*,'my_string222: ',trim(my_string2)
-            
-            my_string = "v "//trim(my_string2)//" "//trim(my_string2)//" "//trim(my_string2)
-            
-            ! print*,'my_string: ',my_string
-            ! print*,'output dir: "',trim(output_dir),'"'
-            
+
+            ! write to wavefront file
             open(10,file=trim(output_dir)//"/"//trim(filename)//".obj") ! wavefront format
-            ! write(10,*) '# rotated particle'
             do i = 1, num_verts
-                ! ! make string for line in file
-                ! my_string = "v "
-                ! write(my_string2,*) verts(i,1)
-                ! write(my_string3,*) verts(i,2)
-                ! write(my_string4,*) verts(i,3)
-                ! call StripSpaces(my_string2)
-                ! call StripSpaces(my_string3)
-                ! call StripSpaces(my_string4)
-                ! my_string = "v "//trim(my_string2)//" "//trim(my_string3)//" "//trim(my_string4)
-                ! write(10,*) trim(my_string)
-                
-                write(10,'(A1,f16.8,f16.8,f16.8)') "v ", verts(i,1), verts(i,2), verts(i,3)
+                write(10,'(A3,f16.8,f16.8,f16.8)') "v ", geometry%verts(i,1), geometry%verts(i,2), geometry%verts(i,3)
             end do
-            if(output_norms) then
-                do i = 1, num_norms
-                    write(10,'(A1,f16.8,f16.8,f16.8)') "vn ", norms(i,1), norms(i,2), norms(i,3)
-                end do
-            end if
+            do i = 1, num_norms
+                write(10,'(A3,f16.8,f16.8,f16.8)') "vn ", geometry%norms(i,1), geometry%norms(i,2), geometry%norms(i,3)
+            end do
             do i = 1, num_faces
                 my_string = "f "
                 call StripSpaces(my_string)
-                do j = 1, num_face_vert(i)
-                    write(my_string2,*) face_ids(i,j)
+                do j = 1, geometry%face(i)%num_verts
+                    write(my_string2,*) geometry%face(i)%vert_ids(j)
                     call StripSpaces(my_string2)
-                    ! print*,'my_string2: ',trim(my_string2)
                     my_string = trim(my_string)//" "//trim(my_string2)
-                    ! print*,'my_string: ',trim(my_string) 
                 end do
-                ! print*,'my_string: ',trim(my_string)
-                ! stop
-                ! write(10,'(A1,I10,I10,I10)') 'f', face_ids(i,1), face_ids(i,2), face_ids(i,3)
                 write(10,'(A100)') adjustl(my_string)
             end do
             close(10)
             
+            ! write to macke ray tracing style
             open(10,file=trim(output_dir)//"/"//trim(filename)//".cry") ! macke format (only for triangulated at the moment)
-            ! write(10,*) '# rotated particle'
             write(10,'(I8)') num_faces
             do i = 1, num_faces
-                ! print*,'face #',i,' had ',num_face_vert(i),' vertices'
-                write(10,*) num_face_vert(i)
+                write(10,*) geometry%face(i)%num_verts
             end do
-            ! print*,'maxval(num_face_vert)',maxval(num_face_vert)
-            ! stop
             do i = 1, num_faces
-                do j = 1, num_face_vert(i)
-                    k = num_face_vert(i) - j + 1
-                    ! k = j
-                    write(10,'(f16.8,f16.8,f16.8)') verts(face_ids(i,k),1), verts(face_ids(i,k),2), verts(face_ids(i,k),3)
+                do j = 1, geometry%face(i)%num_verts
+                    k = geometry%face(i)%num_verts - j + 1
+                    write(10,'(f16.8,f16.8,f16.8)') geometry%verts(geometry%face(i)%vert_ids(k),1), geometry%verts(geometry%face(i)%vert_ids(k),2), geometry%verts(geometry%face(i)%vert_ids(k),3)
                 end do
             end do
             close(10)
             
             print*,'finished writing rotated particle to file'
             
+            ! also write the apertures file
+            call save_apertures(geometry, output_dir)
+
             print*,'========== end sr PDAS'
             
         end subroutine

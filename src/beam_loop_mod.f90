@@ -422,22 +422,21 @@ end do
 
 end subroutine
 
-subroutine find_vis(aperture_id, rotatedVert, Face1, Face2, &
-                    isWithinBeam, apertures, &
+subroutine find_vis(rotatedVert, Face1, Face2, &
+                    apertures, &
                     rotatedMidpoints, rotatedNorm, &
                     in_beam, dist_beam, id_beam, is_shad, &
-                    beamV, beamF1, rotatedapertureNormals, &
-                    is_multithreaded)
+                    rotatedapertureNormals, &
+                    is_multithreaded, &
+                    beam)
 
     ! for subroutine beam_scan
     ! for a given particle orientation with assumed propagation along the -z axis,
     ! computes the internally illuminated facets for a given illuminating aperture
     ! uses a z-buffer technique to increase speed, among a few other tricks
 
-integer, intent(in) :: aperture_id
 integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedVert
-logical, dimension(:), allocatable, intent(in) :: isWithinBeam
 integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedMidpoints
@@ -446,10 +445,9 @@ logical, dimension(:), allocatable, intent(out) :: in_beam
 real(8), dimension(:), allocatable, intent(out) :: dist_beam
 integer, dimension(:), allocatable, intent(out) :: id_beam
 logical, dimension(:), allocatable, intent(out) :: is_shad
-real(8), dimension(:,:), allocatable, intent(in) :: beamV
-integer, dimension(:,:), allocatable, intent(in) :: beamF1 ! face vertex IDs
 real(8), dimension(:,:), allocatable, intent(in) :: rotatedapertureNormals
 logical, intent(in) :: is_multithreaded
+type(beam_type), intent(in) :: beam
 
 logical am_i_multithreaded
 
@@ -475,6 +473,7 @@ real(8) beamXmax0, beamXmin0, beamYmax0, beamYmin0
 real(8) beamXmax, beamXmin, beamYmax, beamYmin
 logical, dimension(:,:), allocatable :: F5
 real(8) start, finish
+integer, dimension(:), allocatable :: mapping
 
 ! ################################
 ! start new ray tracing algorithm
@@ -544,6 +543,7 @@ allocate(in_beam(1:size(Face2,1)))
 allocate(is_beam(1:size(Face2,1)))
 allocate(id_beam(1:size(Face2,1)))
 allocate(dist_beam(1:size(Face2,1)))
+allocate(mapping(1:size(Face2,1)))
 
 is_vis = .true.
 is_shad = .false.
@@ -551,23 +551,21 @@ in_beam = .false.
 is_beam = .false.
 id_beam = 0
 dist_beam = 0
+mapping = 0
 
-
-! make array to track which facets were part of the illuminating beam
-do i = 1, size(Face2,1) ! for each facet
-    if(isWithinBeam(i) .and. apertures(i) .eq. aperture_id) then
-        is_beam(i) = .true. ! if the facet was within the beam of the previous recursion, and belongs to this aperture
-        ! print*,i
-    end if
+! record which facets are part of the illuminating beam
+do i = 1, beam%num_facets
+    is_beam(beam%field(i)%face_id) = .true.
+    mapping(beam%field(i)%face_id) = i ! map each illuminating facet to its position in the beam data structure
 end do
 
 ! need to add a check to ignore facets outside beam max/min here
 ! ok well this gave 5x speedup
 do i = 1, 3 ! bodge
-    beamXmax0 = maxval(beamV(beamF1(1:size(beamF1,1),i),1))
-    beamXmin0 = minval(beamV(beamF1(1:size(beamF1,1),i),1))
-    beamYmax0 = maxval(beamV(beamF1(1:size(beamF1,1),i),2))
-    beamYmin0 = minval(beamV(beamF1(1:size(beamF1,1),i),2))
+    beamXmax0 = maxval(rotatedVert(Face1(beam%field(1:beam%num_facets)%face_id,i),1))
+    beamXmin0 = minval(rotatedVert(Face1(beam%field(1:beam%num_facets)%face_id,i),1))
+    beamYmax0 = maxval(rotatedVert(Face1(beam%field(1:beam%num_facets)%face_id,i),2))
+    beamYmin0 = minval(rotatedVert(Face1(beam%field(1:beam%num_facets)%face_id,i),2))
     if(i .eq. 1) then
         beamXmax = beamXmax0
         beamXmin = beamXmin0
@@ -608,12 +606,10 @@ if(am_i_multithreaded) then
                     ! if(F4(j,1) .eq. BB .or. F4(j,2) .eq. BB .or. F4(j,3) .eq. BB) then ! 
                     if(F5(j,BB)) then ! 
                     ! if(any(F4(j,1:3)) .eq. BB) then ! if blocker was in fuzzy bounding box
-                        if(j .ne. m) then ! ignore self-block and downfacing
-                            ! if(F4(j,1) .ne. BB .and. F4(j,2) .ne. BB .and. F4(j,3) .ne. BB) then ! 
-                            if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
-                            ! if(any((/F4(j,1) .eq. BB, F4(j,2) .eq. BB, F4(j,3) .eq. BB/))) then
+                        if(j .ne. m) then ! ignore self-block
+                            if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! if down-facing, sign flip here for internal
                                 ! do nothing
-                            else
+                            else ! if up-facing
                                 if (rotatedMidpoints(m,3) .gt. rotatedMidpoints(j,3)) then ! if potential blocker was behind facet m
                                     ! do nothing
                                 else ! if potential blocker was in front of facet m
@@ -653,7 +649,8 @@ if(am_i_multithreaded) then
                                                 end if
                                             else ! if this is the first time finding a blocking beam facet
                                                 in_beam(m) = .true. ! set to be within beam
-                                                id_beam(m) = j ! record the blocking facet
+                                                ! id_beam(m) = j ! record the blocking facet
+                                                id_beam(m) = mapping(j) 
                                                 dist_beam(m) = rotatedMidpoints(j,3) - rotatedMidpoints(m,3) ! record the distance from centroid of blocker to centroid of facet m
                                             end if
                                         else
@@ -693,12 +690,10 @@ else
                     ! if(F4(j,1) .eq. BB .or. F4(j,2) .eq. BB .or. F4(j,3) .eq. BB) then ! 
                     if(F5(j,BB)) then ! 
                     ! if(any(F4(j,1:3)) .eq. BB) then ! if blocker was in fuzzy bounding box
-                        if(j .ne. m) then ! ignore self-block and downfacing
-                            ! if(F4(j,1) .ne. BB .and. F4(j,2) .ne. BB .and. F4(j,3) .ne. BB) then ! 
-                            if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
-                            ! if(any((/F4(j,1) .eq. BB, F4(j,2) .eq. BB, F4(j,3) .eq. BB/))) then
+                        if(j .ne. m) then ! ignore self-block
+                            if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! if down-facing, sign flip here for internal
                                 ! do nothing
-                            else
+                            else ! if up-facing
                                 if (rotatedMidpoints(m,3) .gt. rotatedMidpoints(j,3)) then ! if potential blocker was behind facet m
                                     ! do nothing
                                 else ! if potential blocker was in front of facet m
@@ -738,7 +733,7 @@ else
                                                 end if
                                             else ! if this is the first time finding a blocking beam facet
                                                 in_beam(m) = .true. ! set to be within beam
-                                                id_beam(m) = j ! record the blocking facet
+                                                id_beam(m) = mapping(j) ! record the position of the blocking facet in the beam data struct
                                                 dist_beam(m) = rotatedMidpoints(j,3) - rotatedMidpoints(m,3) ! record the distance from centroid of blocker to centroid of facet m
                                             end if
                                         else
@@ -765,34 +760,7 @@ else
     end do
 end if
 
-
-
-! counter = 0
-! do j = 1, size(Face2,1)
-!     if(in_beam(j)) then
-!         counter = counter + 1
-!         print*,j
-!     end if
-! end do
-! print*,'counter',counter
-
-! counter = 0
-! open(10,file = "test.txt")
-! do j = 1, size(Face2,1)
-!     if(in_beam(j)) then
-!         counter = counter + 1
-!         write(10,'(I1)') 1
-!     else
-!         write(10,'(I1)') 0
-!     end if
-! end do
-! print*,'counter',counter
-! close(10)
-! stop
-
 call CPU_TIME(finish)
-! print'(A,f10.8,A)',"visible facets found in: ",finish-start," secs"
-! stop
 
 end subroutine
 
@@ -845,14 +813,14 @@ end subroutine
 
 subroutine rotate_into_aperture_system( aperturePropagationVectors, apertureMidpoints, apertureNormals, &
                                         verts, Norm, midPoints, &
-                                        aperture_id, &
                                         rotatedapertureMidpoints, &
                                         rotatedapertureNormals, &
                                         rotatedaperturePropagationVectors, &
                                         rotatedVert, &
                                         rotatedNorm, &
                                         rotatedMidpoints, &
-                                        rotationMatrices)
+                                        rotationMatrices, &
+                                        beam)
 
 real(8), dimension(:,:), allocatable, intent(in) :: aperturePropagationVectors
 real(8), dimension(:,:), allocatable, intent(in) :: apertureMidpoints ! the midpoint of each aperture
@@ -860,7 +828,6 @@ real(8), dimension(:,:), allocatable, intent(in) :: apertureNormals ! the normal
 real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
 real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints ! face midpoints
-integer, intent(in) :: aperture_id
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedaperturePropagationVectors
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedapertureMidpoints
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedapertureNormals
@@ -868,6 +835,7 @@ real(8), dimension(:,:), allocatable, intent(out) :: rotatedVert
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedNorm
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedMidpoints
 real(8), dimension(:,:,:), allocatable, intent(inout) :: rotationMatrices
+type(beam_type), intent(in) :: beam
 
 real(8) theta_1, theta_2
 real(8) rot1(1:3,1:3), rot2(1:3,1:3), rot(1:3,1:3)
@@ -875,18 +843,19 @@ real(8) temp_vector(1:3)
 integer i, j
 
 ! print*,'rotating into aperture system for aperture:',aperture_id
+! print*,'propagation direction is',aperturePropagationVectors(aperture_id,1:3)
 
 rot1 = 0 ! initialise
 rot2 = 0 ! initialise
 rot = 0 ! initialise
 
-theta_1 = 2*pi - atan2(aperturePropagationVectors(aperture_id,2),aperturePropagationVectors(aperture_id,1)) ! angle to rotate about z axis into x-z plane in +ive x direction
+theta_1 = 2*pi - atan2(beam%prop(2),beam%prop(1)) ! angle to rotate about z axis into x-z plane in +ive x direction
 rot1(1,1) = cos(theta_1)
 rot1(1,2) = -sin(theta_1)
 rot1(2,1) = sin(theta_1)
 rot1(2,2) = cos(theta_1)
 rot1(3,3) = 1
-temp_vector = matmul(rot1,aperturePropagationVectors(aperture_id,1:3)) ! to hold the propagation vector after rotating into x-z plane before we rotate onto z-axis
+temp_vector = matmul(rot1,beam%prop(1:3)) ! to hold the propagation vector after rotating into x-z plane before we rotate onto z-axis
 call normalise_vec(temp_vector)
 theta_2 = acos(-temp_vector(3))
 rot2(1,1) = cos(theta_2)
@@ -898,7 +867,7 @@ rot = matmul(rot2,rot1)
 
 do i = 1, 3
     do j = 1, 3
-        rotationMatrices(i,j,aperture_id) = rot(i,j)
+        rotationMatrices(i,j,beam%aperture_id) = rot(i,j)
     end do
 end do
 
@@ -949,26 +918,17 @@ end subroutine
 
 subroutine beam_scan(   aperturePropagationVectors, apertureMidpoints, apertureNormals, &
                         verts, Norm, midPoints, Face1, Face2, &
-                        aperture_id, &
-                        isWithinBeam, &
                         apertures, &
                         faceAreas, &
-                        maxIlluminatedFacets_ps, &
                         threshold, &
                         sufficientlyIlluminated2, &
-                        totalIlluminatedApertures, &
-                        prescan, &
-                        beamFaceAreas, &
-                        beamvk71, beamvk72, beamvk73, &
-                        beam_ampl, &
-                        isWithinBeam2, isWithinBeam2_ps, &
+                        in_beam, &
                         rotatedapertureNormals, &
                         rotationMatrices, &
-                        beamIDs_ps, distances_ps, &
-                        vk71, vk72, vk73, ampl, &
-                        rotatedVert, rotatedNorm, &
+                        id_beam, dist_beam, &
                         is_shad, &
-                        is_multithreaded)
+                        is_multithreaded, &
+                        beam)
 
 real(8), dimension(:,:), allocatable, intent(in) :: aperturePropagationVectors
 real(8), dimension(:,:), allocatable, intent(in) :: apertureMidpoints ! the midpoint of each aperture
@@ -978,34 +938,21 @@ real(8), dimension(:,:), allocatable, intent(in) :: Norm ! face normals
 real(8), dimension(:,:), allocatable, intent(in) :: Midpoints ! face midpoints
 integer, dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
 integer, dimension(:), allocatable, intent(in) :: Face2 ! face normal ID of each face
-logical, dimension(:), allocatable, intent(in) :: isWithinBeam
 integer, dimension(:), allocatable, intent(in) :: apertures ! the aperture which each facet belongs to
 real(8), dimension(:), allocatable, intent(in) :: faceAreas ! area of each facet
 real(8), intent(in) :: threshold ! minimum area of illumination per aperture to create new beam
-integer, intent(in) :: aperture_id
-! integer, intent(inout) :: maxIlluminatedFacets ! counts the maximum number of facets illuminated across all illuminating apertures
-integer, intent(inout) :: maxIlluminatedFacets_ps ! counts the maximum number of facets illuminated across all illuminating apertures (plus shadow)
-integer, intent(inout) :: totalIlluminatedApertures
-logical, intent(in) :: prescan
 logical, dimension(:), allocatable, intent(inout) :: sufficientlyIlluminated2 ! whether each aperture was sufficiently illuminated by the previous beam
-real(8), dimension(:), allocatable, intent(out) :: beamFaceAreas
-real(8), dimension(:), allocatable, intent(out) :: beamvk71, beamvk72, beamvk73
-complex(8), dimension(:,:,:), allocatable, intent(out) :: beam_ampl
-logical, dimension(:), allocatable, intent(out) :: isWithinBeam2, isWithinBeam2_ps
 real(8), dimension(:,:), allocatable, intent(out) :: rotatedapertureNormals
 real(8), dimension(:,:,:), allocatable, intent(inout) :: rotationMatrices
-integer, dimension(:), allocatable, intent(out) :: beamIDs_ps
-complex(8), dimension(:,:,:), allocatable, intent(in) :: ampl
-real(8), dimension(:), allocatable, intent(in) :: vk71, vk72, vk73 ! reflected e-perp vector from each facet
-real(8), dimension(:), allocatable, intent(out) :: distances_ps
-real(8), dimension(:,:), allocatable, intent(out) :: rotatedVert
-real(8), dimension(:,:), allocatable, intent(out) :: rotatedNorm
+real(8), dimension(:,:), allocatable :: rotatedVert
+real(8), dimension(:,:), allocatable :: rotatedNorm
 ! new ray tracing algorithm
 logical, dimension(:), allocatable, intent(out) :: is_shad
-logical, dimension(:), allocatable :: in_beam
-integer, dimension(:), allocatable :: id_beam
+logical, dimension(:), allocatable, intent(out) :: in_beam
+integer, dimension(:), allocatable, intent(out) :: id_beam
 real(8), dimension(:), allocatable :: dist_beam
 logical, intent(in) :: is_multithreaded
+type(beam_type), intent(in) :: beam
 
 integer k
 
@@ -1014,183 +961,40 @@ real(8), dimension(:,:), allocatable :: rotatedaperturePropagationVectors
 real(8), dimension(:,:), allocatable :: rotatedapertureMidpoints
 real(8), dimension(:,:), allocatable :: rotatedMidpoints
 ! beam variables
-real(8), dimension(:,:), allocatable :: beamV
-integer, dimension(:,:), allocatable :: beamF1 ! face vertex IDs
-real(8), dimension(:,:), allocatable :: beamN
-integer, dimension(:), allocatable :: beamF2 ! face normal ID of each face
-real(8), dimension(:,:), allocatable :: BeamMidPoints
 ! findVisible and findWithinBeam
-logical, dimension(:), allocatable :: isVisible, isVisiblePlusShadows
-integer i, num_beam_facets, counter, counter2
-real(8), dimension(:), allocatable :: distances
-integer, dimension(:), allocatable :: beamIDs
+integer i, counter2
+! real(8), dimension(:), allocatable :: distances
+! integer, dimension(:), allocatable :: beamIDs
 ! illuminations
 integer totalIlluminated_ps
 integer j
 real(8), dimension(:), allocatable :: illuminatedApertureAreas2
 real(8), dimension(:), allocatable :: illuminatedApertureAreas2_ps
 
-! allocations
-allocate(isVisible(1:size(Face2,1)))
-allocate(isVisiblePlusShadows(1:size(Face2,1)))
-allocate(beamV(size(Verts,1),1:3))
-allocate(beamN(size(Norm,1),1:3))
-allocate(isWithinBeam2(1:size(Face2,1)))
-allocate(isWithinBeam2_ps(1:size(Face2,1)))
-allocate(distances(1:size(Face2,1)))
-allocate(distances_ps(1:size(Face2,1)))
-allocate(beamIDs(1:size(Face2,1)))
-allocate(beamIDs_ps(1:size(Face2,1)))
 allocate(illuminatedApertureAreas2(1:size(apertureMidpoints,1)))
 allocate(illuminatedApertureAreas2_ps(1:size(apertureMidpoints,1)))
 
 ! rotate into the aperture
-call rotate_into_aperture_system(   aperturePropagationVectors, apertureMidpoints, apertureNormals, &
+call rotate_into_aperture_system(   aperturePropagationVectors, &
+                                    apertureMidpoints, apertureNormals, &
                                     verts, Norm, midPoints, &
-                                    aperture_id, &
                                     rotatedapertureMidpoints, &
                                     rotatedapertureNormals, &
-                                    rotatedaperturePropagationVectors, &
-                                    rotatedVert, &
+                                    rotatedaperturePropagationVectors, & ! unused
+                                    rotatedVert, & 
                                     rotatedNorm, &
                                     rotatedMidpoints, &
-                                    rotationMatrices)
+                                    rotationMatrices, &
+                                    beam)
 
-
-
-! extract geometric parameters of illuminating beam surface
-! intial loop to find number of facets in this aperture that were within the beam of the previous recursion
-num_beam_facets = 0 ! initialise
-do i = 1, size(Face2,1) ! for each facet
-    if(isWithinBeam(i) .and. apertures(i) .eq. aperture_id) then ! if the facet was within the beam of the previous recursion, and belongs to this aperture
-        num_beam_facets = num_beam_facets + 1
-    end if
-end do
-
-! print*,'number of beam facets: ',num_beam_facets
-! allocations
-allocate(beamF1(1:num_beam_facets,1:3))
-allocate(beamF2(1:num_beam_facets))
-allocate(BeamMidPoints(1:num_beam_facets,1:3))
-if(allocated(beamFaceAreas)) deallocate(beamFaceAreas)
-if(allocated(beamvk71)) deallocate(beamvk71)
-if(allocated(beamvk72)) deallocate(beamvk72)
-if(allocated(beamvk73)) deallocate(beamvk73)
-if(allocated(beam_ampl)) deallocate(beam_ampl)
-allocate(beamFaceAreas(1:num_beam_facets))
-allocate(beamvk71(1:num_beam_facets))
-allocate(beamvk72(1:num_beam_facets))
-allocate(beamvk73(1:num_beam_facets))
-allocate(beam_ampl(1:2,1:2,1:num_beam_facets))
-beamFaceAreas = 0
-beamvk71 = 0
-beamvk72 = 0
-beamvk73 = 0
-beam_ampl = 0
-
-beamV = rotatedVert
-beamN = rotatedNorm
-
-counter = 0 ! initialise a counter
-do i = 1, size(Face2,1) ! for each facet
-    if(isWithinBeam(i) .and. apertures(i) .eq. aperture_id) then ! if the facet was within the beam of the previous recursion, and belongs to this aperture
-        counter = counter + 1
-        beamF1(counter,1:3) = Face1(i,1:3)
-        beamF2(counter) = Face2(i)
-        BeamMidPoints(counter,1:3) = rotatedMidpoints(i,1:3)
-        beamvk71(counter) = vk71(i)
-        beamvk72(counter) = vk72(i)
-        beamvk73(counter) = vk73(i)
-        beamFaceAreas(counter) = faceAreas(i)
-        beam_ampl(1:2,1:2,counter) = ampl(1:2,1:2,i)
-
-        if (real(ampl(1,1,i)) .gt. 1e5) then
-            print*,'oh dear inside beam scan'
-            stop
-        end if
-
-        ! if(counter .eq. 49) print*,'counter was 49 -> face ID = ',i
-
-    end if
-end do
-
-! do i = 1, num_beam_facets
-    ! print'(A,I,A,I,I,I)','face: ',i,' beam face vertex IDs:',Face1(i,1),Face1(i,2),Face1(i,3)
-    ! print'(A,I,A,I)','face: ',i,' beam face normal IDs:',Face2(i)
-! end do
-
-
-! ! ################################
-! ! start old ray tracing algorithm
-
-! ! get internal visible facets
-! call findVisibleFacetsInt(rotatedVert, Face1, rotatedNorm, Face2, rotatedMidpoints, isVisible, apertures)
-
-! call findVisibleFacetsInt_ps(rotatedVert, Face1, rotatedNorm, Face2, rotatedMidpoints, isVisiblePlusShadows, apertures, rotatedapertureNormals)
-
-
-! print'(A,I8)','looking for intersections within the beam for aperture: ',aperture_id
-
-! ! probably can remove the first call below at some point, with a few adjustments
-! call findWithinBeamInt(Face1, rotatedMidpoints, isVisible, beamV, beamF1, beamN, beamF2, beamMidpoints, isWithinBeam2, distances, beamIDs)
-
-! call findWithinBeamInt(Face1, rotatedMidpoints, isVisiblePlusShadows, beamV, beamF1, beamN, beamF2, beamMidpoints, isWithinBeam2_ps, distances_ps, beamIDs_ps)
-
-! ! print*,'checkpoint #1'
-
-! ! open(10,file="test.txt")
-! ! do i = 1, size(Face1,1)
-! !    if(isWithinBeam2_ps(i)) then
-! !        write(10,'(i1)') 1
-! !    else
-! !        write(10,'(i1)') 0
-! !    end if
-! !    ! write(10,'(f12.8)') distances(i)
-! !    ! write(10,'(I8)') beamIDs(i)
-! ! end do
-! ! close(10)
-
-! allocate(is_shad(1:size(Face2,1)))
-
-! is_shad = .false. ! init
-! do j = 1, size(Face2,1) ! for each facet
-!     if(isWithinBeam2_ps(j) .and. isWithinBeam2(j) .eq. .false.) is_shad(j) = .true. ! determine if is a shadow facet (ie. facing downward or blocked by a facet from the same aperture)
-!     ! print*,j,isShadow(j)
-! end do
-
-! ! end old ray tracing algorithm
-! ! ################################
-
-! ! ################################
-! ! start new ray tracing algorithm
-
-call find_vis(  aperture_id, rotatedVert, Face1, Face2, &
-                isWithinBeam, apertures, &
+! find the facets illuminated by the beam
+call find_vis(  rotatedVert, Face1, Face2, &
+                apertures, &
                 rotatedMidpoints, rotatedNorm, &
                 in_beam, dist_beam, id_beam, is_shad, &
-                beamV, beamF1, rotatedapertureNormals, &
-                is_multithreaded)
-
-isWithinBeam2_ps = in_beam
-distances_ps = dist_beam
-beamIDs_ps = 0
-
-! grim...
-do j = 1, size(Face2,1)
-    if(in_beam(j)) then
-        counter = 0
-        do k = 1, size(Face2,1)
-            if(isWithinBeam(k) .and. apertures(k) .eq. aperture_id) then
-                counter = counter + 1
-            end if
-            if(k .eq. id_beam(j)) beamIDs_ps(j) = counter
-        end do
-    end if
-end do
-
-
-! end new ray tracing algorithm
-! ################################
+                rotatedapertureNormals, &
+                is_multithreaded, &
+                beam)
 
 ! init
 ! totalIlluminated = 0
@@ -1206,7 +1010,7 @@ do i = 1, size(apertureMidpoints,1) ! for each aperture
         !     counter = counter + 1
         !     illuminatedApertureAreas2(i) = illuminatedApertureAreas2(i) + faceAreas(j)            
         ! end if
-        if(isWithinBeam2_ps(j) .and. apertures(j) .eq. i) then
+        if(in_beam(j) .and. apertures(j) .eq. i) then
             counter2 = counter2 + 1
             illuminatedApertureAreas2_ps(i) = illuminatedApertureAreas2_ps(i) + faceAreas(j)
         end if
@@ -1218,16 +1022,14 @@ do i = 1, size(apertureMidpoints,1) ! for each aperture
     !     totalIlluminated = totalIlluminated + counter
     ! end if
     if(counter2 .gt. 0) then
-        if(prescan) then
-            ! print'(A,I5,A,I5,A40,I5,A,f10.6)','aperture ',aperture_id,' illuminated ',counter2,' facets (shadow) in aperture ',i,' with a total area of ',illuminatedApertureAreas2_ps(i)
-        end if
+        ! print'(A,I5,A,I5,A40,I5,A,f10.6)','aperture ',aperture_id,' illuminated ',counter2,' facets (shadow) in aperture ',i,' with a total area of ',illuminatedApertureAreas2_ps(i)
         totalIlluminated_ps = totalIlluminated_ps + counter2
     end if    
 end do
 ! print*,'checkpoint #2'
 
 ! if(totalIlluminated .gt. maxIlluminatedFacets) maxIlluminatedFacets = totalIlluminated
-if(totalIlluminated_ps .gt. maxIlluminatedFacets_ps) maxIlluminatedFacets_ps = totalIlluminated_ps
+! if(totalIlluminated_ps .gt. maxIlluminatedFacets_ps) maxIlluminatedFacets_ps = totalIlluminated_ps
 
 ! init
 sufficientlyIlluminated2 = .false.
@@ -1244,15 +1046,15 @@ do i = 1, size(apertureMidpoints,1) ! for each aperture
     if(sufficientlyIlluminated2(i)) then
         if(rotatedapertureNormals(i,3) > -0.01) then ! if normal faces upwards, it is unphysical for internal interactions
             sufficientlyIlluminated2(i) = .false.
-            if(prescan) print'(A,I2,A)','aperture ',i,' was suff. illuminated but set not visible because it was facing the wrong way'
+            ! print'(A,I2,A)','aperture ',i,' was suff. illuminated but set not visible because it was facing the wrong way'
         end if
     end if
 end do
 ! print*,'checkpoint #4'
 
-do i = 1, size(apertureMidpoints,1) ! for each aperture
-    if(sufficientlyIlluminated2(i)) totalIlluminatedApertures = totalIlluminatedApertures + 1
-end do
+! do i = 1, size(apertureMidpoints,1) ! for each aperture
+!     if(sufficientlyIlluminated2(i)) totalIlluminatedApertures = totalIlluminatedApertures + 1
+! end do
 ! print*,'checkpoint #5'
 
 ! due to the above 2 do loops, the total ill. facets is probably an overestimate as some are ignored due to facing wrong way
@@ -1318,22 +1120,17 @@ integer aperture_id
 integer, dimension(:), allocatable :: sufficiently_illuminated_indices ! indices of sufficiently illuminated apertures
 logical, dimension(:), allocatable :: sufficientlyIlluminated2 ! whether each aperture was sufficiently illuminated by the previous beam
 integer sum_suff_ill ! total number of new sufficiently illuminated apertures
-real(8), dimension(:), allocatable :: beamFaceAreas
-real(8), dimension(:), allocatable :: beamvk71, beamvk72, beamvk73
-complex(8), dimension(:,:,:), allocatable :: beam_ampl
 logical prescan
 logical, dimension(:), allocatable :: isShadow
-logical, dimension(:), allocatable :: isWithinBeam2, isWithinBeam2_ps
+logical, dimension(:), allocatable :: in_beam
 real(8), dimension(:,:), allocatable :: rotatedapertureNormals
 real(8), dimension(:,:,:), allocatable :: rotationMatrices
 real(8) vk7a(1:3)
 integer aperture
 real(8) rot(1:2,1:2)
 complex(8) rot_ampl(1:2,1:2)
-integer, dimension(:), allocatable :: beamIDs_ps
-real(8), dimension(:), allocatable :: distances_ps
-real(8), dimension(:,:), allocatable :: rotatedVert
-real(8), dimension(:,:), allocatable :: rotatedNorm
+integer, dimension(:), allocatable :: id_beam
+real(8), dimension(:), allocatable :: dist_beam
 real(8) theta_i, theta_t, theta_i_aperture
 logical tir
 complex(8) r_perp, t_perp, r_par, t_par ! fresnel coefficients
@@ -1344,9 +1141,14 @@ real(8) a_vec(1:3), b_vec(1:3), c_vec(1:3)
 real(8) intensity_in, intensity_abs, intensity_out
 ! real(8) start, finish
 
+type(beam_type) beam ! current beam to be traced
+
+
+
 ! allocations
 allocate(sufficientlyIlluminated2(1:size(sufficientlyIlluminated,1)))
 allocate(rotationMatrices(1:3,1:3,1:size(apertureMidpoints,1)))
+allocate(beam%field(1:size(Face1,1))) ! reduce this to just the size of each beam to preserve memory
 
 ! make a quick array containing the sufficiently illuminated aperture numbers
 num_sufficiently_illuminated_apertures = 0
@@ -1373,32 +1175,32 @@ rotationMatrices = 0
 ! start = omp_get_wtime()
 
 ! perform prescan to determine shape of arrays (removed)
-prescan = .true.
-do i = 1, num_sufficiently_illuminated_apertures
-    aperture_id = sufficiently_illuminated_indices(i)
-    call beam_scan( aperturePropagationVectors, apertureMidpoints, apertureNormals, &
-                    verts, Norm, midPoints, Face1, Face2, &
-                    aperture_id, &
-                    isWithinBeam, &
-                    apertures, &
-                    faceAreas, &
-                    maxIlluminatedFacets_ps, &
-                    threshold, &
-                    sufficientlyIlluminated2, &
-                    totalIlluminatedApertures, &
-                    prescan, &
-                    beamFaceAreas, & ! dummy
-                    beamvk71, beamvk72, beamvk73, & ! dummy
-                    beam_ampl, & ! dummy
-                    isWithinBeam2, isWithinBeam2_ps, & 
-                    rotatedapertureNormals, &
-                    rotationMatrices, &
-                    beamIDs_ps, distances_ps, &
-                    vk71, vk72, vk73, ampl, &
-                    rotatedVert, rotatedNorm, &
-                    isShadow, &
-                    is_multithreaded) 
-end do
+! prescan = .true.
+! do i = 1, num_sufficiently_illuminated_apertures
+!     aperture_id = sufficiently_illuminated_indices(i)
+!     call beam_scan( aperturePropagationVectors, apertureMidpoints, apertureNormals, &
+!                     verts, Norm, midPoints, Face1, Face2, &
+!                     aperture_id, &
+!                     isWithinBeam, &
+!                     apertures, &
+!                     faceAreas, &
+!                     maxIlluminatedFacets_ps, &
+!                     threshold, &
+!                     sufficientlyIlluminated2, &
+!                     totalIlluminatedApertures, &
+!                     prescan, &
+!                     beamFaceAreas, & ! dummy
+!                     beamvk71, beamvk72, beamvk73, & ! dummy
+!                     beam_ampl, & ! dummy
+!                     isWithinBeam2, isWithinBeam2_ps, & 
+!                     rotatedapertureNormals, &
+!                     rotationMatrices, &
+!                     beamIDs_ps, distances_ps, &
+!                     vk71, vk72, vk73, ampl, &
+!                     rotatedVert, rotatedNorm, &
+!                     isShadow, &
+!                     is_multithreaded) 
+! end do
 
 ! print*,'total new illuminated apertures: ',totalIlluminatedApertures
 ! print*,'max number of illuminated facets: ',maxIlluminatedFacets
@@ -1406,7 +1208,7 @@ end do
 
 ! prescan complete, now we know the sizes to allocate for arrays
 
-! maxIlluminatedFacets_ps = size(Face1,1) ! override prescan
+maxIlluminatedFacets_ps = size(Face1,1) ! override prescan
 
 ! get total number of illuminating apertures
 sum_suff_ill = 0 
@@ -1468,69 +1270,48 @@ do i = 1, num_sufficiently_illuminated_apertures
     l = l + 1 ! update counter
     aperture_id = sufficiently_illuminated_indices(i) ! replaces i in matlab code
 
-    ! print*,'ampl(1:2,1:2,3121)',ampl(1:2,1:2,3121)
 
-    call beam_scan( aperturePropagationVectors, apertureMidpoints, apertureNormals, &
+
+    ! populate the beam data structure
+    counter = 0 ! initialise a counter
+    do j = 1, size(Face2,1) ! for each facet
+        if(isWithinBeam(j) .and. apertures(j) .eq. aperture_id) then ! if the facet was within the beam of the previous recursion, and belongs to this aperture
+            counter = counter + 1
+            beam%field(counter)%face_id = j
+            beam%field(counter)%e_perp = (/vk71(j),vk72(j),vk73(j)/)
+            beam%field(counter)%ampl = ampl(1:2,1:2,j)
+        end if
+    end do
+
+    beam%prop(1:3) = aperturePropagationVectors(aperture_id,1:3)
+    beam%num_facets = counter
+    beam%aperture_id = aperture_id
+
+    call beam_scan( aperturePropagationVectors, &
+                    apertureMidpoints, apertureNormals, &
                     verts, Norm, midPoints, Face1, Face2, &
-                    aperture_id, &
-                    isWithinBeam, &
                     apertures, &
                     faceAreas, &
-                    maxIlluminatedFacets_ps, &
                     threshold, &
                     sufficientlyIlluminated2, &
-                    totalIlluminatedApertures, &
-                    prescan, &
-                    beamFaceAreas, &
-                    beamvk71, beamvk72, beamvk73, &
-                    beam_ampl, &
-                    isWithinBeam2, isWithinBeam2_ps, &
+                    in_beam, &
                     rotatedapertureNormals, &
                     rotationMatrices, &
-                    beamIDs_ps, distances_ps, &
-                    vk71, vk72, vk73, ampl, &
-                    rotatedVert, rotatedNorm, &
+                    id_beam, dist_beam, &
                     isShadow, &
-                    is_multithreaded)
-
-    ! print*,'real(beam_ampl(1,1,1))',real(beam_ampl(1,1,1))
-
-    ! if(isWithinBeam2_ps(5746)) then
-    !     print*,'beam_ampl(1:2,1:2,49)',beam_ampl(1:2,1:2,49)
-    !     ! stop
-    ! end if
-
-
-
-    ! isShadow = .false. ! init
-    ! do j = 1, size(Face2,1) ! for each facet
-    !     if(isWithinBeam2_ps(j) .and. isWithinBeam2(j) .eq. .false.) isShadow(j) = .true. ! determine if is a shadow facet (ie. facing downward or blocked by a facet from the same aperture)
-    !     ! print*,j,isShadow(j)
-    ! end do
+                    is_multithreaded, &
+                    beam)
 
     ! get the reflected propagation vectors for the current illuminating beam
     call get_reflection_vectors(propagationVectors2, rotatedapertureNormals, sufficientlyIlluminated2, l)
 
-    ! do j = 1, 8
-    !     print'(f12.6,f12.6,f12.6)',propagationVectors2(j,1,1),propagationVectors2(j,2,1),propagationVectors2(j,3,1)
-    ! end do
-
     ! now rotate the propagation vectors back to the original coordinate system for later use
-    ! print'(A,I)','rotation matrix for illuminating aperture: ',i
-    ! do j = 1, 3
-    !     print'(A,f12.6,A,f12.6,A,f12.6,A)','|',rotationMatrices(j,1,i),',',rotationMatrices(j,2,i),',',rotationMatrices(j,3,i),'|'
-    ! end do
-
     call rotate_back_propagation_vectors(rotationMatrices, propagationVectors2, sufficientlyIlluminated2, aperture_id, l)
-
-    ! do j = 1, size(sufficientlyIlluminated2,1)
-    !     print'(f12.6,f12.6,f12.6)',propagationVectors2(j,1,l),propagationVectors2(j,2,l),propagationVectors2(j,3,l)
-    ! end do
 
     k = 0 ! counting variable for storing e-field components later on
 
     do j = 1, size(Face2,1) ! for each facet
-        if(isWithinBeam2_ps(j)) then
+        if(in_beam(j)) then
             k = k + 1
             ! if(isShadow(j) .eqv. .false.) then
             !     call cross(-Norm(Face2(j),1:3),aperturePropagationVectors(aperture_id,1:3),vk7a(1:3))
@@ -1540,47 +1321,28 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! end if
 
             call getRotationMatrix( rot,vk7a(1),vk7a(2),vk7a(3), &
-                                    beamvk71(beamIDs_ps(j)),beamvk72(beamIDs_ps(j)),beamvk73(beamIDs_ps(j)), &
+                                    ! beamvk71(id_beam(j)),beamvk72(id_beam(j)),beamvk73(id_beam(j)), &
+                                    beam%field(id_beam(j))%e_perp(1),beam%field(id_beam(j))%e_perp(2),beam%field(id_beam(j))%e_perp(3), &
                                     aperturePropagationVectors(aperture_id,1),aperturePropagationVectors(aperture_id,2),aperturePropagationVectors(aperture_id,3))
 
-            ! print*,'vk7a',vk7a
-            ! print*,'beamvk71',beamvk71(beamIDs_ps(j)),beamvk72(beamIDs_ps(j)),beamvk73(beamIDs_ps(j))
-            ! print*,'aperturePropagationVectors',aperturePropagationVectors(i,1),aperturePropagationVectors(i,2),aperturePropagationVectors(i,3)
-            ! print*,'rot',rot(1,1),rot(1,2),rot(2,1),rot(2,2)
-
-            rot_ampl(1:2,1:2) = matmul(rot(1:2,1:2),beam_ampl(1:2,1:2,beamIDs_ps(j)))
-
-            ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)',' beam ampl in: (',real(rot_ampl(1,1)),' + ',imag(rot_ampl(1,1)),'i, ',real(rot_ampl(1,2)),' + ',imag(rot_ampl(1,2)),'i)'
-            ! print'(A16,f10.4,A,f10.4,A,f10.4,A,f10.4,A)','               (',real(rot_ampl(2,1)),' + ',imag(rot_ampl(2,1)),'i, ',real(rot_ampl(2,2)),' + ',imag(rot_ampl(2,2)),'i)'
-
-            ! rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) ! no absorption
+            rot_ampl(1:2,1:2) = matmul(rot(1:2,1:2),beam%field(id_beam(j))%ampl(:,:))
 
             intensity_in = real(0.5*(   rot_ampl(1,1)*conjg(rot_ampl(1,1)) + &
                                         rot_ampl(1,2)*conjg(rot_ampl(1,2)) + &
                                         rot_ampl(2,1)*conjg(rot_ampl(2,1)) + &
                                         rot_ampl(2,2)*conjg(rot_ampl(2,2))))
 
-            ! print*,'intensity in: ',real(0.5*(  beam_ampl(1,1,beamIDs_ps(j))*conjg(beam_ampl(1,1,beamIDs_ps(j))) + &
-            !                                     beam_ampl(1,2,beamIDs_ps(j))*conjg(beam_ampl(1,2,beamIDs_ps(j))) + &
-            !                                     beam_ampl(2,1,beamIDs_ps(j))*conjg(beam_ampl(2,1,beamIDs_ps(j))) + &
-            !                                     beam_ampl(2,2,beamIDs_ps(j))*conjg(beam_ampl(2,2,beamIDs_ps(j)))))                                                
+            rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*dist_beam(j)) * exp(-2*waveno*ibi*sqrt(dist_beam(j))) ! absorption
 
-            rot_ampl = rot_ampl * exp2cmplx(waveno*rbi*distances_ps(j)) * exp(-2*waveno*ibi*sqrt(distances_ps(j))) ! absorption
+            intensity_out = real(0.5*(  rot_ampl(1,1)*conjg(rot_ampl(1,1)) + &
+                                        rot_ampl(1,2)*conjg(rot_ampl(1,2)) + &
+                                        rot_ampl(2,1)*conjg(rot_ampl(2,1)) + &
+                                        rot_ampl(2,2)*conjg(rot_ampl(2,2))))
 
-            ! print*,'absorption factor: ',exp(-2*waveno*ibi*distances_ps(j))**2
-            ! print*,'1 - absorption factor: ',(1 - exp(-2*waveno*ibi*distances_ps(j))**2)
-
-
-
-            intensity_out = real(0.5*(rot_ampl(1,1)*conjg(rot_ampl(1,1)) + &
-                                                            rot_ampl(1,2)*conjg(rot_ampl(1,2)) + &
-                                                            rot_ampl(2,1)*conjg(rot_ampl(2,1)) + &
-                                                            rot_ampl(2,2)*conjg(rot_ampl(2,2))))
-
-            intensity_abs = real(0.5*(  beam_ampl(1,1,beamIDs_ps(j))*conjg(beam_ampl(1,1,beamIDs_ps(j))) + &
-                                        beam_ampl(1,2,beamIDs_ps(j))*conjg(beam_ampl(1,2,beamIDs_ps(j))) + &
-                                        beam_ampl(2,1,beamIDs_ps(j))*conjg(beam_ampl(2,1,beamIDs_ps(j))) + &
-                                        beam_ampl(2,2,beamIDs_ps(j))*conjg(beam_ampl(2,2,beamIDs_ps(j)))))*(1-exp(-2*waveno*ibi*sqrt(distances_ps(j)))**2)
+            intensity_abs = real(0.5*(  beam%field(id_beam(j))%ampl(1,1)*conjg(beam%field(id_beam(j))%ampl(1,1)) + &
+                                        beam%field(id_beam(j))%ampl(1,2)*conjg(beam%field(id_beam(j))%ampl(1,2)) + &
+                                        beam%field(id_beam(j))%ampl(2,1)*conjg(beam%field(id_beam(j))%ampl(2,1)) + &
+                                        beam%field(id_beam(j))%ampl(2,2)*conjg(beam%field(id_beam(j))%ampl(2,2))))*(1-exp(-2*waveno*ibi*sqrt(dist_beam(j)))**2)
 
             ! print*,'intensity conservation: ',(intensity_out + intensity_abs)/intensity_in * 100,'%'
 
@@ -1630,27 +1392,22 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! remove transmission for shadowed facets (probably doesnt matter)
             if(isShadow(j)) trans_ampl = trans_ampl*0
 
-            ! print*,'illuminating propagation vectors'
-            ! do m = 1, 8
-            !     print*,aperturePropagationVectors(m,1), aperturePropagationVectors(m,2), aperturePropagationVectors(m,3)
-            ! end do
-
             ! print*,'illuminated facet ID: ',j
             ! print*,'illuminated facet cos(theta_i): ',cos(theta_i)
             ! print*,'illuminated face area: ',faceAreas(j)
             ! print*,'illuminated projected face area: ',cos(theta_i)*faceAreas(j)
-            ! ! print*,'illuminating facet ID: ',beamIDs_ps(j)
-            ! ! print*,'illuminating facet area: ',faceAreas(beamIDs_ps(j))
-            ! print*,'illuminating facet cos(theta_i)',-rotatedNorm(Face2(beamIDs_ps(j)),3)
-            ! ! print*,'illuminating projected face area: ',-rotatedNorm(Face2(beamIDs_ps(j)),3)*faceAreas(beamIDs_ps(j))
-            ! print*,'absorption factor: ',(1-exp(-2*waveno*ibi*distances_ps(j)))
-            ! print*,'illuminated extinction cross section: ',(1-exp(-2*waveno*ibi*distances_ps(j)))*cos(theta_i)*faceAreas(j)
+            ! print*,'illuminating facet ID: ',id_beam(j)
+            ! print*,'illuminating facet area: ',faceAreas(id_beam(j))
+            ! print*,'illuminating facet cos(theta_i)',-rotatedNorm(Face2(id_beam(j)),3)
+            ! print*,'illuminating projected face area: ',-rotatedNorm(Face2(id_beam(j)),3)*faceAreas(id_beam(j))
+            ! print*,'absorption factor: ',(1-exp(-2*waveno*ibi*dist_beam(j)))
+            ! print*,'illuminated extinction cross section: ',(1-exp(-2*waveno*ibi*dist_beam(j)))*cos(theta_i)*faceAreas(j)
 
-            ! ext_cross_section = ext_cross_section + sqrt(1-exp(-2*waveno*ibi*distances_ps(j)))*cos(theta_i)*faceAreas(j)*intensity_in*rbi ! this might need a check
+            ! ext_cross_section = ext_cross_section + sqrt(1-exp(-2*waveno*ibi*dist_beam(j)))*cos(theta_i)*faceAreas(j)*intensity_in*rbi ! this might need a check
             
             ext_cross_section = ext_cross_section + intensity_abs*cos(theta_i)*faceAreas(j)*rbi ! this might need a check, rbi because energy is more concentrated inside particle
 
-            ! ext_cross_section = ext_cross_section + intensity_abs*cos(theta_i)*faceAreas(j)*rbi/(-rotatedNorm(Face2(beamIDs_ps(j)),3)) ! this might need a check
+            ! ext_cross_section = ext_cross_section + intensity_abs*cos(theta_i)*faceAreas(j)*rbi/(-rotatedNorm(Face2(id_beam(j)),3)) ! this might need a check
                                         ! stop
 
             ! output variables
@@ -1801,6 +1558,7 @@ real(8), dimension(:), allocatable :: vk71, vk72, vk73
 real(8) start, finish
 logical is_first_beam_back ! whether or not this is the first loop iteration back
 integer num_req_threads ! number of required threads
+
 
 ! start = omp_get_wtime()
 
@@ -4023,5 +3781,12 @@ end do
 
 end subroutine
 
+subroutine get_beam(beam)
+
+type(beam_type), intent(out) :: beam
+
+
+
+end subroutine
 
 end module beam_loop_mod

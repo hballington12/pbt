@@ -22,7 +22,8 @@ implicit none
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
-! test
+! add save apertures back in to caching
+! add back output particle to caching as well
 
 ! ############################################################################################################
 
@@ -43,6 +44,7 @@ real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
 real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
 integer, dimension(:), allocatable :: num_face_vert ! number of vertices in each face
 integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
+type(geometry_type) geometry ! particle geometry data structure
 
 ! sr make_normals
 integer, dimension(:) ,allocatable :: norm_ids ! face vertex IDs
@@ -94,7 +96,6 @@ seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
 
 call parse_command_line(job_params)
 
-
 if(job_params%resume) then
     print*,'attempting to resume job using cache #',job_params%cache_id
     call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
@@ -117,12 +118,24 @@ call PDAL2( num_vert,       & !  -> number of unique vertices
             vert_in,        & !  -> unique vertices
             num_face_vert,  & !  -> number of vertices in each face
             apertures,      & !  -> apertures
-            job_params)       ! <-  job parameters
+            job_params,     & ! <-  job parameters
+            geometry, norm_ids, norms)         !  -> particle geometry
 
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
     print*,'================================='
-    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness, my_rank, output_dir) ! triangulate the particle
+    call triangulate(   vert_in, &
+                        face_ids, &
+                        num_vert, &
+                        num_face, &
+                        num_face_vert, &
+                        job_params%tri_edge_length, &
+                        '-Q -q', &
+                        apertures, &
+                        job_params%tri_roughness, &
+                        my_rank, &
+                        output_dir, &
+                        geometry) ! triangulate the particle
     call merge_vertices(vert_in, face_ids, num_vert, 1D-1) ! merge vertices that are close enough
     call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! max_edge_length = job_params%la*2
@@ -132,20 +145,10 @@ if (job_params%tri) then
     print*,'================================='
 end if
 
-call make_normals(face_ids, vert_in, norm_ids, norms)
-
-! stop
 ! write unrotated particle to file (optional)            
-call PDAS(  vert_in,        & ! <-  rotated vertices
-            face_ids,       & ! <-  face vertex IDs
-            output_dir,     & ! <-  output directory
-            num_face_vert,  & ! <-  number of verices in each face
+call PDAS(  output_dir,     & ! <-  output directory
             "unrotated",    & ! <-  filename
-            norms,          &
-            norm_ids)
-
-! also write the apertures
-call save_apertures(apertures, output_dir)
+            geometry)
 
 call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 call init_loop( alpha_vals, &
@@ -182,13 +185,13 @@ do i = 1, num_remaining_orients
                     job_params)
 
     ! write rotated particle to file (optional)
-    if (job_params%num_orients .eq. 1) then
-        call PDAS(  vert,           & ! <-  rotated vertices
-                    face_ids,       & ! <-  face vertex IDs
-                    output_dir,     & ! <-  output directory
-                    num_face_vert,  & ! <-  number of verices in each face
-                    "rotated")
-    end if
+    ! if (job_params%num_orients .eq. 1) then
+    !     call PDAS(  vert,           & ! <-  rotated vertices
+    !                 face_ids,       & ! <-  face vertex IDs
+    !                 output_dir,     & ! <-  output directory
+    !                 num_face_vert,  & ! <-  number of verices in each face
+    !                 "rotated")
+    ! end if
 
     ! fast implementation of the incident beam
     call makeIncidentBeam(  beamV,         & ! ->  beam vertices

@@ -547,14 +547,16 @@
       ! call make_cache_dir("cache/",cache_dir)
       print*,'cache directory is "',trim(cache_dir),'"'
       
-      call PDAS(  vert_in,        & ! <-  rotated vertices
-      face_ids,       & ! <-  face vertex IDs
-      cache_dir,      & ! <-  output directory
-      num_face_vert,  & ! <-  number of verices in each face
-      "unrotated")      ! <-  filename
+      ! this needs putting back in but i havent sorted the geometry out yet
+      ! call PDAS(  vert_in,        & ! <-  rotated vertices
+      ! face_ids,       & ! <-  face vertex IDs
+      ! cache_dir,      & ! <-  output directory
+      ! num_face_vert,  & ! <-  number of verices in each face
+      ! "unrotated")      ! <-  filename
       
-      call save_apertures(apertures,  & ! <-  apertures
-      cache_dir)    ! <-  cache directory
+      ! need to put this back in!
+      ! call save_apertures(apertures,  & ! <-  apertures
+      !                     cache_dir)    ! <-  cache directory
       
       call save_params(job_params,i_loop,cache_dir,output_parameters_total)
       

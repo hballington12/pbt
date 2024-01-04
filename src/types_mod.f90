@@ -75,6 +75,50 @@ type job_parameters_type
     logical timing ! code timing output
 end type job_parameters_type
 
+type field_type
+    ! field: contains the information about the electric field at a facet
+    ! this is used as an allocatable entry in the beam type structure
+    integer(8) face_id ! the facet id
+    complex(8) ampl(1:2,1:2) ! the amplitude matrix
+    real(8) e_perp(1:3) ! electric field perpendicular vector (previously known as vk7)
+end type field_type
+
+type beam_type
+    ! beam type: contains all information of a single beam
+    ! a beam is a collection of facets with a single propagation direction
+    ! the amplitude matrix is stored at the centroid of each facet
+    ! generally, the information here is passed to the beam recursion subroutine to be propagated
+    type(field_type), dimension(:), allocatable :: field ! information about the e-field at each facet (see above)
+    real(8) prop(1:3) ! the propagation direction of the beam
+    integer num_facets ! total number of facets that belong to this beam
+    integer aperture_id ! the aperture from which this beam is propagating
+end type beam_type
+
+type facet_type
+
+    integer(8), dimension(:), allocatable :: vert_ids
+    integer(8) norm_id
+    real(8) midpoint(1:3)
+    real(8) area
+    integer(8) num_verts ! number of vertices on this face
+    integer(8) aperture ! the aperture to which this face belongs
+
+end type facet_type
+
+type geometry_type
+    ! geometry type: contains information about a particle geometry
+    ! a particle geometry is defined by its vertices and facets
+    ! vertices in each facet should be ordered in an anti-clockwise fashion as viewed from outside the particle
+    real(8), dimension(:,:), allocatable :: verts ! vertices in the geometry, dimension N x 3
+    real(8), dimension(:,:), allocatable :: norms ! normals in the geometry, dimension N x 3
+    type(facet_type), dimension(:), allocatable :: face ! data structure with information about each facet in the geometry
+    integer(8) num_verts ! total number of unique vertices in the geometry
+    integer(8) num_faces ! number of faces in the geometry
+    integer(8) num_norms ! number of unique normals
+end type geometry_type
+
+
+
 contains
 
 end module types_mod
