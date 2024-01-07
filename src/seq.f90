@@ -29,7 +29,7 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer i_loop, loop_start, i
+integer i_loop, loop_start, i, j
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -43,8 +43,9 @@ integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
 real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
 real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
 integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
-integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
+integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
 type(geometry_type) geometry ! particle geometry data structure
+type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 
 ! sr make_normals
 integer, dimension(:) ,allocatable :: norm_ids ! face vertex IDs
@@ -111,33 +112,39 @@ open(101,file=trim(output_dir)//"/"//"log") ! open global non-standard log file 
 ! write job parameters to log file
 call write_job_params(job_params)
 
-! get input particle information
-call PDAL2( num_vert,       & !  -> number of unique vertices
-            num_face,       & !  -> number of faces
-            face_ids,       & !  -> face vertex IDs
-            vert_in,        & !  -> unique vertices
-            num_face_vert,  & !  -> number of vertices in each face
-            apertures,      & !  -> apertures
-            job_params,     & ! <-  job parameters
-            geometry, norm_ids, norms)         !  -> particle geometry
+! get input particle geometry
+call PDAL2( job_params,     & ! <-  job parameters
+            geometry)         !  -> particle geometry            
+
+! bodge conversion while i refactor
+num_vert = geometry%nv
+num_face = geometry%nf
+allocate(vert_in(1:num_vert,1:3))
+vert_in(:,:) = geometry%v(:,:)
+allocate(num_face_vert(1:num_face))
+num_face_vert(:) = geometry%f(:)%nv
+allocate(apertures(1:num_face))
+apertures(:) = geometry%f(:)%ap
+allocate(norms(1:geometry%nn,1:3))
+norms(:,:) = geometry%n(:,:)
+allocate(face_ids(1:num_face,1:maxval(num_face_vert)))
+do i = 1, num_face
+    do j = 1, num_face_vert(i)
+        face_ids(i,j) = geometry%f(i)%vi(j)
+    end do
+end do
 
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
     print*,'================================='
-    call triangulate(   vert_in, &
-                        face_ids, &
-                        num_vert, &
-                        num_face, &
-                        num_face_vert, &
-                        job_params%tri_edge_length, &
+    call triangulate(   job_params%tri_edge_length, &
                         '-Q -q', &
-                        apertures, &
                         job_params%tri_roughness, &
                         my_rank, &
                         output_dir, &
                         geometry) ! triangulate the particle
-    call merge_vertices(vert_in, face_ids, num_vert, 1D-1) ! merge vertices that are close enough
-    call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
+    ! call merge_vertices(vert_in, face_ids, 1D-1, geometry) ! merge vertices that are close enough
+    ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! max_edge_length = job_params%la*2
     ! max_area = max_edge_length**2*sqrt(3D0)/4D0
     ! print*,'area threshold: ',max_area
@@ -176,37 +183,35 @@ do i = 1, num_remaining_orients
     i_loop = remaining_orients(i)
 
     ! rotate particle
-    call PROT_MPI(  vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
-                    vert,       &
-                    alpha_vals, &
+    call PROT_MPI(  alpha_vals, &
                     beta_vals,  &
                     gamma_vals, &
                     i_loop,     &
-                    job_params)
+                    job_params, &
+                    geometry,   &
+                    rotated_geometry)
+
+    vert = rotated_geometry%v(:,:)
 
     ! write rotated particle to file (optional)
-    ! if (job_params%num_orients .eq. 1) then
-    !     call PDAS(  vert,           & ! <-  rotated vertices
-    !                 face_ids,       & ! <-  face vertex IDs
-    !                 output_dir,     & ! <-  output directory
-    !                 num_face_vert,  & ! <-  number of verices in each face
-    !                 "rotated")
-    ! end if
+    if (job_params%num_orients .eq. 1) then
+        call PDAS(  output_dir,     & ! <-  output directory
+                    "rotated",    & ! <-  filename
+                    rotated_geometry)
+    end if
 
+    ! stop
     ! fast implementation of the incident beam
     call makeIncidentBeam(  beamV,         & ! ->  beam vertices
                             beamF1,        & ! ->  beam face vertex indices
                             beamN,         & ! ->  beam normals
                             beamF2,        & ! ->  beam face normal indices
-                            vert,          & ! <-  unique vertices
+                            rotated_geometry,          & ! <-  unique vertices
                             beamMidpoints, & !  -> beam  midpoints
                             ampl_beam)       !  -> amplitude matrix of incident beam       
 
     ! beam loop
-    call beam_loop( face_ids,                  & ! <-  face vertex IDs
-                    vert,                      & ! <-  unique vertices
-                    apertures,                 & ! <-  apertures
-                    beamV,                     & ! <-  beam vertices
+    call beam_loop( beamV,                     & ! <-  beam vertices
                     beamF1,                    & ! <-  beam face vertex indices
                     beamN,                     & ! <-  beam normals
                     beamF2,                    & ! <-  beam face normal indices
@@ -219,8 +224,8 @@ do i = 1, num_remaining_orients
                     energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
-                    num_face_vert,             & ! <-  number of verices in each face
-                    job_params)
+                    job_params,                 &
+                    rotated_geometry)
     
     if(num_remaining_orients .gt. 1) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
@@ -271,16 +276,13 @@ do i = 1, num_remaining_orients
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
         call make_cache_dir("cache/",cache_dir)
         call cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients)
-        call cache_job( vert_in,                    & ! unrotated vertices
-                        face_ids,                   & ! face ids
-                        num_face_vert,              & ! num vertices per face
-                        apertures,                  & ! apertures
-                        job_params,                 & ! job parameters
+        call cache_job( job_params,                 & ! job parameters
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
                         mueller_total,              & ! total 2d mueller
                         mueller_1d_total,           & ! total 1d mueller
-                        cache_dir)
+                        cache_dir,                  &
+                        geometry)
         stop
     end if
 

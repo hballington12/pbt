@@ -4,6 +4,7 @@
    module outputs_mod
    
    use misc_submod
+   use types_mod
    
    implicit none
    
@@ -346,7 +347,7 @@
          open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
          do i = 1, size(theta_vals,1)
             do j = 1, size(phi_vals,1)
-               write(10,'(f12.4,f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)') &
+               write(10,fmt_mueller_2d) &
                theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
                mueller(j,i,1), mueller(j,i,2), mueller(j,i,3), mueller(j,i,4), &
                mueller(j,i,5), mueller(j,i,6), mueller(j,i,7), mueller(j,i,8), &
@@ -358,7 +359,7 @@
       end if
       open(10,file=trim(output_dir)//"/"//"mueller_scatgrid_1d")
       do j = 1, size(theta_vals,1)
-         write(10,'(f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)') &
+         write(10,fmt_mueller_1d) &
          theta_vals(j)*180/pi, &
          mueller_1d(j,1), mueller_1d(j,2), mueller_1d(j,3), mueller_1d(j,4), &
          mueller_1d(j,5), mueller_1d(j,6), mueller_1d(j,7), mueller_1d(j,8), &
@@ -519,47 +520,35 @@
 
    end subroutine
 
-   subroutine cache_job(vert_in,                    & ! unrotated vertices
-                        face_ids,                   & ! face ids
-                        num_face_vert,              & ! num vertices per face
-                        apertures,                  & ! apertures
-                        job_params,                 & ! job parameters
+   subroutine cache_job(job_params,                 & ! job parameters
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
                         mueller_total,              & ! total 2d mueller
                         mueller_1d_total,           & ! total 1d mueller
-                        cache_dir)
+                        cache_dir,                  &
+                        geometry)
       
       ! saves the job to the cache directory, possibly to be resumed later
       
-      real(8), dimension(:,:), allocatable, intent(in) :: vert_in ! unique vertices (unrotated)
-      integer(8), dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
-      integer(8), dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
-      integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
+      real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
+      integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
+      integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
+      integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
       type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
       integer, intent(in) :: i_loop
       type(output_parameters_type), intent(inout) :: output_parameters_total
       real(8), dimension(:,:,:), allocatable , intent(in):: mueller_total ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d_total ! phi-integrated mueller matrices
       character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
+      type(geometry_type), intent(in) :: geometry
       
       print*,'job exit point detected. saving job files to cache...'
       ! call make_cache_dir("cache/",cache_dir)
       print*,'cache directory is "',trim(cache_dir),'"'
       
-      ! this needs putting back in but i havent sorted the geometry out yet
-      ! call PDAS(  vert_in,        & ! <-  rotated vertices
-      ! face_ids,       & ! <-  face vertex IDs
-      ! cache_dir,      & ! <-  output directory
-      ! num_face_vert,  & ! <-  number of verices in each face
-      ! "unrotated")      ! <-  filename
-      
-      ! need to put this back in!
-      ! call save_apertures(apertures,  & ! <-  apertures
-      !                     cache_dir)    ! <-  cache directory
-      
+      call PDAS(cache_dir, "unrotated", geometry)
+      call save_apertures(geometry, cache_dir)
       call save_params(job_params,i_loop,cache_dir,output_parameters_total)
-      
       call writeup(mueller_total, mueller_1d_total, cache_dir, output_parameters_total, job_params) ! write to file
       
       print*,'saved job files to cache.'

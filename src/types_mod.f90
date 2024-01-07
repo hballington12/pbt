@@ -96,12 +96,12 @@ end type beam_type
 
 type facet_type
     ! facet type: information about each facet of the particle geometry
-    integer(8), dimension(:), allocatable :: vert_ids
-    integer(8) norm_id
-    real(8) midpoint(1:3)
-    real(8) area
-    integer(8) num_verts ! number of vertices on this face
-    integer(8) aperture ! the aperture to which this face belongs
+    integer(8), dimension(:), allocatable :: vi ! vertex index - points to a position in the vertex array
+    integer(8) ni ! normal index - points to a position in the normal array
+    real(8) mid(1:3) ! midpoint
+    real(8) area ! area
+    integer(8) nv ! number of vertices on this face
+    integer(8) ap ! the aperture to which this face belongs
 
 end type facet_type
 
@@ -109,14 +109,18 @@ type geometry_type
     ! geometry type: contains information about a particle geometry
     ! a particle geometry is defined by its vertices and facets
     ! vertices in each facet should be ordered in an anti-clockwise fashion as viewed from outside the particle
-    real(8), dimension(:,:), allocatable :: verts ! vertices in the geometry, dimension N x 3
-    real(8), dimension(:,:), allocatable :: norms ! normals in the geometry, dimension N x 3
-    type(facet_type), dimension(:), allocatable :: face ! data structure with information about each facet in the geometry
-    integer(8) num_verts ! total number of unique vertices in the geometry
-    integer(8) num_faces ! number of faces in the geometry
-    integer(8) num_norms ! number of unique normals
+    real(8), dimension(:,:), allocatable :: v ! vertices in the geometry, dimension N x 3
+    real(8), dimension(:,:), allocatable :: n ! normals in the geometry, dimension N x 3
+    type(facet_type), dimension(:), allocatable :: f ! data structure with information about each facet in the geometry
+    integer(8) nv ! total number of unique vertices in the geometry
+    integer(8) nf ! number of faces in the geometry
+    integer(8) nn ! number of unique normals
 end type geometry_type
 
+! format specifiers
+
+character(len=111), parameter :: fmt_mueller_2d = '(f12.4,f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)'
+character(len=105), parameter :: fmt_mueller_1d = '(f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)'
 
 
 contains

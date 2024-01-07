@@ -1595,32 +1595,33 @@ subroutine PROT_CC(verts)
 
 end subroutine
 
-subroutine PROT_MPI(verts,              & ! unrotated vertices
-                    verts_rot,          & ! rotated vertices
-                    alpha_vals,         & ! list of values for euler alpha angle in range 0 to 1 (for multirot only)
+subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle in range 0 to 1 (for multirot only)
                     beta_vals,          & ! list of values for beta alpha angle in range 0 to 1 (for multirot only)
                     gamma_vals,         & ! list of values for gamma alpha angle in range 0 to 1 (for multirot only)
                     loop_index,         & ! current loop index that each process is on
-                    job_params)
+                    job_params,         &
+                    geometry,           &
+                    rot_geometry)
 
     ! rotates particle
     ! modified to ensure different mpi processes have different 
 
     character(100) rot_method ! rotation method
-    real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices    
-    real(8), dimension(:,:), allocatable, intent(out) :: verts_rot ! unique vertices    
+    real(8), dimension(:,:), allocatable :: verts_rot ! unique vertices    
     real(8), dimension(:), allocatable, intent(in) :: alpha_vals, beta_vals, gamma_vals
     integer offs(1:2)
     real(8) eulers(1:3)
     real(8) vec(1:3) ! off rotation vector
     real(8) hilf0, hilf1
     real(8) rot1(1:3,1:3), rot2(1:3,1:3), rot(1:3,1:3)
-    integer i
+    integer(8) i
     real(8) s1, s2, s3, c1, c2, c3
     real(8) rand
     integer, intent(in) :: loop_index
     integer num_orients ! number of orientations
     type(job_parameters_type), intent(in) :: job_params
+    type(geometry_type), intent(in) :: geometry
+    type(geometry_type), intent(out) :: rot_geometry
 
     rot_method = job_params%rot_method
     num_orients = job_params%num_orients
@@ -1635,7 +1636,7 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
     end if
 
-    allocate(verts_rot(1:size(verts,1),1:size(verts,2))) ! allocate array for rotated vertices
+    allocate(verts_rot(1:geometry%nv,1:3)) ! allocate array for rotated vertices
 
     if(rot_method(1:len(trim(rot_method))) .eq. 'none') then
         ! do nothing
@@ -1643,7 +1644,7 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         ! call read_input_vals(ifn,"rot off",offs,2)
         ! print*,'off values: ', offs(1:2)
 
-        verts_rot = verts
+        verts_rot = geometry%v
 
         call UN_PROT_CC(verts_rot)
 
@@ -1726,8 +1727,8 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         rot(3,2) = s2*s3
         rot(3,3) = c2
 
-        do i = 1, size(verts,1) ! for each vertex
-            verts_rot(i,1:3) = matmul(rot,verts(i,1:3)) ! rotate
+        do i = 1, geometry%nv ! for each vertex
+            verts_rot(i,1:3) = matmul(rot,geometry%v(i,1:3)) ! rotate
         end do
         
     else if(rot_method(1:len(trim(rot_method))) .eq. 'multi') then
@@ -1771,10 +1772,19 @@ subroutine PROT_MPI(verts,              & ! unrotated vertices
         rot(3,2) = s2*s3
         rot(3,3) = c2
 
-        do i = 1, size(verts,1) ! for each vertex
-            verts_rot(i,1:3) = matmul(rot,verts(i,1:3)) ! rotate
+        do i = 1, geometry%nv ! for each vertex
+            verts_rot(i,1:3) = matmul(rot,geometry%v(i,1:3)) ! rotate
         end do
     end if
+
+    ! make a copy of the original geometry
+    rot_geometry = geometry
+    ! reassign the rotated vertices
+    rot_geometry%v(:,:) = verts_rot(:,:)
+    ! recompute the midpoints
+    call compute_geometry_midpoints(rot_geometry)
+    ! recompute normals
+    call compute_geometry_normals(rot_geometry  )
 
     ! stop
     if(job_params%debug >= 1) then 
@@ -1908,7 +1918,7 @@ subroutine readApertures(afn,apertures, face_ids)
 ! sr readApertures reads the apertures filename
 ! will exit if the apertures file does not have the correct number of lines
 
-integer, dimension(:), allocatable, intent(out) :: apertures
+integer(8), dimension(:), allocatable, intent(out) :: apertures
 character(100), intent(in) :: afn ! crystal filename
 integer(8), dimension(:,:), allocatable, intent(in) :: face_ids
 
@@ -1952,20 +1962,24 @@ close(10)
 
 end subroutine
 
-subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, verts, beamMidpoints, ampl_beam)
+subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, geometry, beamMidpoints, ampl_beam)
 
 ! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle (currently set to 1000)
 ! the width and length of the wavefront is set larger than the maximum x and y vertex values of the particle (full illumination)
 
+type(geometry_type), intent(in) :: geometry
 real(8), allocatable, intent(out), dimension(:,:) :: beamV, beamN
 integer(8), allocatable, intent(out), dimension(:,:) :: beamF1
 integer(8), allocatable, intent(out), dimension(:) :: beamF2
-real(8), dimension(:,:) ,allocatable, intent(in) :: verts
+real(8), dimension(:,:) ,allocatable :: verts
 real(8), dimension(:,:) ,allocatable, intent(out) :: beamMidpoints
 ! integer, dimension(:,:) ,allocatable, intent(in) :: face_ids
 complex(8), allocatable, dimension(:,:,:), intent(out) :: ampl_beam ! amplitude matrix of incident beam
 
 real(8) min_x, min_y, max_x, max_y, min_z, max_z, fac
+
+allocate(verts(1:geometry%nv,1:3))
+verts(:,:) = geometry%v(:,:)
 
 ! print*,'========== start sr makeIncidentBeam'
 
@@ -2217,14 +2231,8 @@ subroutine SDATIN(  ifn,                & ! input filename
     
 end subroutine
 
-subroutine PDAL2(   num_vert,       &
-                    num_face,       &
-                    face_ids,       &
-                    verts,          &
-                    num_face_vert,  &
-                    apertures,      &
-                    job_params,     &
-                    geometry, norm_ids, norms)
+subroutine PDAL2(   job_params,     &
+                    geometry)
 
 ! subroutine PDAL2 reads a file containing the particle geometry
 ! accepted file types: "obj" - .obj files, "mrt" - macke ray-tracing style
@@ -2246,16 +2254,16 @@ subroutine PDAL2(   num_vert,       &
     character(len=100) cfn ! particle filename
     character(len=100) cft ! particle filetype
     character(100) afn ! apertures filename
-    integer(8), intent(out) :: num_vert, num_face ! number of unique vertices, number of faces
+    integer(8) :: num_vert, num_face ! number of unique vertices, number of faces
     integer :: num_norm ! number of face normals
-    integer(8), dimension(:), allocatable, intent(out) :: num_face_vert ! number of vertices in each face
+    integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
     integer, dimension(:), allocatable :: norm_ids ! face normal ID of each face
-    real(8), dimension(:,:) ,allocatable, intent(out) :: verts ! unique vertices
+    real(8), dimension(:,:) ,allocatable :: verts ! unique vertices
     real(8), dimension(:,:) ,allocatable :: norms ! unique vertices, face vertex IDs, face normals
     integer, dimension(:,:) ,allocatable :: face_ids_temp ! temporary array to hold face vertex IDs
-    integer(8), dimension(:,:) ,allocatable, intent(out) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+    integer(8), dimension(:,:) , allocatable :: face_ids ! face vertex IDs (for after excess columns have been truncated)
     character(100) c_method ! method of particle file input
-    integer, dimension(:), allocatable, intent(out) :: apertures ! taken as parents parent facets
+    integer(8), dimension(:), allocatable :: apertures ! taken as parents parent facets
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
     type(job_parameters_type), intent(inout) :: job_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
     type(geometry_type), intent(out) :: geometry ! the particle geometry data structure
@@ -2267,9 +2275,9 @@ subroutine PDAL2(   num_vert,       &
     integer entry_count, delim_count, digits_to_read
     logical is_current_char_slash
     integer vertex_count
-    integer num_face_vert_max
-    logical has_end_of_line_reached
-    integer i, io, j, k, m, o ! counting variables
+    integer(8) num_face_vert_max
+    ! logical has_end_of_line_reached
+    integer(8) i, io, j, k, m, o ! counting variables
     real(8), dimension(:), allocatable :: faceAreas ! area of each facet
     real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
     logical auto_apertures ! whether or noth automatic aperture asignment should be used
@@ -2327,7 +2335,7 @@ subroutine PDAL2(   num_vert,       &
             face_string_length = 0
             is_current_char_slash = .false.
             entry_count = 0
-            has_end_of_line_reached = .true.
+            ! has_end_of_line_reached = .true.
             j = 1 ! reset counting variable
             k = 1 ! reset counting variable
             m = 1 ! reset counting variable
@@ -2632,40 +2640,36 @@ subroutine PDAL2(   num_vert,       &
 
     call area_stats(faceAreas)
 
-    call make_normals(face_ids, verts, norm_ids, norms) ! recompute normals
-
-
     ! now put everything into a data strucute (work in progress)
     ! vertices
-    allocate(geometry%verts(1:num_vert,1:3))
-    geometry%num_verts = num_vert
-    do i = 1, geometry%num_verts
-        geometry%verts(i,:) = verts(i,:)
+    allocate(geometry%v(1:num_vert,1:3))
+    geometry%nv = num_vert
+    do i = 1, geometry%nv
+        geometry%v(i,:) = verts(i,:)
     end do
 
     ! faces
-    allocate(geometry%face(1:num_face))
-    geometry%num_faces = num_face
-    do i = 1, geometry%num_faces
-        allocate(geometry%face(i)%vert_ids(1:num_face_vert(i)))
+    allocate(geometry%f(1:num_face))
+    geometry%nf = num_face
+    do i = 1, geometry%nf
+        allocate(geometry%f(i)%vi(1:num_face_vert(i)))
         do j = 1, num_face_vert(i)
-            geometry%face(i)%vert_ids(j) = face_ids(i,j)
+            geometry%f(i)%vi(j) = face_ids(i,j)
         end do
-        geometry%face(i)%midpoint(:) = Midpoints(i,:)
-        geometry%face(i)%area = faceAreas(i)
-        geometry%face(i)%aperture = apertures(i)
-        geometry%face(i)%norm_id = norm_ids(i)
-        geometry%face(i)%num_verts = num_face_vert(i)
+        geometry%f(i)%mid(:) = Midpoints(i,:)
+        geometry%f(i)%area = faceAreas(i)
+        geometry%f(i)%ap = apertures(i)
+        geometry%f(i)%nv = num_face_vert(i)
     end do
 
-    ! do norms here later...
-    geometry%num_norms = size(norms,1)
-    allocate(geometry%norms(1:geometry%num_norms,1:3))
-    do i = 1, geometry%num_norms
-        geometry%norms(i,:) = norms(i,:)
-    end do
+    call compute_geometry_normals(geometry)
+    call compute_geometry_midpoints(geometry)
+    call compute_geometry_areas(geometry)
 
-    ! allocate(geometry%norms(1:num_norm,1:3))
+    ! print*,'faceareas(123)',faceAreas(123)
+    ! print*,'guess:',geometry%f(123)%area
+
+    ! allocate(geometry%n(1:num_norm,1:3))
 
     print*,'========== end sr PDAL2'
     ! stop

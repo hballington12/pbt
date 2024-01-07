@@ -12,7 +12,69 @@
         real(8), parameter, public :: pi = 3.14159265358979 
         
         contains
-        
+
+        subroutine compute_geometry_areas(geometry)
+
+            type(geometry_type), intent(inout) :: geometry
+
+            real(8) temp_area
+            integer(8) i, j
+            real(8), dimension(1:3) :: vec_a, vec_b, a_cross_b
+
+            ! reset the face areas to 0
+            geometry%f(:)%area = 0
+
+            do i = 1, geometry%nf ! for each face
+                do j = 1, geometry%f(i)%nv ! for each vertex in the face
+                    vec_a = geometry%v(geometry%f(i)%vi(j),:) - geometry%f(i)%mid(:) ! vector from midpoint to vertex j
+                    if(j == geometry%f(i)%nv) then
+                        vec_b = geometry%v(geometry%f(i)%vi(1),:) - geometry%f(i)%mid(:) ! vector from midpoint to vertex j+1
+                    else
+                        vec_b = geometry%v(geometry%f(i)%vi(j+1),:) - geometry%f(i)%mid(:) ! vector from midpoint to vertex j+1
+                    end if
+                    call cross(vec_a,vec_b,a_cross_b,.false.) ! cross product, no normalisation, calculates parallelepid area
+                    temp_area = sqrt(a_cross_b(1)**2 + a_cross_b(2)**2 + a_cross_b(3)**2)/2 ! triangle area is half the above area
+                    geometry%f(i)%area = geometry%f(i)%area + temp_area ! add area to total facet area
+                end do
+            end do
+
+        end subroutine
+
+        subroutine compute_geometry_midpoints(geometry)
+
+            type(geometry_type), intent(inout) :: geometry
+            integer(8) i, n
+
+            do i = 1, geometry%nf
+                n = geometry%f(i)%nv
+                geometry%f(i)%mid(:) = sum(geometry%v(geometry%f(i)%vi(:),:),1)/n
+            end do
+
+        end subroutine
+
+        subroutine compute_geometry_normals(geometry)
+
+            type(geometry_type), intent(inout) :: geometry
+
+            integer(8) i
+            real(8) temp_verts(1:3,1:3) ! temporary array to hold the xyz components of the first 3 vertices in each facet
+            real(8), dimension(1:3) :: vec12, vec23, normal ! temporary vectors used to find the facet normal
+
+            if(allocated(geometry%n)) deallocate(geometry%n) ! if allocated, deallocate
+            allocate(geometry%n(1:geometry%nf,1:3)) ! reallocate with 1 normal per face
+            geometry%nn = geometry%nf ! save total number of normals
+
+            do i = 1, geometry%nf ! for each face
+                temp_verts(1:3,1:3) = geometry%v(geometry%f(i)%vi(1:3),1:3) ! get first 3 vertices of facet
+                vec12(1:3) = temp_verts(2,1:3) - temp_verts(1,1:3) ! vector from vertex 1 to vertex 2
+                vec23(1:3) = temp_verts(3,1:3) - temp_verts(2,1:3) ! vector from vertex 2 to vertex 3
+                call cross(vec12,vec23,normal) ! compute normal
+                geometry%f(i)%ni = i ! save normal id
+                geometry%n(i,:) = normal(:) ! save normal
+            end do
+
+        end subroutine
+
         ! credit: 
         !! A. Penttil�, Fortran 95 implementation of the Quicksort algorithm (computer code),
         !! http://wiki.helsinki.fi/display/~aipentti@helsinki.fi/Collection+of+codes (2012).
@@ -250,6 +312,7 @@
             read(10,*) output_parameters_total%scatt_eff
             read(10,*) output_parameters_total%ext_eff
             read(10,*) output_parameters_total%geo_cross_sec
+            read(10,*) output_parameters_total%back_scatt
             close(10)
             
             print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/theta_vals.dat"
@@ -320,7 +383,7 @@
             allocate(mueller_1d_total(1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
             
             do i = 1, size(job_params%theta_vals,1)
-                read(10,'(f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
+                read(10,fmt_mueller_1d) &
                 junk, &
                 mueller_1d_total(i,1), mueller_1d_total(i,2), mueller_1d_total(i,3), mueller_1d_total(i,4), &
                 mueller_1d_total(i,5), mueller_1d_total(i,6), mueller_1d_total(i,7), mueller_1d_total(i,8), &
@@ -337,7 +400,7 @@
             
             do i = 1, size(job_params%theta_vals,1)
                 do j = 1, size(job_params%phi_vals,1)
-                    read(10,'(f12.4,f12.4,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8,f20.8)') &
+                    read(10,fmt_mueller_2d) &
                     junk, junk, &
                     mueller_total(j,i,1), mueller_total(j,i,2), mueller_total(j,i,3), mueller_total(j,i,4), &
                     mueller_total(j,i,5), mueller_total(j,i,6), mueller_total(j,i,7), mueller_total(j,i,8), &
@@ -406,6 +469,7 @@
             write(10,*) output_parameters_total%scatt_eff
             write(10,*) output_parameters_total%ext_eff
             write(10,*) output_parameters_total%geo_cross_sec
+            write(10,*) output_parameters_total%back_scatt
             close(10)
             
         end subroutine
@@ -419,12 +483,12 @@
             ! integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
             type(geometry_type), intent(in) :: geometry
 
-            integer i
+            integer(8) i
             
             open(10,file=trim(output_dir)//"/apertures.dat") ! open pertures file
             
-            do i = 1, geometry%num_faces
-                write(10,*) geometry%face(i)%aperture
+            do i = 1, geometry%nf
+                write(10,*) geometry%f(i)%ap
             end do
             
             close(10)
@@ -652,18 +716,18 @@
             integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs
             integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
             integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert ! number of vertices in each face
-            integer, dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
+            integer(8), dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
             
-            integer i, j ,k
+            integer(8) i, j ,k
             real(8) edge_vector(1:3), a_vector(1:3) ! some vectors
-            integer next_index, prev_index
+            integer(8) next_index, prev_index
             real(8) edge_vector_length, a_vector_length, a_dot_product, closest_vector_length
-            integer num_collinear_vertices ! number of vertices found along an edge
-            integer collinear_vertex_id ! id of a vertex found to be collinear
-            integer temp_face_ids(1000000,1:10) ! face vertex IDs
-            integer temp_num_face_vert(1000000) ! number of vertices in each face
-            integer temp_apertures(1000000) ! apertures asignments for each facet
-            integer max_verts ! max vertices per face
+            integer(8) num_collinear_vertices ! number of vertices found along an edge
+            integer(8) collinear_vertex_id ! id of a vertex found to be collinear
+            integer(8) temp_face_ids(1000000,1:10) ! face vertex IDs
+            integer(8) temp_num_face_vert(1000000) ! number of vertices in each face
+            integer(8) temp_apertures(1000000) ! apertures asignments for each facet
+            integer(8) max_verts ! max vertices per face
             logical success
             
             success = .true.
@@ -779,119 +843,117 @@
             
         end subroutine
         
-        subroutine merge_vertices(verts, face_ids, num_vert, distance_threshold)
+        ! subroutine merge_vertices(verts, face_ids, distance_threshold, geometry)
             
-            ! merges vertices that are close enough together
-            ! general outline:
-            ! for each vertex, calculate the distance to all other vertices
-            ! if the distance is less than the specified distance threshold, merge them at the centre
-            ! else, keep the vertex as it is
-            ! add the vertex to a new vertex array and appropriately assign the face_ids
+        !     ! merges vertices that are close enough together
+        !     ! general outline:
+        !     ! for each vertex, calculate the distance to all other vertices
+        !     ! if the distance is less than the specified distance threshold, merge them at the centre
+        !     ! else, keep the vertex as it is
+        !     ! add the vertex to a new vertex array and appropriately assign the face_ids
             
-            real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
-            integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
-            integer(8), intent(inout) :: num_vert ! number of unique vertices, number of faces
-            real(8), intent(in) :: distance_threshold ! max distance between two vertices for them to be merged
+        !     real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
+        !     integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+        !     integer(8) num_vert, num_face ! number of unique vertices, number of faces
+        !     real(8), intent(in) :: distance_threshold ! max distance between two vertices for them to be merged
+        !     type(geometry_type), intent(inout) :: geometry
             
-            logical, dimension(:), allocatable :: has_vertex_been_checked ! whether this vertex has been checked for merge
-            real(8) this_vertex(1:3), another_vertex(1:3), midpoint(1:3)
-            real(8) distance
-            integer i, j, k, num_vertices_to_merge
-            integer vertices_to_merge_with(1:100)
-            real(8) merged_verts(1000000,1:3)
-            integer merged_vert_counter
-            integer, dimension(:,:) ,allocatable :: merged_face_ids ! face vertex IDs (for after excess columns have been truncated)
-            integer, dimension(:) ,allocatable :: vertex_mapping ! maps the old vertices to the merged vertices
+        !     logical, dimension(:), allocatable :: has_vertex_been_checked ! whether this vertex has been checked for merge
+        !     real(8) this_vertex(1:3), another_vertex(1:3), midpoint(1:3)
+        !     real(8) distance
+        !     integer i, j, k, num_vertices_to_merge
+        !     integer vertices_to_merge_with(1:100)
+        !     real(8) merged_verts(1000000,1:3)
+        !     integer merged_vert_counter
+        !     integer, dimension(:,:) ,allocatable :: merged_face_ids ! face vertex IDs (for after excess columns have been truncated)
+        !     integer, dimension(:) ,allocatable :: vertex_mapping ! maps the old vertices to the merged vertices
             
-            print*,'start vertex merge...'
+        !     print*,'start vertex merge...'
             
-            allocate(vertex_mapping(1:size(verts,1)))
-            allocate(merged_face_ids(1:size(face_ids,1),1:size(face_ids,2)))
-            allocate(has_vertex_been_checked(1:size(verts,1))) ! allocate as same size as number of vertices
-            has_vertex_been_checked = .false.
-            merged_vert_counter = 0
+        !     num_vert = geometry%nv
+        !     num_face = geometry%nf
+
+        !     allocate(vertex_mapping(1:num_vert))
+        !     allocate(merged_face_ids(1:size(face_ids,1),1:size(face_ids,2)))
+        !     allocate(has_vertex_been_checked(1:size(verts,1))) ! allocate as same size as number of vertices
+        !     has_vertex_been_checked = .false.
+        !     merged_vert_counter = 0
             
-            do i = 1, num_vert ! for each vertex
-                if(.not. has_vertex_been_checked(i)) then ! if we havent already checked this vertex
-                    num_vertices_to_merge = 0 ! set the counter
-                    this_vertex(1:3) = verts(i,1:3) ! get the components of this vertex
-                    do j = 1, num_vert ! check against all other vertices
-                        if(j .eq. i) then ! ignore self
-                            ! do nothing
-                        else
-                            another_vertex(1:3) = verts(j,1:3) ! get the components of another vertex
-                            distance = sqrt((this_vertex(1)-another_vertex(1))**2 + &
-                            (this_vertex(2)-another_vertex(2))**2 + &
-                            (this_vertex(3)-another_vertex(3))**2) ! distance between the 2 vertices
-                            if(distance .lt. distance_threshold) then ! if the 2 vertices are close enough...
-                                num_vertices_to_merge = num_vertices_to_merge + 1 ! update counter
-                                vertices_to_merge_with(num_vertices_to_merge) = j ! record the vertex id
-                            end if
-                        end if
-                    end do
-                    ! print*,'vertex:',i,' - number of vertices to merge with: ',num_vertices_to_merge
-                    merged_vert_counter = merged_vert_counter + 1 ! update counter
+        !     do i = 1, num_vert ! for each vertex
+        !         if(.not. has_vertex_been_checked(i)) then ! if we havent already checked this vertex
+        !             num_vertices_to_merge = 0 ! set the counter
+        !             this_vertex(1:3) = verts(i,1:3) ! get the components of this vertex
+        !             do j = 1, num_vert ! check against all other vertices
+        !                 if(j .eq. i) then ! ignore self
+        !                     ! do nothing
+        !                 else
+        !                     another_vertex(1:3) = verts(j,1:3) ! get the components of another vertex
+        !                     distance = sqrt((this_vertex(1)-another_vertex(1))**2 + &
+        !                     (this_vertex(2)-another_vertex(2))**2 + &
+        !                     (this_vertex(3)-another_vertex(3))**2) ! distance between the 2 vertices
+        !                     if(distance .lt. distance_threshold) then ! if the 2 vertices are close enough...
+        !                         num_vertices_to_merge = num_vertices_to_merge + 1 ! update counter
+        !                         vertices_to_merge_with(num_vertices_to_merge) = j ! record the vertex id
+        !                     end if
+        !                 end if
+        !             end do
+        !             ! print*,'vertex:',i,' - number of vertices to merge with: ',num_vertices_to_merge
+        !             merged_vert_counter = merged_vert_counter + 1 ! update counter
                     
-                    ! now get the midpoint of the vertices we wish to merge
-                    midpoint(1:3) = this_vertex(1:3) ! start by setting the midpoint to this vertex
-                    vertex_mapping(i) = merged_vert_counter ! record the mapping from old to merged vertices
-                    ! print*,'i',i,'vertex_mapping(i)',vertex_mapping(i)
-                    do k = 1, num_vertices_to_merge
-                        ! print*,vertices_to_merge_with(k)
-                        midpoint(1:3) = midpoint(1:3) + verts(vertices_to_merge_with(k),1:3) ! add the other vertices
-                        vertex_mapping(vertices_to_merge_with(k)) = merged_vert_counter ! record the mapping from old to merged vertices
-                        has_vertex_been_checked(vertices_to_merge_with(k)) = .true.
-                    end do
-                    midpoint(1:3) = midpoint(1:3) / (num_vertices_to_merge + 1) ! divide by number of vertices to get the midpoint
+        !             ! now get the midpoint of the vertices we wish to merge
+        !             midpoint(1:3) = this_vertex(1:3) ! start by setting the midpoint to this vertex
+        !             vertex_mapping(i) = merged_vert_counter ! record the mapping from old to merged vertices
+        !             ! print*,'i',i,'vertex_mapping(i)',vertex_mapping(i)
+        !             do k = 1, num_vertices_to_merge
+        !                 ! print*,vertices_to_merge_with(k)
+        !                 midpoint(1:3) = midpoint(1:3) + verts(vertices_to_merge_with(k),1:3) ! add the other vertices
+        !                 vertex_mapping(vertices_to_merge_with(k)) = merged_vert_counter ! record the mapping from old to merged vertices
+        !                 has_vertex_been_checked(vertices_to_merge_with(k)) = .true.
+        !             end do
+        !             midpoint(1:3) = midpoint(1:3) / (num_vertices_to_merge + 1) ! divide by number of vertices to get the midpoint
                     
-                    merged_verts(merged_vert_counter,1:3) = midpoint(1:3) ! save the new vertex into a new array
+        !             merged_verts(merged_vert_counter,1:3) = midpoint(1:3) ! save the new vertex into a new array
                     
-                    has_vertex_been_checked(i) = .true. ! record that this vertex has been checked
-                end if
-            end do
+        !             has_vertex_been_checked(i) = .true. ! record that this vertex has been checked
+        !         end if
+        !     end do
             
-            ! do i = 1, num_vert
-            !     print*,'vertex',i,' was mapped to merged vertex',vertex_mapping(i)
-            ! end do
+        !     ! do i = 1, num_vert
+        !     !     print*,'vertex',i,' was mapped to merged vertex',vertex_mapping(i)
+        !     ! end do
             
-            ! make the new face_ids array
-            do i = 1, size(face_ids,1)
-                do j = 1, size(face_ids,2)
-                    if((face_ids(i,j)) .ne. 0) then ! if its not a null
-                        merged_face_ids(i,j) = vertex_mapping(face_ids(i,j))
-                    end if
-                end do
-            end do
+        !     ! make the new face_ids array
+        !     do i = 1, size(face_ids,1)
+        !         do j = 1, size(face_ids,2)
+        !             if((face_ids(i,j)) .ne. 0) then ! if its not a null
+        !                 merged_face_ids(i,j) = vertex_mapping(face_ids(i,j))
+        !             end if
+        !         end do
+        !     end do
             
-            ! repopulate the input arrays with the merged arrays
-            deallocate(verts)
-            allocate(verts(1:merged_vert_counter,1:3))
+        !     ! repopulate the input arrays with the merged arrays
+        !     deallocate(verts)
+        !     allocate(verts(1:merged_vert_counter,1:3))
             
-            do i = 1, merged_vert_counter
-                verts(i,1:3) = merged_verts(i,1:3)
-            end do
-            do i = 1, size(face_ids,1)
-                do j = 1, size(face_ids,2)
-                    face_ids(i,j) = merged_face_ids(i,j)
-                end do
-            end do
+        !     do i = 1, merged_vert_counter
+        !         verts(i,1:3) = merged_verts(i,1:3)
+        !     end do
+        !     do i = 1, size(face_ids,1)
+        !         do j = 1, size(face_ids,2)
+        !             face_ids(i,j) = merged_face_ids(i,j)
+        !         end do
+        !     end do
             
-            print*,'merged',num_vert,' vertices into ',merged_vert_counter,' vertices.'
+        !     print*,'merged',num_vert,' vertices into ',merged_vert_counter,' vertices.'
             
-            num_vert = merged_vert_counter
+        !     num_vert = merged_vert_counter
             
-            ! stop
+        !     ! stop
             
-        end subroutine
+        ! end subroutine
         
-        subroutine triangulate( verts, &
-                                face_ids, &
-                                num_vert, &
-                                num_face, &
-                                num_face_vert, &
-                                max_edge_length, &
+        subroutine triangulate( max_edge_length, &
                                 flags, &
-                                apertures, &
                                 roughness, &
                                 rank, &
                                 output_dir, &
@@ -900,13 +962,13 @@
             ! calls triangle to triangulate and subdivide a surface
             ! returns the subdivided surface
             
-            real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
-            integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs (for after excess columns have been truncated)
-            integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
-            integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert
+            real(8), dimension(:,:) ,allocatable :: verts ! unique vertices
+            integer(8), dimension(:,:) ,allocatable :: face_ids ! face vertex IDs (for after excess columns have been truncated)
+            integer(8) :: num_vert, num_face ! number of unique vertices, number of faces
+            integer(8), dimension(:), allocatable :: num_face_vert
             character(len=*) flags
             real(8), intent(in) :: max_edge_length
-            integer, dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
+            integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
             real(8), intent(in) :: roughness
             character(len=255), intent(in) :: output_dir ! output directory
             type(geometry_type), intent(inout) :: geometry
@@ -923,7 +985,7 @@
             integer(8) num_nodes, num_faces
             real(8) verts_out(1:1000000,1:3) ! vertices after triangulation
             integer(8) face_ids_out(1:1000000,1:3) ! face_ids after triangulation
-            integer apertures_out(1:1000000) ! apertures after triangulation
+            integer(8) apertures_out(1:1000000) ! apertures after triangulation
             
             ! real(8), dimension(:,:), allocatable :: verts_out_final
             ! integer, dimension(:,:), allocatable :: face_ids_out_final
@@ -942,13 +1004,13 @@
 
 
             ! allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
-            allocate(apertures_temp(1:geometry%num_faces)) ! make an array to hold the input apertures
-            apertures_temp = geometry%face(:)%aperture ! save the input apertures
+            allocate(apertures_temp(1:geometry%nf)) ! make an array to hold the input apertures
+            apertures_temp = geometry%f(:)%ap ! save the input apertures
             
             vert_counter_total = 0
             face_counter_total = 0
             
-            do i = 1, geometry%num_faces ! for each face
+            do i = 1, geometry%nf ! for each face
                 ! do i = 1, 1 ! for each face
                 
                 vert_counter = 0
@@ -956,7 +1018,7 @@
                 
                 ! print*,'face:',i
                 ! num_verts = num_face_vert(i)
-                num_verts = geometry%face(i)%num_verts
+                num_verts = geometry%f(i)%nv
                 ! print*,'num verts in this face: ',num_verts
                 
                 ! rotate into x-y plane
@@ -968,9 +1030,9 @@
                 allocate(v1(1:3,1:num_verts))
                 
                 do j = 1,num_verts
-                    v(1,j) = geometry%verts(geometry%face(i)%vert_ids(j),1)
-                    v(2,j) = geometry%verts(geometry%face(i)%vert_ids(j),2)
-                    v(3,j) = geometry%verts(geometry%face(i)%vert_ids(j),3)
+                    v(1,j) = geometry%v(geometry%f(i)%vi(j),1)
+                    v(2,j) = geometry%v(geometry%f(i)%vi(j),2)
+                    v(3,j) = geometry%v(geometry%f(i)%vi(j),3)
                     ! print*,v(1:3,j)
                 end do
                 
@@ -1067,7 +1129,9 @@
                     face_ids_out(face_counter + face_counter_total,2) = face_ids_out(face_counter + face_counter_total,2) + vert_counter_total
                     face_ids_out(face_counter + face_counter_total,3) = face_ids_out(face_counter + face_counter_total,3) + vert_counter_total
                     
-                    apertures_out(face_counter + face_counter_total) = apertures(i) ! this face aperture set as the same as the input face that it was part of
+                    ! print*,'face_counter + face_counter_total',face_counter + face_counter_total
+                    apertures_out(face_counter + face_counter_total) = geometry%f(i)%ap ! this face aperture set as the same as the input face that it was part of
+                    ! apertures_out(face_counter + face_counter_total) = 1 ! this face aperture set as the same as the input face that it was part of
                     ! print*,face_ids_out(face_counter + face_counter_total,1), face_ids_out(face_counter + face_counter_total,2), face_ids_out(face_counter + face_counter_total,3)
                 end do
                 close(10)
@@ -1090,11 +1154,7 @@
             num_vert = vert_counter_total
             num_face = face_counter_total
             
-            ! now deallocate the old arrays and reassign
-            deallocate(verts)
-            deallocate(face_ids)
-            deallocate(num_face_vert)
-            deallocate(apertures)
+            ! now allocate arrays and reassign
             
             allocate(num_face_vert(1:face_counter_total))
             allocate(verts(1:vert_counter_total,1:3))
@@ -1118,33 +1178,33 @@
 
             ! update the geometry data structure
 
-            deallocate(geometry%verts)
-            deallocate(geometry%norms)
-            deallocate(geometry%face)
+            deallocate(geometry%v)
+            deallocate(geometry%n)
+            deallocate(geometry%f)
 
-            geometry%num_verts = vert_counter_total
-            geometry%num_faces = face_counter_total
-            geometry%num_norms = size(norms,1)
+            geometry%nv = vert_counter_total
+            geometry%nf = face_counter_total
+            geometry%nn = size(norms,1)
 
-            allocate(geometry%verts(1:vert_counter_total,1:3))
-            allocate(geometry%norms(1:geometry%num_norms,1:3))
-            allocate(geometry%face(1:face_counter_total))
+            allocate(geometry%v(1:vert_counter_total,1:3))
+            allocate(geometry%n(1:geometry%nn,1:3))
+            allocate(geometry%f(1:face_counter_total))
 
-            do i = 1, geometry%num_verts
-                geometry%verts(i,1:3) = verts_out(i,1:3)
+            do i = 1, geometry%nv
+                geometry%v(i,1:3) = verts_out(i,1:3)
             end do
 
-            do i = 1, geometry%num_faces
-                allocate(geometry%face(i)%vert_ids(1:3))
-                geometry%face(i)%vert_ids(:) = face_ids_out(i,:)
-                geometry%face(i)%aperture = apertures_out(i)
-                geometry%face(i)%norm_id = norm_ids(i)
-                geometry%face(i)%area = faceAreas(i)
-                geometry%face(i)%midpoint(:) = Midpoints(i,:)
+            do i = 1, geometry%nf
+                allocate(geometry%f(i)%vi(1:3))
+                geometry%f(i)%vi(:) = face_ids_out(i,:)
+                geometry%f(i)%ap = apertures_out(i)
+                geometry%f(i)%ni = norm_ids(i)
+                geometry%f(i)%area = faceAreas(i)
+                geometry%f(i)%mid(:) = Midpoints(i,:)
             end do
 
-            do i = 1, geometry%num_norms
-                geometry%norms(i,1:3) = norms(i,1:3)
+            do i = 1, geometry%nn
+                geometry%n(i,1:3) = norms(i,1:3)
             end do
 
         end subroutine
@@ -1268,7 +1328,7 @@
             do j = 1, num_verts ! write vertices of this face
                 write(10,'(I3,F16.8,F16.8)') j, v1(1,j), v1(2,j)
                 ! my_array(j) = face_ids(i,j)
-                my_array(j) = geometry%face(i)%vert_ids(j)
+                my_array(j) = geometry%f(i)%vi(j)
                 ! print*,'my_array(j)',my_array(j)
                 ! print*,'v1:',v1(1,j), v1(2,j)
             end do
@@ -1278,10 +1338,10 @@
                     ! print*,'face_ids(i,j)',face_ids(i,j)
                     ! print*,'findloc(my_array,face_ids(i,j))',findloc(my_array,face_ids(i,j))
                     ! write(10,'(I3,I3,I3)') j, face_ids(i,j), face_ids(i,1)
-                    write(10,'(I3,I3,I3)') j, findloc(my_array,geometry%face(i)%vert_ids(j)), findloc(my_array,geometry%face(i)%vert_ids(1))
+                    write(10,'(I3,I3,I3)') j, findloc(my_array,geometry%f(i)%vi(j)), findloc(my_array,geometry%f(i)%vi(1))
                 else
                     ! write(10,'(I3,I3,I3)') j, face_ids(i,j), face_ids(i,j+1)
-                    write(10,'(I3,I3,I3)') j, findloc(my_array,geometry%face(i)%vert_ids(j)), findloc(my_array,geometry%face(i)%vert_ids(j+1))
+                    write(10,'(I3,I3,I3)') j, findloc(my_array,geometry%f(i)%vi(j)), findloc(my_array,geometry%f(i)%vi(j+1))
                 end if
             end do
             write(10,'(I3)') 0 ! number of holes
@@ -1307,25 +1367,25 @@
             
             print*,'========== start sr PDAS'
             
-            num_verts = geometry%num_verts
-            num_norms = geometry%num_norms
-            num_faces = geometry%num_faces
+            num_verts = geometry%nv
+            num_norms = geometry%nn
+            num_faces = geometry%nf
             
             print*,'writing rotated particle to file...'
-
+    
             ! write to wavefront file
             open(10,file=trim(output_dir)//"/"//trim(filename)//".obj") ! wavefront format
             do i = 1, num_verts
-                write(10,'(A3,f16.8,f16.8,f16.8)') "v ", geometry%verts(i,1), geometry%verts(i,2), geometry%verts(i,3)
+                write(10,'(A3,f16.8,f16.8,f16.8)') "v ", geometry%v(i,1), geometry%v(i,2), geometry%v(i,3)
             end do
             do i = 1, num_norms
-                write(10,'(A3,f16.8,f16.8,f16.8)') "vn ", geometry%norms(i,1), geometry%norms(i,2), geometry%norms(i,3)
+                write(10,'(A3,f16.8,f16.8,f16.8)') "vn ", geometry%n(i,1), geometry%n(i,2), geometry%n(i,3)
             end do
             do i = 1, num_faces
                 my_string = "f "
                 call StripSpaces(my_string)
-                do j = 1, geometry%face(i)%num_verts
-                    write(my_string2,*) geometry%face(i)%vert_ids(j)
+                do j = 1, geometry%f(i)%nv
+                    write(my_string2,*) geometry%f(i)%vi(j)
                     call StripSpaces(my_string2)
                     my_string = trim(my_string)//" "//trim(my_string2)
                 end do
@@ -1337,12 +1397,12 @@
             open(10,file=trim(output_dir)//"/"//trim(filename)//".cry") ! macke format (only for triangulated at the moment)
             write(10,'(I8)') num_faces
             do i = 1, num_faces
-                write(10,*) geometry%face(i)%num_verts
+                write(10,*) geometry%f(i)%nv
             end do
             do i = 1, num_faces
-                do j = 1, geometry%face(i)%num_verts
-                    k = geometry%face(i)%num_verts - j + 1
-                    write(10,'(f16.8,f16.8,f16.8)') geometry%verts(geometry%face(i)%vert_ids(k),1), geometry%verts(geometry%face(i)%vert_ids(k),2), geometry%verts(geometry%face(i)%vert_ids(k),3)
+                do j = 1, geometry%f(i)%nv
+                    k = geometry%f(i)%nv - j + 1
+                    write(10,'(f16.8,f16.8,f16.8)') geometry%v(geometry%f(i)%vi(k),1), geometry%v(geometry%f(i)%vi(k),2), geometry%v(geometry%f(i)%vi(k),3)
                 end do
             end do
             close(10)
