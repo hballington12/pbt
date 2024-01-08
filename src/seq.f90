@@ -29,7 +29,7 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer i_loop, loop_start, i, j
+integer(8) i_loop, loop_start, i, j
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -37,21 +37,11 @@ character(len=255) :: output_dir ! output directory
 type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
-integer(8) num_vert ! number of unique vertices
-integer(8) num_face !  number of faces
-integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
-real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
-real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
-integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
-integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
 type(geometry_type) geometry ! particle geometry data structure
 type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 
-! sr make_normals
-integer, dimension(:) ,allocatable :: norm_ids ! face vertex IDs
-real(8), dimension(:,:) ,allocatable :: norms ! unique vertices
-
 ! sr makeIncidentBeam
+type(geometry_type) beam_geometry
 real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
 real(8), allocatable, dimension(:,:) :: beamN ! beam normals
 real(8), allocatable, dimension(:,:) :: beamMidpoints ! beam  midpoints
@@ -62,7 +52,7 @@ complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of inc
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
 type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing beams from external diffraction
-integer beam_outbeam_tree_counter ! counts the current number of beam outbeams
+integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
 real(8) energy_out_beam
 real(8) energy_out_ext_diff
 real(8) energy_abs_beam
@@ -84,8 +74,8 @@ real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 integer my_rank
 integer seed(1:8)
 character(len=255) cache_dir ! cached files directory (if job stops early)
-integer, dimension(:), allocatable :: remaining_orients
-integer num_remaining_orients
+integer(8), dimension(:), allocatable :: remaining_orients
+integer(8) num_remaining_orients
 
 ! ############################################################################################################
 ! start main
@@ -116,23 +106,6 @@ call write_job_params(job_params)
 call PDAL2( job_params,     & ! <-  job parameters
             geometry)         !  -> particle geometry            
 
-! bodge conversion while i refactor
-num_vert = geometry%nv
-num_face = geometry%nf
-allocate(vert_in(1:num_vert,1:3))
-vert_in(:,:) = geometry%v(:,:)
-allocate(num_face_vert(1:num_face))
-num_face_vert(:) = geometry%f(:)%nv
-allocate(apertures(1:num_face))
-apertures(:) = geometry%f(:)%ap
-allocate(norms(1:geometry%nn,1:3))
-norms(:,:) = geometry%n(:,:)
-allocate(face_ids(1:num_face,1:maxval(num_face_vert)))
-do i = 1, num_face
-    do j = 1, num_face_vert(i)
-        face_ids(i,j) = geometry%f(i)%vi(j)
-    end do
-end do
 
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
@@ -191,8 +164,6 @@ do i = 1, num_remaining_orients
                     geometry,   &
                     rotated_geometry)
 
-    vert = rotated_geometry%v(:,:)
-
     ! write rotated particle to file (optional)
     if (job_params%num_orients .eq. 1) then
         call PDAS(  output_dir,     & ! <-  output directory
@@ -208,15 +179,11 @@ do i = 1, num_remaining_orients
                             beamF2,        & ! ->  beam face normal indices
                             rotated_geometry,          & ! <-  unique vertices
                             beamMidpoints, & !  -> beam  midpoints
-                            ampl_beam)       !  -> amplitude matrix of incident beam       
+                            ampl_beam, &       !  -> amplitude matrix of incident beam       
+                            beam_geometry)
 
     ! beam loop
-    call beam_loop( beamV,                     & ! <-  beam vertices
-                    beamF1,                    & ! <-  beam face vertex indices
-                    beamN,                     & ! <-  beam normals
-                    beamF2,                    & ! <-  beam face normal indices
-                    beamMidpoints,             & ! <-  beam  midpoints
-                    ampl_beam,                 & ! <-  amplitude matrix of incident beam
+    call beam_loop( ampl_beam,                 & ! <-  amplitude matrix of incident beam
                     beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
                     ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
@@ -225,7 +192,8 @@ do i = 1, num_remaining_orients
                     energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
                     job_params,                 &
-                    rotated_geometry)
+                    rotated_geometry, &
+                    beam_geometry)
     
     if(num_remaining_orients .gt. 1) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'

@@ -14,11 +14,11 @@
 
       ! saves the remaining orientation numbers to cached file
 
-      integer, intent(in) :: i
+      integer(8), intent(in) :: i
       character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
-      integer j
-      integer, dimension(:), allocatable, intent(in) :: remaining_orients
-      integer, intent(in) ::  num_remaining_orients
+      integer(8) j
+      integer(8), dimension(:), allocatable, intent(in) :: remaining_orients
+      integer(8), intent(in) ::  num_remaining_orients
 
       open(10,file=trim(cache_dir)//"/orient_remaining.dat") ! open file
          do j = i + 1, num_remaining_orients
@@ -380,6 +380,7 @@
       write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs / output_parameters_total%geo_cross_sec
       write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt / output_parameters_total%geo_cross_sec
       write(10,'(A30,f16.8)') 'ext. efficiency: ',output_parameters_total%ext / output_parameters_total%geo_cross_sec
+      
       ! below is commented because: different orientations have dif. geo. cross sections, so the efficiencies dont add linearly
       ! write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs_eff
       ! write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt_eff
@@ -535,7 +536,7 @@
       integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
       integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
       type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
-      integer, intent(in) :: i_loop
+      integer(8), intent(in) :: i_loop
       type(output_parameters_type), intent(inout) :: output_parameters_total
       real(8), dimension(:,:,:), allocatable , intent(in):: mueller_total ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d_total ! phi-integrated mueller matrices

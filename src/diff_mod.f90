@@ -63,7 +63,7 @@ module diff_mod
     ! outgoing beams are ignored if the amplitude matrix has less than 1e-6 energy
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_tree ! beam_tree to be trimmed
-    integer, intent(inout) :: beam_tree_counter ! counts the current number of beam outbeams
+    integer(8), intent(inout) :: beam_tree_counter ! counts the current number of beam outbeams
     type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
     integer i, j
     type(outbeamtype), dimension(:), allocatable :: beam_tree_temp ! beam_tree temporary copy
@@ -731,7 +731,7 @@ module diff_mod
         ! sr diff_main is the main shell for diffraction of all beams + external diffraction at a fixed orientation
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
-    integer, intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+    integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
     real(8) lambda ! wavelength
     real(8), dimension(:), allocatable :: theta_vals
     real(8), dimension(:), allocatable :: phi_vals

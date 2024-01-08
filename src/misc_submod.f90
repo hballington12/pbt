@@ -186,7 +186,7 @@
         ! subroutine make_normals recomputes and returns the normals, as well as the corresponding IDs for each face
             
         integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids ! face vertex IDs
-        integer, dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
+        integer(8), dimension(:) ,allocatable, intent(out) :: norm_ids ! face vertex IDs
         real(8), dimension(:,:) ,allocatable, intent(in) :: verts ! unique vertices
         real(8), dimension(:,:) ,allocatable, intent(out) :: norms ! unique vertices
             
@@ -250,11 +250,11 @@
             ! attempts to pull cached files from cache directory
             
             type(job_parameters_type), intent(inout) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
-            integer, intent(out) :: num_remaining_orients
+            integer(8), intent(out) :: num_remaining_orients
             real(8), dimension(:,:,:), allocatable, intent(out) :: mueller_total ! mueller matrices
             real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d_total ! mueller matrices
             type(output_parameters_type), intent(out) :: output_parameters_total
-            integer, dimension(:), allocatable, intent(out) :: remaining_orients
+            integer(8), dimension(:), allocatable, intent(out) :: remaining_orients
             
             integer cache_id, i, nlines, io, j
             character(len=32) cache_id_string
@@ -420,7 +420,7 @@
             ! saves the job parameters to a file
             
             character(len=255), intent(in) :: output_dir ! cached files directory (if job stops early)
-            integer, intent(in) :: loop_index ! current loop index of the main loop
+            integer(8), intent(in) :: loop_index ! current loop index of the main loop
             type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
             type(output_parameters_type), intent(in) :: output_parameters_total
             
@@ -480,7 +480,7 @@
             ! saves the apertures to a file
             
             character(len=255), intent(in) :: output_dir ! cached files directory (if job stops early)
-            ! integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
+            ! integer(8), dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
             type(geometry_type), intent(in) :: geometry
 
             integer(8) i
@@ -968,7 +968,7 @@
             integer(8), dimension(:), allocatable :: num_face_vert
             character(len=*) flags
             real(8), intent(in) :: max_edge_length
-            integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
+            integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
             real(8), intent(in) :: roughness
             character(len=255), intent(in) :: output_dir ! output directory
             type(geometry_type), intent(inout) :: geometry
@@ -997,7 +997,7 @@
             integer rank ! for avoiding clashes between processes of different rank
             character(len=16) rank_string
             real(8), dimension(:,:) ,allocatable :: norms ! unique vertices, face vertex IDs, face normals
-            integer, dimension(:), allocatable :: norm_ids ! face normal ID of each face
+            integer(8), dimension(:), allocatable :: norm_ids ! face normal ID of each face
             real(8), dimension(:), allocatable :: faceAreas ! area of each facet
             real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
     
@@ -1607,11 +1607,11 @@
             ! var2 is what is to be concatenated on to
             ! version for integer arrays
             
-            integer, dimension(:,:), allocatable, intent(in) :: var1
-            integer, dimension(:,:), allocatable, intent(inout) :: var2
+            integer(8), dimension(:,:), allocatable, intent(in) :: var1
+            integer(8), dimension(:,:), allocatable, intent(inout) :: var2
             
-            integer, dimension(:,:), allocatable :: var1_temp
-            integer, dimension(:,:), allocatable :: var2_temp
+            integer(8), dimension(:,:), allocatable :: var1_temp
+            integer(8), dimension(:,:), allocatable :: var2_temp
             integer var1_size1, var1_size2 ! array dimension sizes
             integer var2_size1, var2_size2
             integer i, j, max_rows, max_cols, icol, irow
@@ -1877,9 +1877,9 @@
             ! end do
             
             logical, dimension(:), allocatable, intent(in) :: mask
-            integer, dimension(:), allocatable, intent(inout) :: array
+            integer(8), dimension(:), allocatable, intent(inout) :: array
             
-            integer, dimension(:), allocatable :: array_temp
+            integer(8), dimension(:), allocatable :: array_temp
             integer i, counter
             
             allocate(array_temp(1:size(array,1))) ! allocate
@@ -1923,9 +1923,9 @@
             ! input and output should be of type "integer, dimension(:), allocatable"
             ! inspired by: https://stackoverflow.com/questions/44198212/a-fortran-equivalent-to-unique
             
-            integer, dimension(:), allocatable, intent(in) :: array_in
-            integer, dimension(:), allocatable :: unique
-            integer, dimension(:), allocatable, intent(out) :: array_unique
+            integer(8), dimension(:), allocatable, intent(in) :: array_in
+            integer(8), dimension(:), allocatable :: unique
+            integer(8), dimension(:), allocatable, intent(out) :: array_unique
             integer min_val, max_val, i
             
             ! allocate unique array
