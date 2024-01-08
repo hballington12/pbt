@@ -1962,17 +1962,17 @@ close(10)
 
 end subroutine
 
-subroutine makeIncidentBeam(beamV, beamF1, beamN, beamF2, geometry, beamMidpoints, ampl_beam, beam_geometry)
+subroutine makeIncidentBeam(geometry, ampl_beam, beam_geometry)
 
 ! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle (currently set to 1000)
 ! the width and length of the wavefront is set larger than the maximum x and y vertex values of the particle (full illumination)
 
 type(geometry_type), intent(in) :: geometry
-real(8), allocatable, intent(out), dimension(:,:) :: beamV, beamN
-integer(8), allocatable, intent(out), dimension(:,:) :: beamF1
-integer(8), allocatable, intent(out), dimension(:) :: beamF2
+real(8), allocatable, dimension(:,:) :: beamV, beamN
+integer(8), allocatable, dimension(:,:) :: beamF1
+integer(8), allocatable, dimension(:) :: beamF2
 real(8), dimension(:,:) ,allocatable :: verts
-real(8), dimension(:,:) ,allocatable, intent(out) :: beamMidpoints
+real(8), dimension(:,:) ,allocatable :: beamMidpoints
 ! integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids
 complex(8), allocatable, dimension(:,:,:), intent(out) :: ampl_beam ! amplitude matrix of incident beam
 type(geometry_type), intent(out) :: beam_geometry

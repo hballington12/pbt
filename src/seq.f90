@@ -42,11 +42,6 @@ type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 
 ! sr makeIncidentBeam
 type(geometry_type) beam_geometry
-real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
-real(8), allocatable, dimension(:,:) :: beamN ! beam normals
-real(8), allocatable, dimension(:,:) :: beamMidpoints ! beam  midpoints
-integer(8), allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
-integer(8), allocatable, dimension(:) :: beamF2 ! beam face normal indices
 complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of incident beam
 
 ! sr beam_loop
@@ -173,12 +168,7 @@ do i = 1, num_remaining_orients
 
     ! stop
     ! fast implementation of the incident beam
-    call makeIncidentBeam(  beamV,         & ! ->  beam vertices
-                            beamF1,        & ! ->  beam face vertex indices
-                            beamN,         & ! ->  beam normals
-                            beamF2,        & ! ->  beam face normal indices
-                            rotated_geometry,          & ! <-  unique vertices
-                            beamMidpoints, & !  -> beam  midpoints
+    call makeIncidentBeam(  rotated_geometry,          & ! <-  unique vertices
                             ampl_beam, &       !  -> amplitude matrix of incident beam       
                             beam_geometry)
 
