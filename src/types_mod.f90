@@ -109,6 +109,7 @@ type beam_type
     integer(8) nf_out ! total number of facets illuminated by this beam
     integer(8) ap ! the aperture from which this beam is propagating
     real(8) cross_ext ! extinction cross section (energy absorbed)
+    logical is_int ! whether or not the beam is propagating inside the particle
 end type beam_type
 
 type facet_type
