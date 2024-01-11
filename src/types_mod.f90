@@ -73,25 +73,42 @@ type job_parameters_type
     logical output_eulers ! enables an output of the euler angles to a file
     integer debug ! level of debugging output (0-3)
     logical timing ! code timing output
+    real(8) threshold ! area threshold for new beams
 end type job_parameters_type
 
-type field_type
-    ! field: contains the information about the electric field at a facet
+type field_in_type
+    ! field: contains the information about the electric field at a facet of the illuminating surface
     ! this is used as an allocatable entry in the beam type structure
-    integer(8) face_id ! the facet id
+    integer(8) fi ! the facet id
     complex(8) ampl(1:2,1:2) ! the amplitude matrix
     real(8) e_perp(1:3) ! electric field perpendicular vector (previously known as vk7)
-end type field_type
+end type field_in_type
+
+type field_out_type
+    ! field: contains the information about the electric field at a facet of the illuminated surface
+    ! this is used as an allocatable entry in the beam type structure
+    integer(8) fi ! the facet id
+    complex(8) ampl_int(1:2,1:2) ! the internal amplitude matrix
+    complex(8) ampl_ext(1:2,1:2) ! the external amplitude matrix
+    real(8) e_perp(1:3) ! electric field perpendicular vector (previously known as vk7)
+    integer(8) ap ! the aperture id
+    logical is_tir ! whether or not this was total internal reflection
+    real(8) prop_int(1:3) ! internal propagation direction
+    real(8) prop_ext(1:3) ! external propagation direction
+end type field_out_type
 
 type beam_type
     ! beam type: contains all information of a single beam
     ! a beam is a collection of facets with a single propagation direction
     ! the amplitude matrix is stored at the centroid of each facet
     ! generally, the information here is passed to the beam recursion subroutine to be propagated
-    type(field_type), dimension(:), allocatable :: field ! information about the e-field at each facet (see above)
+    type(field_in_type), dimension(:), allocatable :: field_in ! information about the e-field at each facet in the illuminating surface (see above)
+    type(field_out_type), dimension(:), allocatable :: field_out ! information about the e-field at each facet in the illuminated surface (see above)
     real(8) prop(1:3) ! the propagation direction of the beam
-    integer num_facets ! total number of facets that belong to this beam
-    integer aperture_id ! the aperture from which this beam is propagating
+    integer(8) nf_in ! total number of facets that belong to this beam
+    integer(8) nf_out ! total number of facets illuminated by this beam
+    integer(8) ap ! the aperture from which this beam is propagating
+    real(8) cross_ext ! extinction cross section (energy absorbed)
 end type beam_type
 
 type facet_type
@@ -102,8 +119,15 @@ type facet_type
     real(8) area ! area
     integer(8) nv ! number of vertices on this face
     integer(8) ap ! the aperture to which this face belongs
-
 end type facet_type
+
+type aperture_type
+    ! aperture type: information about an aperture of the particle geometry
+    real(8) n(1:3) ! normal
+    real(8) mid(1:3) ! midpoint
+    real(8) area
+    integer(8) nf ! number of faces in this aperture
+end type aperture_type
 
 type geometry_type
     ! geometry type: contains information about a particle geometry
@@ -115,6 +139,8 @@ type geometry_type
     integer(8) nv ! total number of unique vertices in the geometry
     integer(8) nf ! number of faces in the geometry
     integer(8) nn ! number of unique normals
+    integer(8) na ! number of apertures
+    type(aperture_type), dimension(:), allocatable :: ap ! data structure with information about each aperture in the geometry
 end type geometry_type
 
 ! format specifiers

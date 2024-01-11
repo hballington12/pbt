@@ -13,6 +13,36 @@
         
         contains
 
+        subroutine compute_geometry_apertures(geometry)
+
+        type(geometry_type), intent(inout) :: geometry
+
+        integer(8) i, j
+        integer(8) counter
+        integer(8) ni ! a normal id
+        real(8) nf ! normalisation factor
+
+        do i = 1, geometry%na ! for each aperture
+            counter = 0 ! init counter to track number of faces in this aperture
+            geometry%ap(i)%n(:) = 0 ! init
+            geometry%ap(i)%mid(:) = 0 ! init
+            geometry%ap(i)%area = 0 ! init
+            do j = 1, geometry%nf ! for each face
+                if(geometry%f(j)%ap == i) then ! if the jth face belongs to the ith aperture
+                    counter = counter + 1 ! update the total number of faces in this aperture
+                    ni = geometry%f(j)%ni ! get the index of the normal of this face
+                    geometry%ap(i)%n(:) = geometry%ap(i)%n(:) + geometry%n(ni,:) ! sum the total normal
+                    geometry%ap(i)%mid(:) = geometry%ap(i)%mid(:) + geometry%f(j)%mid(:) ! sum the total midpoint
+                    geometry%ap(i)%area = geometry%ap(i)%area + geometry%f(j)%area ! sum the area
+                end if
+            end do
+            geometry%ap(i)%mid(:) = geometry%ap(i)%mid(:) / counter ! normalise
+            nf = sqrt(geometry%ap(i)%n(1)**2 + geometry%ap(i)%n(2)**2 + geometry%ap(i)%n(3)**2)
+            geometry%ap(i)%n(:) = geometry%ap(i)%n(:) / nf ! normalise
+        end do
+
+        end subroutine
+
         subroutine compute_geometry_areas(geometry)
 
             type(geometry_type), intent(inout) :: geometry

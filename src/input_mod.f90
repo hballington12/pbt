@@ -298,6 +298,7 @@ job_params%gamma_lims = (/0D0,360D0/)
 job_params%output_eulers = .false.
 job_params%debug = 1 ! default value is some debugging output
 job_params%timing = .false. ! default is no timing
+job_params%threshold = 0 ! default is no threshold
 
 
 ! print*,'command_argument_count(): ',command_argument_count()
@@ -1784,7 +1785,9 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
     ! recompute the midpoints
     call compute_geometry_midpoints(rot_geometry)
     ! recompute normals
-    call compute_geometry_normals(rot_geometry  )
+    call compute_geometry_normals(rot_geometry)
+    ! recompute aperture parameters
+    call compute_geometry_apertures(rot_geometry)
 
     ! stop
     if(job_params%debug >= 1) then 
@@ -2693,9 +2696,14 @@ subroutine PDAL2(   job_params,     &
         geometry%f(i)%nv = num_face_vert(i)
     end do
 
+    geometry%na = maxval(geometry%f(:)%ap) ! total number of apertures
+    allocate(geometry%ap(1:geometry%na)) ! allocate
+
     call compute_geometry_normals(geometry)
     call compute_geometry_midpoints(geometry)
     call compute_geometry_areas(geometry)
+    call compute_geometry_apertures(geometry)
+
 
     ! print*,'faceareas(123)',faceAreas(123)
     ! print*,'guess:',geometry%f(123)%area
