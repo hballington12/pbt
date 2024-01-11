@@ -13,6 +13,29 @@ real(8) ext_cross_section ! extinction cross section
 
 contains
 
+subroutine get_trans_prop(theta_i,theta_t,prop_in,norm,prop_out)
+
+real(8), intent(in) :: theta_i
+real(8), intent(in) :: theta_t
+real(8), intent(in) :: prop_in(1:3)
+real(8), intent(out) :: prop_out(1:3)
+real(8), intent(in) :: norm(1:3)
+
+real(8) A, B, alpha, nf
+real(8), dimension(1:3) :: a_vec, b_vec, c_vec
+
+alpha = pi - theta_t
+A = sin(theta_t-theta_i)/sin(theta_i)
+B = sin(alpha)/sin(theta_i)
+b_vec(:) = prop_in(:)
+a_vec(:) = norm(:)
+prop_out(:) = B*b_vec(:) - A*a_vec(:)
+nf = sqrt(prop_out(1)**2 + prop_out(2)**2 + prop_out(3)**2)
+prop_out(:) = prop_out(:) / nf
+
+
+end subroutine
+
 subroutine add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
 
 ! for beams which propagated internally
@@ -33,6 +56,7 @@ integer(8) fi ! aperture id
 integer(8) index ! index of a beam in the beam tree
 integer(8) nf ! a counter for the number of facets in a beam tree entry
 
+! determine which apertures were sufficiently illuminated to create new beams
 call get_suff_illuminated2(geometry,beam,job_params,suff_ill,num_ill)
 
 allocate(mapping(1:geometry%na)) ! maps each aperture to a position in the beam tree (if suff. illuminated)
@@ -46,7 +70,7 @@ do i = 1, geometry%na ! for each aperture in the geometry
         ! add stuff to the beam tree
         beam_tree(num_beams)%ap = i ! aperture id
         beam_tree(num_beams)%nf_in = 0 ! init
-        print*,'aperture',beam%ap,'illuminated',num_ill(i),'facets'
+        ! print*,'aperture',beam%ap,'illuminated',num_ill(i),'facets'
     end if
 end do
 
@@ -245,6 +269,7 @@ real(8), dimension(:,:), allocatable :: rotatedapertureNormals
 integer(8), dimension(:), allocatable :: ais ! illuminated aperture ids
 integer(8), dimension(:), allocatable :: nfs ! number of illuminated facets in each aperture
 logical, dimension(:), allocatable :: suff_ill ! number of illuminated facets in each aperture
+real(8) prop(1:3) ! incoming propagation direction in unrotated system
 real(8) prop_int(1:3) ! reflected/refracted propagation vector
 real(8) prop_ext(1:3) ! reflected/refracted propagation vector
 integer(8) num_suff_ill
@@ -269,6 +294,10 @@ complex(8) m ! complex refractive index
 complex(8) fr(1:2,1:2) ! fresnel reflection matrix
 complex(8) ft(1:2,1:2) ! fresnel reflection matrix
 real(8) abs_intensity ! absorbed intensity
+real(8) intensity_out ! intensity after absorption
+real(8) norm(1:3) ! a facet normal
+
+ ! intensity after absorption
 
 waveno = 2*pi/job_params%la ! wavenumber
 rbi = job_params%rbi ! real part refractive index
@@ -345,6 +374,7 @@ do i = 1, rot_geometry%nf ! for each face
         ampl(:,:) = beam%field_in(bfi)%ampl(:,:) ! get the amplitude matrix of the illuminating facet
         e_perp(:) = beam%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
         dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
+        prop(:) = beam%prop(:) ! incoming propagation direction in unrotated system
 
         ! get the reflected propagation vector in unrotated system
         prop_int(1) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(1) ! reflected propagation vector (in rotated system)
@@ -353,10 +383,10 @@ do i = 1, rot_geometry%nf ! for each face
         prop_int(:) = matmul(transpose(rot),prop_int(:)) ! rotate reflected/refracted propagation vector back to original coordinate system
 
         ! get vk7, the new e-perp vector (normal x reflected prop vector)
-        call cross(-an,prop_int,vk7,.true.)
+        call cross(-an,prop,vk7,.true.)
         
         ! get the rotation matrix to rotate about prop. vector into new scattering plane
-        call get_rot_matrix(rot2,vk7,e_perp,prop_int)
+        call get_rot_matrix(rot2,vk7,e_perp,prop)
 
         ! rotate the amplitude matrix into the new scattering plane
         ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
@@ -372,6 +402,12 @@ do i = 1, rot_geometry%nf ! for each face
 
         ! apply absorption factor
         ampl(:,:) = ampl(:,:) * exp(-2*waveno*ibi*sqrt(dist))
+
+        ! compute remaining intensity after absorption
+        intensity_out = real(0.5*(  ampl(1,1)*conjg(ampl(1,1)) + &
+                                    ampl(1,2)*conjg(ampl(1,2)) + &
+                                    ampl(2,1)*conjg(ampl(2,1)) + &
+                                    ampl(2,2)*conjg(ampl(2,2))))
 
         ! compute fresnel matrices
         fr(:,:) = 0D0 ! init fresnel reflection matrix
@@ -397,13 +433,18 @@ do i = 1, rot_geometry%nf ! for each face
         trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
 
         ! possibly remove transmission from shadow facets here
-        if(is_shad(j)) trans_ampl(:,:) = 0D0
+        if(is_shad(i)) trans_ampl(:,:) = 0D0
         
         ! add to the extinction cross section
         beam%cross_ext = beam%cross_ext + (abs_intensity * cos(theta_i) * geometry%f(i)%area * rbi)
 
-        ! compute the transmitted propagation vector
-        ! unfinished
+        ! compute the transmitted propagation vector ()
+        if(.not. is_tir) then ! if no internal reflection
+            norm(:) = geometry%n(geometry%f(i)%ni,:)
+            call get_trans_prop(theta_i,theta_t,prop,norm,prop_ext) ! get the transmitted propagation vector
+        end if
+
+        ! if(n == 5) print*,'prop out:',prop_ext(1),prop_ext(2),prop_ext(3)
 
         ! save stuff to the beam structure
         beam%field_out(n)%ampl_ext(:,:) = trans_ampl(:,:) ! save the transmitted amplitude matrix
@@ -412,7 +453,9 @@ do i = 1, rot_geometry%nf ! for each face
         beam%field_out(n)%fi = i ! save the face id
         beam%field_out(n)%ap = ai ! save the aperture
         beam%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
+        beam%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
         beam%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
+    
     end if
 end do
 
@@ -751,54 +794,35 @@ subroutine beam_loop(   ampl_beam, &
         end if
     end do
 
+    ! main loop
     i_start = 1 ! entry in beam tree to start at
-
-    print*,'num_beams',num_beams
-
-    ! finished adding to beam tree
     do i = 1, rec ! for each recursion
         i_end = num_beams ! entry in beam tree to stop at
-        do j = i_start, i_end ! for each entry in the beam tree that belongs to this recursion (omp)
-            beam = beam_tree(j) ! get a beam from the beam_tree
-
-            ! propagate this beam
-            call recursion(beam,geometry,job_params)
-
-            ! add the new beams to the beam tree
-            call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
-
-            ! add the beams to the diffraction structure
-
-        end do
-        i_start = i_end + 1 ! update the starting index for the next recursion
-    end do
-
-    print*,'finish: num_beams',num_beams
-
-    ! stop
-
-    ! main loop
-    do i = 1, rec ! for each beam recursion
+        
         if(job_params%debug >= 2) then
             print*,'internal recursion #',i
         end if
+
         if(job_params%timing) then
             if(job_params%debug >= 1) then
                 start1 = omp_get_wtime()
             end if
         end if
-       call internal_recursion_outer(   F1Mapping, &
-                                        propagationVectors, &
-                                        verts, Norm, midPoints, Face1, Face2, &
-                                        apertureMidpoints, apertureNormals, apertures, &
-                                        faceAreas, &
-                                        threshold, &
-                                        rbi, ibi, waveno, &
-                                        vk71Int, vk72Int, vk73Int, &
-                                        beam_outbeam_tree, beam_outbeam_tree_counter, &
-                                        refl_ampl_out11Int, refl_ampl_out12Int, refl_ampl_out21Int, refl_ampl_out22Int, &
-                                        interactionCounter, &
-                                        is_multithreaded)
+
+        do j = i_start, i_end ! for each entry in the beam tree that belongs to this recursion (omp)
+            
+            beam = beam_tree(j) ! get a beam from the beam_tree
+
+            ! propagate this beam
+            call recursion(beam,geometry,job_params)
+
+            ! add the new beams to the beam tree 
+            call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
+
+            ! add the outgoing surface field to the diffraction structure
+            call add_to_outbeam_tree2(beam_outbeam_tree,beam_outbeam_tree_counter,beam)
+
+        end do
         if(job_params%timing) then
             if(job_params%debug >= 2) then
                 finish1 = omp_get_wtime()
@@ -806,9 +830,8 @@ subroutine beam_loop(   ampl_beam, &
                 write(101,'(A,I3,A,f16.8,A)')"recursion",i," - time elapsed: ",finish1-start1," secs"
             end if
         end if
+        i_start = i_end + 1 ! update the starting index for the next recursion
     end do
-
-    stop
 
     if(job_params%debug >= 1) then
         if(job_params%timing) then
@@ -1492,7 +1515,7 @@ do i = 1, size(apertureMidpoints,1) ! for each aperture
     !     totalIlluminated = totalIlluminated + counter
     ! end if
     if(counter2 .gt. 0) then
-        print'(A,I5,A,I5,A40,I5,A,f10.6)','aperture ',beam%ap,' illuminated ',counter2,' facets (shadow) in aperture ',i,' with a total area of ',illuminatedApertureAreas2_ps(i)
+        ! print'(A,I5,A,I5,A40,I5,A,f10.6)','aperture ',beam%ap,' illuminated ',counter2,' facets (shadow) in aperture ',i,' with a total area of ',illuminatedApertureAreas2_ps(i)
         totalIlluminated_ps = totalIlluminated_ps + counter2
     end if    
 end do
@@ -1875,16 +1898,43 @@ do i = 1, num_sufficiently_illuminated_apertures
             ! remove transmission for shadowed facets (probably doesnt matter)
             if(isShadow(j)) trans_ampl = trans_ampl*0
 
-            ! print*,'illuminated facet ID: ',j
-            ! print*,'illuminated facet cos(theta_i): ',cos(theta_i)
-            ! print*,'illuminated face area: ',faceAreas(j)
-            ! print*,'illuminated projected face area: ',cos(theta_i)*faceAreas(j)
-            ! print*,'illuminating facet ID: ',id_beam(j)
-            ! print*,'illuminating facet area: ',faceAreas(id_beam(j))
-            ! print*,'illuminating facet cos(theta_i)',-rotatedNorm(Face2(id_beam(j)),3)
-            ! print*,'illuminating projected face area: ',-rotatedNorm(Face2(id_beam(j)),3)*faceAreas(id_beam(j))
-            ! print*,'absorption factor: ',(1-exp(-2*waveno*ibi*dist_beam(j)))
-            ! print*,'illuminated extinction cross section: ',(1-exp(-2*waveno*ibi*dist_beam(j)))*cos(theta_i)*faceAreas(j)
+            ! if(k .eq. 5) then
+            ! print*,'facet ID: ',j
+            ! ! ! print*,'illuminated facet cos(theta_i): ',cos(theta_i)
+            ! ! ! print*,'illuminated face area: ',faceAreas(j)
+            ! ! ! print*,'illuminated projected face area: ',cos(theta_i)*faceAreas(j)
+            ! ! print*,'illuminating facet ID: ',id_beam(j)
+            ! ! print*,'beam ampl 1 1',beam%field_in(id_beam(j))%ampl(1,1)
+            ! ! print*,'rot ampl 1 1',rot_ampl(1,1)
+            ! ! print*,'prop_int(1)',aperturePropagationVectors(aperture_id,1)
+            ! ! print*,'prop_int(2)',aperturePropagationVectors(aperture_id,2)
+            ! ! print*,'prop_int(3)',aperturePropagationVectors(aperture_id,3)
+            ! ! print*,'rot(1,1)',rot(1,1)
+            ! ! print*,'rot(1,2)',rot(1,2)               
+            ! ! print*,'rot(2,1)',rot(2,1)
+            ! ! print*,'rot(2,2)',rot(2,2)
+            ! ! print*,'dist',dist_beam(j)
+            ! ! print*,'refl ampl 1 1',refl_ampl(1,1)
+            ! ! print*,'theta_i', theta_i
+            ! ! print*,'theta_t', theta_t
+            ! ! print*,'rot_ampl 1 1',rot_ampl(1,1)
+            ! ! print*,'rot_ampl 1 2',rot_ampl(1,2)
+            ! ! print*,'rot_ampl 2 1',rot_ampl(2,1)
+            ! ! print*,'rot_ampl 2 2',rot_ampl(2,2)
+            ! ! print*,'trans_ampl 1 1',trans_ampl (1,1)
+            ! ! print*,'intensity out',intensity_out
+            ! print*,'isShadow',isShadow(j)
+            ! print*,'intensity_trans',real(0.5*(  trans_ampl(1,1)*conjg(trans_ampl(1,1)) + &
+            !                             trans_ampl(1,2)*conjg(trans_ampl(1,2)) + &
+            !                             trans_ampl(2,1)*conjg(trans_ampl(2,1)) + &
+            !                             trans_ampl(2,2)*conjg(trans_ampl(2,2))))
+            ! ! ! print*,'illuminating facet area: ',faceAreas(id_beam(j))
+            ! ! ! print*,'illuminating facet cos(theta_i)',-rotatedNorm(Face2(id_beam(j)),3)
+            ! ! ! print*,'illuminating projected face area: ',-rotatedNorm(Face2(id_beam(j)),3)*faceAreas(id_beam(j))
+            ! ! ! print*,'absorption factor: ',(1-exp(-2*waveno*ibi*dist_beam(j)))
+            ! ! ! print*,'illuminated extinction cross section: ',(1-exp(-2*waveno*ibi*dist_beam(j)))*cos(theta_i)*faceAreas(j)
+            ! ! print*,'====================='
+            ! end if
 
             ! ext_cross_section = ext_cross_section + sqrt(1-exp(-2*waveno*ibi*dist_beam(j)))*cos(theta_i)*faceAreas(j)*intensity_in*rbi ! this might need a check
             
@@ -1944,6 +1994,7 @@ do i = 1, num_sufficiently_illuminated_apertures
                 !     print*,'aperturePropagationVectors(aperture_id,1:3)',aperturePropagationVectors(aperture_id,1:3)
                 !     stop
                 ! end if
+                ! if(k == 5) print*,'prop out:',c_vec(1),c_vec(2),c_vec(3)
 
             end if
 
@@ -2580,6 +2631,7 @@ real(8), intent(inout) :: rot(1:2,1:2) ! rotation matrix
 
 real(8) myfunc_arg
 real(8) evo21, evo22, evo23
+real(8) det ! normalisation factor
 
 myfunc_arg = vk71*ev11 + vk72*ev12 + vk73*ev13
 
@@ -2591,6 +2643,9 @@ rot(1,1) = myfunc_arg
 rot(1,2) = -(vk71*evo21 + vk72*evo22 + vk73*evo23)
 rot(2,1) = +(vk71*evo21 + vk72*evo22 + vk73*evo23)
 rot(2,2) = myfunc_arg
+
+det = rot(1,1)*rot(2,2) - rot(1,2)*rot(2,1)
+rot(:,:) = rot(:,:) / sqrt(abs(det))
 
 end subroutine
 
@@ -4264,6 +4319,30 @@ subroutine get_interaction( InteractionInt2, &
             end do
         end if
     end do
+
+end subroutine
+
+subroutine add_to_outbeam_tree2(beam_outbeam_tree,beam_outbeam_tree_counter,beam)
+
+integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
+type(beam_type), intent(in) :: beam ! current beam to be traced
+
+integer(8) i, j, num_beams
+
+do i = 1, beam%nf_out ! for each illuminated facet in this beam structure
+    if(.not. beam%field_out(i)%is_tir) then ! if it wasnt total internal reflection, add to outbeams
+        beam_outbeam_tree_counter = beam_outbeam_tree_counter + 1 ! update outbeam tree counter
+        if(beam_outbeam_tree_counter .gt. size(beam_outbeam_tree,1)) then
+            print*,'error: need more space in outbeam_tree. please increase in sr init'
+        end if
+        beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(:,:) = beam%field_out(i)%ampl_ext(:,:) ! external amplitude matrix
+        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(:) = beam%field_out(i)%prop_int(:) ! incident propagation direction
+        beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(:) = beam%field_out(i)%prop_ext(:) ! outgoing propagation direction
+        beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(:) = beam%field_out(i)%e_perp(:) ! perpendicular field vector
+        beam_outbeam_tree(beam_outbeam_tree_counter)%FOut = beam%field_out(i)%fi ! facet id
+    end if
+end do
 
 end subroutine
 

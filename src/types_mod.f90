@@ -11,7 +11,7 @@ type outbeamtype ! type for outbeam trees (used for diffraction)
     real(8) verts(1:3,1:3) ! x, y, and z components of each vertex
     real(8) prop_out(1:3) ! outgoing propagation vector
     real(8) prop_in(1:3) ! incoming propagation vector
-    integer FOut ! face ID from which the beam was emitted
+    integer(8) FOut ! face ID from which the beam was emitted
     integer interactionOut ! interaction counter
 end type outbeamtype
 
@@ -93,8 +93,8 @@ type field_out_type
     real(8) e_perp(1:3) ! electric field perpendicular vector (previously known as vk7)
     integer(8) ap ! the aperture id
     logical is_tir ! whether or not this was total internal reflection
-    real(8) prop_int(1:3) ! internal propagation direction
-    real(8) prop_ext(1:3) ! external propagation direction
+    real(8) prop_int(1:3) ! internal propagation direction (computed from aperture normal)
+    real(8) prop_ext(1:3) ! external propagation direction (computed from facet normal)
 end type field_out_type
 
 type beam_type

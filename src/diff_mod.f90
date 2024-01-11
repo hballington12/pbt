@@ -80,6 +80,8 @@ module diff_mod
                                 beam_tree(i)%ampl(2,2)*conjg(beam_tree(i)%ampl(2,2)))) ! calc energy out
         if(energy .gt. 1e-6) then ! if significant energy
             j = j + 1 ! update total number of outbeams
+            ! print*,'i=',i,'energy=',energy
+            ! print*,'i=',i,'prop=',beam_tree(i)%prop_out(1),beam_tree(i)%prop_out(2),beam_tree(i)%prop_out(3)
             beam_tree_temp(j) = beam_tree(i) ! add entry to trimmed outbeam tree
         end if
     end do
@@ -90,6 +92,8 @@ module diff_mod
     
     beam_tree_counter = j ! replace old beam counter with adjusted one
     beam_tree = beam_tree_temp ! replace in beam_tree with trimmed one
+
+    ! stop
 
     end subroutine
 
@@ -797,7 +801,7 @@ module diff_mod
         print*,'start diff beam loop...'
     end if
 
-    call trim_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,job_params) ! removes very low energy outbeams from the beam tree
+    ! call trim_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,job_params) ! removes very low energy outbeams from the beam tree
 
     if (is_multithreaded) then ! multi-threaded diffraction
 
