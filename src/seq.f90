@@ -22,8 +22,7 @@ implicit none
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
-! add save apertures back in to caching
-! add back output particle to caching as well
+! add ext cross to beam loop back
 
 ! ############################################################################################################
 
@@ -175,8 +174,7 @@ do i = 1, num_remaining_orients
                             beam_inc)
 
     ! beam loop
-    call beam_loop( ampl_beam,                 & ! <-  amplitude matrix of incident beam
-                    beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
+    call beam_loop( beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
                     ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
                     energy_out_beam,           & !  -> total energy out from beams (before diffraction)
