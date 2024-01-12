@@ -43,6 +43,7 @@ type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 ! sr makeIncidentBeam
 type(geometry_type) beam_geometry
 complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of incident beam
+type(beam_type) :: beam_inc
 
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
@@ -170,7 +171,8 @@ do i = 1, num_remaining_orients
     ! fast implementation of the incident beam
     call makeIncidentBeam(  rotated_geometry,          & ! <-  unique vertices
                             ampl_beam, &       !  -> amplitude matrix of incident beam       
-                            beam_geometry)
+                            beam_geometry, &
+                            beam_inc)
 
     ! beam loop
     call beam_loop( ampl_beam,                 & ! <-  amplitude matrix of incident beam
@@ -183,7 +185,8 @@ do i = 1, num_remaining_orients
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
                     job_params,                 &
                     rotated_geometry, &
-                    beam_geometry)
+                    beam_geometry, &
+                    beam_inc)
     
     if(num_remaining_orients .gt. 1) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'

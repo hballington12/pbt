@@ -13,17 +13,167 @@ real(8) ext_cross_section ! extinction cross section
 
 contains
 
+subroutine recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree)
+
+type(geometry_type), intent(in) :: geometry
+type(job_parameters_type), intent(in) :: job_params
+type(beam_type), intent(inout) :: beam_inc ! current beam to be traced
+type(geometry_type), intent(in) :: beam_geometry
+type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
+
+integer(8) i, j, ai
+real(8) rot(1:3,1:3)
+real(8) rot2(1:2,1:2)
+logical, dimension(:), allocatable :: in_beam
+real(8), dimension(:), allocatable :: dist_beam
+integer(8), dimension(:), allocatable :: id_beam
+logical, dimension(:), allocatable :: is_shad
+logical, dimension(:), allocatable :: is_vis
+real(8) prop(1:3) ! incoming propagation direction in unrotated system
+real(8) prop_int(1:3) ! reflected/refracted propagation vector
+real(8) prop_ext(1:3) ! reflected/refracted propagation vector
+integer(8) num_ill_facets    
+integer(8) n ! a counter
+real(8) an(1:3) ! an aperture normal
+real(8) ran(1:3) ! a rotated aperture normal
+real(8) vk7(1:3) ! a reflected/refracted e-perp vector
+real(8) e_perp(1:3) ! an incident e-perp vector
+integer(8) bfi ! an beam face id
+complex(8) ampl(1:2,1:2) ! an amplitude matrix
+complex(8) refl_ampl(1:2,1:2) ! a reflected amplitude matrix
+complex(8) trans_ampl(1:2,1:2) ! a transmitted amplitude matrix
+real(8) waveno ! wave number
+real(8) rbi_int ! internal real part refractive index
+real(8) ibi_int ! internal imaginary part refractive index
+complex(8) m_int ! internal complex refractive index
+real(8) dist ! distance travelled
+logical is_tir ! whether or not there is total internal reflection
+real(8) theta_i ! incident angle
+real(8) theta_t ! transmitted angle
+complex(8) fr(1:2,1:2) ! fresnel reflection matrix
+complex(8) ft(1:2,1:2) ! fresnel reflection matrix
+real(8) abs_intensity ! absorbed intensity
+real(8) intensity_out ! intensity after absorption
+real(8) norm(1:3) ! a facet normal
+
+waveno = 2*pi/job_params%la ! wavenumber
+rbi_int = job_params%rbi ! real part refractive index
+ibi_int = job_params%ibi ! imaginary part refractive index
+m_int = cmplx(rbi_int,ibi_int,kind=8) ! refractive index
+
+! no need to rotate as propagation is already along the -z direction
+
+! find the facets illuminated by the beam
+call find_vis_incidence(in_beam, is_vis, dist_beam, id_beam, is_shad, beam_inc, geometry, beam_geometry)
+
+! get the total number of facets illuminated by this beam
+num_ill_facets = 0
+do i = 1, geometry%na
+    do j = 1, geometry%nf
+        if(in_beam(j) .and. geometry%f(j)%ap == i) then
+            num_ill_facets = num_ill_facets + 1
+        end if
+    end do
+end do
+
+! allocate space in the beam structure to hold the illuminated field
+beam_inc%nf_out = num_ill_facets
+allocate(beam_inc%field_out(1:beam_inc%nf_out))
+allocate(ext_diff_outbeam_tree(1:beam_inc%nf_out)) ! external diffraction
+
+! add info about the illuminated field to the beam structure
+n = 0 ! init a counter to count the number of faces added to the beam struct
+do i = 1, geometry%nf ! for each face
+    if(in_beam(i)) then ! if this face was illuminated by the beam
+        n = n + 1 ! update counter
+        ai = geometry%f(i)%ap ! get the aperture id (in unrotated system)
+        an(:) = geometry%ap(ai)%n(:) ! get the aperture normal (in unrotated systen)
+        ran(:) = geometry%ap(ai)%n(:) ! get the aperture normal (in rotated system)
+        bfi = id_beam(i) ! get the beam facet id which illuminated this one
+        ampl(:,:) = beam_inc%field_in(bfi)%ampl(:,:) ! get the amplitude matrix of the illuminating facet
+        e_perp(:) = beam_inc%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
+        dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
+        prop(:) = beam_inc%prop(:) ! incoming propagation direction in unrotated system
+
+        ! get the reflected propagation vector in unrotated system
+        prop_ext(1) =  0 + 2*geometry%ap(ai)%n(3)*geometry%ap(ai)%n(1) ! reflected propagation vector (in rotated system)
+        prop_ext(2) =  0 + 2*geometry%ap(ai)%n(3)*geometry%ap(ai)%n(2) ! reflected propagation vector (in rotated system)
+        prop_ext(3) = -1 + 2*geometry%ap(ai)%n(3)*geometry%ap(ai)%n(3) ! reflected propagation vector (in rotated system)
+
+        ! get vk7, the new e-perp vector (normal x reflected prop vector)
+        call cross(an,prop,vk7,.true.)
+
+        ! get the rotation matrix to rotate about prop. vector into new scattering plane
+        call get_rot_matrix(rot2,vk7,e_perp,prop)
+
+        ! rotate the amplitude matrix into the new scattering plane
+        ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
+
+        ! apply distance phase factor
+        ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*dist)
+
+        ! compute fresnel matrices
+        fr(:,:) = 0D0 ! init fresnel reflection matrix
+        ft(:,:) = 0D0 ! init fresnel transmission matrix
+        if(is_shad(i)) then ! if facet is in shadow (needs careful consideration)
+            theta_i = acos(an(3)) ! using incident angle as that of the aperture if in shadow
+        else
+            theta_i = acos(geometry%n(geometry%f(i)%ni,3))
+        end if
+        is_tir = .false.
+        theta_t = asin(sin(theta_i)/real(m_int))
+        fr(2,2) = (cos(theta_i) - m_int*cos(theta_t))/(cos(theta_i) + m_int*cos(theta_t))
+        ft(2,2) = (2*cos(theta_i))/(cos(theta_i) + m_int*cos(theta_t))
+        fr(1,1) = (m_int*cos(theta_i) - cos(theta_t))/(cos(theta_t) + m_int*cos(theta_i))
+        ft(1,1) = (2*cos(theta_i))/(cos(theta_t) + m_int*cos(theta_i))
+
+        ! apply fresnel matrices to amplitude matrix
+        refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
+        trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
+
+        ! possibly remove reflection from shadow facets here
+        ! if(is_shad(i)) refl_ampl(:,:) = 0D0
+        
+        ! compute the transmitted propagation vector (from the whole aperture)
+        norm(:) = -an(:) ! get aperture normal
+        call get_trans_prop(theta_i,theta_t,prop,norm,prop_int) ! get the transmitted propagation vector
+
+        ! save some stuff to the external diffraction tree (outside)
+
+        ! save reflection to diffraction tree (outside)
+
+        ! save stuff to the beam structure
+        beam_inc%field_out(n)%ampl_ext(:,:) = refl_ampl(:,:) ! save the transmitted amplitude matrix
+        beam_inc%field_out(n)%ampl_int(:,:) = trans_ampl(:,:) ! save the reflected amplitude matrix
+        beam_inc%field_out(n)%e_perp(:) = vk7(:) ! save the perpendicular field vector
+        beam_inc%field_out(n)%fi = i ! save the face id
+        beam_inc%field_out(n)%ap = ai ! save the aperture
+        beam_inc%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
+        beam_inc%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
+        beam_inc%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
+
+        ! save stuff to external diffraction tree
+        ext_diff_outbeam_tree(n)%ampl(:,:) = ampl(:,:)
+        ext_diff_outbeam_tree(n)%vk7(:) = vk7(:)
+        ext_diff_outbeam_tree(n)%prop_out(:) = prop(:)
+        ext_diff_outbeam_tree(n)%prop_in(:) = prop(:)
+        ext_diff_outbeam_tree(n)%FOut = i ! face ID from which the beam was emitted
+        ext_diff_outbeam_tree(n)%verts(:,:) = transpose(geometry%v(geometry%f(i)%vi(:),:)) ! verts needs readjusting for arbitrary number of vertices
+    end if
+end do
+
+end subroutine
+
 subroutine recursion_int(beam,geometry,job_params)
 
 type(geometry_type), intent(in) :: geometry
 type(geometry_type) :: rot_geometry
 type(job_parameters_type), intent(in) :: job_params
-
 type(beam_type), intent(inout) :: beam ! current beam to be traced
+
 integer(8) i, j, ai
 real(8) rot(1:3,1:3)
 real(8) rot2(1:2,1:2)
-
 logical, dimension(:), allocatable :: is_shad
 logical, dimension(:), allocatable :: in_beam
 integer(8), dimension(:), allocatable :: id_beam
@@ -201,6 +351,65 @@ prop_out(:) = prop_out(:) / nf
 end subroutine
 
 subroutine add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
+
+! for beams which propagated internally
+
+type(beam_type), dimension(:), allocatable, intent(inout) :: beam_tree
+type(beam_type), intent(in) :: beam ! current beam to be traced
+integer(8), intent(inout) :: num_beams
+type(geometry_type), intent(in) :: geometry
+type(job_parameters_type), intent(in) :: job_params
+
+integer(8) i
+integer(8) num_new_beams ! number of beams to add to the beam tree
+logical, dimension(:), allocatable :: suff_ill ! whether each aperture was sufficiently illuminated
+integer(8), dimension(:), allocatable :: num_ill ! number of illuminated facets in each aperture
+integer(8), dimension(:), allocatable :: mapping ! a mapping
+integer(8) ai ! aperture id
+integer(8) fi ! aperture id
+integer(8) index ! index of a beam in the beam tree
+integer(8) nf ! a counter for the number of facets in a beam tree entry
+
+! determine which apertures were sufficiently illuminated to create new beams
+call get_suff_illuminated2(geometry,beam,job_params,suff_ill,num_ill)
+
+allocate(mapping(1:geometry%na)) ! maps each aperture to a position in the beam tree (if suff. illuminated)
+mapping = 0
+num_new_beams = 0 ! init
+
+do i = 1, geometry%na ! for each aperture in the geometry
+    if(suff_ill(i)) then ! if it was sufficiently illuminated by this beam
+        num_beams = num_beams + 1 ! add an internally reflected beam to the beam tree
+        if(num_beams > size(beam_tree,1)) then
+            print*,'not enough space in beam tree'
+            stop
+        end if
+        mapping(i) = num_beams ! save the position of this beam in the beam tree
+        allocate(beam_tree(num_beams)%field_in(1:num_ill(i))) ! allocate space
+        ! add stuff to the beam tree
+        beam_tree(num_beams)%ap = i ! aperture id
+        beam_tree(num_beams)%nf_in = 0 ! init
+        beam_tree(num_beams)%is_int = .true. ! is internally propagating
+        ! print*,'aperture',beam%ap,'illuminated',num_ill(i),'facets'
+    end if
+end do
+
+do i = 1, beam%nf_out ! for each illuminated facet
+    fi = beam%field_out(i)%fi ! get the facet id
+    ai = beam%field_out(i)%ap ! get the aperture id
+    index = mapping(ai) ! get the position of new beam in the beam tree
+    nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
+    nf = nf + 1 ! update the number of facets
+    beam_tree(index)%nf_in = nf ! save updated number of facets
+    beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
+    beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
+    beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
+    beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time)
+end do
+
+end subroutine
+
+subroutine add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params)
 
 ! for beams which propagated internally
 
@@ -528,7 +737,8 @@ subroutine beam_loop(   ampl_beam, &
                         output_parameters, &
                         job_params, &
                         geometry, &
-                        beam_geometry)
+                        beam_geometry, &
+                        beam_inc)
 
     ! main beam loop
 
@@ -549,6 +759,7 @@ subroutine beam_loop(   ampl_beam, &
     integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
     type(geometry_type), intent(in) :: geometry
     type(geometry_type), intent(in) :: beam_geometry
+    type(beam_type), intent(inout) :: beam_inc
 
     real(8), dimension(:,:), allocatable :: Norm ! face normals
     integer(8), dimension(:), allocatable :: Face2 ! face normal ID of each face
@@ -632,7 +843,13 @@ subroutine beam_loop(   ampl_beam, &
     integer(8) counter
     integer(8) i_start, i_end
     type(beam_type) beam ! current beam to be traced
-    integer(8) c1,c2,c3 ! counters
+        integer(8) c1,c2,c3 ! counters
+    logical, dimension(:), allocatable :: in_beam
+    real(8), dimension(:), allocatable :: dist_beam
+    integer(8), dimension(:), allocatable :: id_beam
+    logical, dimension(:), allocatable :: is_shad
+    logical, dimension(:), allocatable :: is_vis
+    complex(8), dimension(:,:,:), allocatable :: ext_diff_ampl ! amplitude matrix after rotation but before fresnel for ext diff
 
     if(job_params%timing) then
         start = omp_get_wtime()
@@ -686,21 +903,8 @@ subroutine beam_loop(   ampl_beam, &
     
     call getShadow(isWithinBeam,isWithinBeam_ps,isShadow)
     
-    c1=0
-    c2=0
-    c3=0
-    do i = 1, size(Face1,1) ! for each face
-        if(isWithinBeam_ps(i)) c1=c1+1
-        if(isShadow(i)) c2=c2+1
-        if(isVisiblePlusShadows(i)) c3=c3+1
-        print*,'i=',i,'|',isWithinBeam_ps(i),'|',isShadow(i),'|',isVisiblePlusShadows(i)
-    end do
 
-    print*,'c1=',c1
-    print*,'c2=',c2
-    print*,'c3=',c3
 
-    ! stop
 
 
     call getApertureAreas(apertures, isWithinBeam, apertureAreas, illuminatedApertureAreas, apertureNormals, faceAreas)
@@ -730,44 +934,56 @@ subroutine beam_loop(   ampl_beam, &
     
     call applyFresnelMatrices(new_in_ampl_ps, rperp, rpar, tperp, tpar, refl_ampl_ps, trans_ampl_ps) ! apply fresnel matrices, including shadow facets
     
-    call make_external_diff_outbeam_tree(new_in_ampl, ampl_diff, isVisible, ext_diff_outbeam_tree, vk71, vk72, vk73, verts, Face1) ! save amplitude matrix after rotation into scattering plane for later
-    
-    call add_refl_to_outbeam_tree(beam_outbeam_tree, beam_outbeam_tree_counter, isWithinBeam, &
-                                        refl_ampl, vk91, vk92, vk93, vk71, vk72, vk73, apertures, interactionCounter)
-    
+    ! call make_external_diff_outbeam_tree(new_in_ampl, ampl_diff, isVisible, ext_diff_outbeam_tree, vk71, vk72, vk73, verts, Face1) ! save amplitude matrix after rotation into scattering plane for later
+    ! stop
+    ! call add_refl_to_outbeam_tree(beam_outbeam_tree, beam_outbeam_tree_counter, isWithinBeam, &
+                                        ! refl_ampl, vk91, vk92, vk93, vk71, vk72, vk73, apertures, interactionCounter)
+
     ! this sr needs optimising (currently has facets with 0 ampl. matrix being passed to main loop)
     call init_for_main_loop(      Face1, trans_ampl_ps, F1Mapping, &
                                   refl_ampl_out11Int, refl_ampl_out12Int, refl_ampl_out21Int, refl_ampl_out22Int, &
                                   aperturePropagationVectors, propagationVectors, &
                                   vk71, vk72, vk73, vk71Int, vk72Int, vk73Int)
-    
-    ! now attempt to write some stuff into a beam tree
+
+    ! appears to do what is intended, but needs more testing with different geometries
+    ! also, only works for simple incident plane wave beam
+    ! init the beam tree
     allocate(beam_tree(1:10000)) ! allocate some space to hold beams to be traced (might need to add more space later)
     num_beams = 0 ! total number of beams in the beam tree
-    do i = 1, size(propagationVectors,1) ! for each aperture
-        if(sufficientlyIlluminated(i)) then ! if this aperture was sufficiently illuminated, add beam to tree
-            num_beams = num_beams + 1 ! update the total number of beams in the tree
-            beam_tree(num_beams)%ap = i ! record the aperture number                
-            beam_tree(num_beams)%prop(:) = propagationVectors(i,:,1) ! propagation vector
-            beam_tree(num_beams)%is_int = .true. ! beam will propagate inside the particle
-            ! now we need to figure out how many facets from each aperture are here
-            counter = 0 ! init
-            do j = 1, size(F1Mapping,1) ! for each illuminated facet
-                if(geometry%f(F1Mapping(j,1))%ap == i) counter = counter + 1 ! count the number of faces
-            end do
-            beam_tree(num_beams)%nf_in = counter ! record the total number of faces
-            allocate(beam_tree(num_beams)%field_in(1:beam_tree(num_beams)%nf_in)) ! allocate space
-            counter = 0 ! init
-            do j = 1, size(F1Mapping,1) ! for each of the total faces
-                if(geometry%f(F1Mapping(j,1))%ap == i) then ! if the facet was part of this aperture, add it to the current beam tree entry
-                    counter = counter + 1
-                    beam_tree(num_beams)%field_in(counter)%fi = F1Mapping(j,1)
-                    beam_tree(num_beams)%field_in(counter)%e_perp(:) = (/vk71Int(j,1),vk72Int(j,1),vk73Int(j,1)/)
-                    beam_tree(num_beams)%field_in(counter)%ampl(:,:) = trans_ampl_ps(:,:,j)
-                end if
-            end do
-        end if
-    end do
+
+    call recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree)
+
+    call add_to_beam_tree_external(beam_tree,beam_inc,num_beams,geometry,job_params)
+
+    call add_to_outbeam_tree2(beam_outbeam_tree,beam_outbeam_tree_counter,beam_inc)
+
+    ! stop
+
+    ! ! now attempt to write some stuff into a beam tree
+    ! do i = 1, size(propagationVectors,1) ! for each aperture
+    !     if(sufficientlyIlluminated(i)) then ! if this aperture was sufficiently illuminated, add beam to tree
+    !         num_beams = num_beams + 1 ! update the total number of beams in the tree
+    !         beam_tree(num_beams)%ap = i ! record the aperture number                
+    !         beam_tree(num_beams)%prop(:) = propagationVectors(i,:,1) ! propagation vector
+    !         beam_tree(num_beams)%is_int = .true. ! beam will propagate inside the particle
+    !         ! now we need to figure out how many facets from each aperture are here
+    !         counter = 0 ! init
+    !         do j = 1, size(F1Mapping,1) ! for each illuminated facet
+    !             if(geometry%f(F1Mapping(j,1))%ap == i) counter = counter + 1 ! count the number of faces
+    !         end do
+    !         beam_tree(num_beams)%nf_in = counter ! record the total number of faces
+    !         allocate(beam_tree(num_beams)%field_in(1:beam_tree(num_beams)%nf_in)) ! allocate space
+    !         counter = 0 ! init
+    !         do j = 1, size(F1Mapping,1) ! for each of the total faces
+    !             if(geometry%f(F1Mapping(j,1))%ap == i) then ! if the facet was part of this aperture, add it to the current beam tree entry
+    !                 counter = counter + 1
+    !                 beam_tree(num_beams)%field_in(counter)%fi = F1Mapping(j,1)
+    !                 beam_tree(num_beams)%field_in(counter)%e_perp(:) = (/vk71Int(j,1),vk72Int(j,1),vk73Int(j,1)/)
+    !                 beam_tree(num_beams)%field_in(counter)%ampl(:,:) = trans_ampl_ps(:,:,j)
+    !             end if
+    !         end do
+    !     end if
+    ! end do
 
     ! main loop
     i_start = 1 ! entry in beam tree to start at
@@ -1426,6 +1642,160 @@ do m = 1, rot_geometry%nf ! for each facet m
                 end if
             end do
         end if
+    end if
+end do
+
+call CPU_TIME(finish)
+
+end subroutine
+
+subroutine find_vis_incidence(in_beam, is_vis, dist_beam, id_beam, is_shad, beam, geometry, beam_geometry)
+
+    ! for the initial incidence
+    ! for subroutine beam_scan
+    ! for a given particle orientation with assumed propagation along the -z axis,
+    ! computes the internally illuminated facets for a given illuminating aperture
+    ! uses a z-buffer technique to increase speed, among a few other tricks
+
+logical, dimension(:), allocatable, intent(out) :: in_beam
+real(8), dimension(:), allocatable, intent(out) :: dist_beam
+integer(8), dimension(:), allocatable, intent(out) :: id_beam
+logical, dimension(:), allocatable, intent(out) :: is_shad
+type(beam_type), intent(in) :: beam
+type(geometry_type), intent(in) :: geometry
+type(geometry_type), intent(in) :: beam_geometry
+
+integer(8) i, k, m, fi, vi
+integer(8) j
+logical, dimension(:), allocatable :: is_beam
+logical, dimension(:), allocatable, intent(out) :: is_vis
+integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
+integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
+real(8), dimension(:), allocatable :: dist_to_bb, dist_to_fbb
+integer(8) BB
+logical within_bounds
+real(8) vecb1, vecb2
+real(8) edge_norm1, edge_norm2
+real(8) edge_check
+real(8) beamXmax0, beamXmin0, beamYmax0, beamYmin0
+real(8) beamXmax, beamXmin, beamYmax, beamYmin
+logical, dimension(:,:), allocatable :: F5
+real(8) start, finish
+integer(8), dimension(:), allocatable :: mapping
+type(geometry_type) bb_geometry ! bounding box geometry
+real(8) vec_a(1:3) ! vector from one face midpoint to another
+real(8) a_dot_n ! dot product of face normal with vec_a
+real(8) n_dot_k ! dot product of face normal with incident propagation direction
+
+! ################################
+! start new ray tracing algorithm
+
+call CPU_TIME(start)
+
+! use the current crystal vertices to create some bounding boxes in x-y plane
+call beam_aligned_bounding_boxes2(geometry,bb_geometry)
+call compute_geometry_midpoints(bb_geometry)
+call compute_geometry_areas(bb_geometry)
+
+allocate(F3(1:geometry%nf)) ! array to hold index of bounding box that each face belongs to
+allocate(F4(1:geometry%nf,1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
+allocate(dist_to_bb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
+allocate(dist_to_fbb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
+
+do i = 1, geometry%nf ! for each face in the particle geometry
+    dist_to_bb(:) = sqrt((bb_geometry%f(:)%mid(1) - geometry%f(i)%mid(1))**2 + (bb_geometry%f(:)%mid(2) - geometry%f(i)%mid(2))**2) ! distance to each bb
+    F3(i) = minloc(dist_to_bb,1) ! record which bounding box midpoint this facet was closest to
+    do j = 1, 3 ! for each vertex
+        dist_to_fbb(:) = sqrt((bb_geometry%f(:)%mid(1) - geometry%v(geometry%f(i)%vi(j),1))**2 + (bb_geometry%f(:)%mid(2) - geometry%v(geometry%f(i)%vi(j),2))**2) ! distance to each fuzzy bb
+        F4(i,j) = minloc(dist_to_fbb,1) ! record which bounding box midpoint this facet vertex was closest to
+    end do 
+end do
+
+! more optimisation
+allocate(F5(1:geometry%nf,1:bb_geometry%nf))
+F5 = .false. ! init
+do i = 1, geometry%nf
+    do j = 1, bb_geometry%nf
+        if(F4(i,1) .eq. j .or. F4(i,2) .eq. j .or. F4(i,3) .eq. j) F5(i,j) = .true.
+    end do
+end do
+
+! allocate and init
+allocate(is_vis(1:geometry%nf))
+allocate(is_shad(1:geometry%nf))
+allocate(in_beam(1:geometry%nf))
+allocate(is_beam(1:geometry%nf))
+allocate(id_beam(1:geometry%nf))
+allocate(dist_beam(1:geometry%nf))
+allocate(mapping(1:geometry%nf))
+
+is_vis = .true.
+is_shad = .false.
+in_beam = .true.
+is_beam = .false.
+id_beam = 0
+dist_beam = 0
+mapping = 0
+
+! record which facets are part of the illuminating beam
+do i = 1, beam%nf_in
+    is_beam(beam%field_in(i)%fi) = .true.
+    mapping(beam%field_in(i)%fi) = i ! map each illuminating facet to its position in the beam data structure
+end do
+
+do m = 1, geometry%nf ! for each facet m
+    if(geometry%ap(geometry%f(m)%ap)%n(3) .lt. 0.01) then ! if aperture is downfacing (flip for external)
+        is_vis(m) = .false. ! set not visible
+        in_beam(m) = .false. ! set not in beam
+    else ! if aperture was facing towards incidence
+        BB = F3(m) ! get bounding box ID
+        do j = 1, geometry%nf ! for each potentially blocking facet j
+            if(F5(j,BB)) then ! 
+                if(j .ne. m) then ! ignore self-block
+                    if(geometry%n(geometry%f(j)%ni,3) .lt. 0.01) then ! if down-facing
+                        ! do nothing
+                    else ! if up-facing
+                        if (geometry%f(m)%mid(3) .gt. geometry%f(j)%mid(3)) then ! if potential blocker was behind facet m
+                            ! do nothing
+                        else ! if potential blocker was in front of facet m
+                            ! do bounded surface edge check
+                            within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
+                            do k = 1, geometry%f(j)%nv ! looping over vertices of potentially blocking facet j
+                                ! compute edge normal
+                                if(k .eq. geometry%f(j)%nv) then ! if its the last vertex in the facet, loop back to the first
+                                    edge_norm2 = -geometry%v(geometry%f(j)%vi(1),1) + geometry%v(geometry%f(j)%vi(geometry%f(j)%nv),1) ! cross product of edge vector with reverse beam direction
+                                    edge_norm1 = +geometry%v(geometry%f(j)%vi(1),2) - geometry%v(geometry%f(j)%vi(geometry%f(j)%nv),2)
+                                else
+                                    edge_norm2 = -geometry%v(geometry%f(j)%vi(k+1),1) + geometry%v(geometry%f(j)%vi(k),1)
+                                    edge_norm1 = +geometry%v(geometry%f(j)%vi(k+1),2) - geometry%v(geometry%f(j)%vi(k),2)
+                                end if
+                                vecb1 = geometry%f(m)%mid(1) - geometry%v(geometry%f(j)%vi(k),1) ! vector from vertex k of potential blocker j to centroid of facet m
+                                vecb2 = geometry%f(m)%mid(2) - geometry%v(geometry%f(j)%vi(k),2)
+                                edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B (sign flip)
+                                if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
+                            end do
+                            if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
+                                !do nothing
+                            else
+                                if(geometry%f(m)%ap .eq. geometry%f(j)%ap) then ! if facet j and facet m belong to the same aperture
+                                    is_shad(m) = .true. ! set m as a shadow facet and continue to search for blockers
+                                else ! if facet j and facet m dont belong to the same aperture
+                                    is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                    in_beam(m) = .false. ! not in beam
+                                end if
+                            end if
+                        end if
+                    end if
+                end if
+            end if
+        end do
+    end if
+end do
+
+do m = 1, geometry%nf ! for each facet m
+    if(in_beam(m)) then ! if in beam
+        dist_beam(m) = beam_geometry%f(1)%mid(3) - geometry%f(m)%mid(3) ! compute the distance travelled ! cheat for simple incident beam with 1 facet
+        id_beam(m) = 1 ! cheat for simple incident beam with 1 facet
     end if
 end do
 
@@ -2712,10 +3082,14 @@ do i = 1, size(isVisible) ! for each facet
         num_outbeams_counter = num_outbeams_counter + 1 ! count the number of facets for external diffraction
         ! save variables to outbeam tree
         ext_diff_outbeam_tree(num_outbeams_counter)%ampl(1:2,1:2) = new_in_ampl(1:2,1:2,i) ! amplitude matrix
+        ! print*,'i=',num_outbeams_counter,'ampl',new_in_ampl(1,1,i)
         ext_diff_outbeam_tree(num_outbeams_counter)%vk7(1) = vk71(i) ! outgoing perpendicular e-field direction
         ext_diff_outbeam_tree(num_outbeams_counter)%vk7(2) = vk72(i)
         ext_diff_outbeam_tree(num_outbeams_counter)%vk7(3) = vk73(i)
+        ! print*,'i=',num_outbeams_counter,'vk7',ext_diff_outbeam_tree(num_outbeams_counter)%vk7(:)
         ext_diff_outbeam_tree(num_outbeams_counter)%verts(1:3,1:3) = transpose(verts(Face1(i,1:3),1:3)) ! x, y, and z components of each vertex
+        print*,'verts',transpose(verts(Face1(i,1:3),1:3))
+        stop
         ext_diff_outbeam_tree(num_outbeams_counter)%prop_out(1) = 0 ! outgoing propagation vector
         ext_diff_outbeam_tree(num_outbeams_counter)%prop_out(2) = 0 ! outgoing propagation vector
         ext_diff_outbeam_tree(num_outbeams_counter)%prop_out(3) = -1 ! outgoing propagation vector
@@ -2972,11 +3346,13 @@ do i = 1, size(Face1,1) ! for each face
         normal = Norm(Face2(i),3)
     end if
     theta_i = acos(normal) ! get incident angle
+    
     theta_t = asin(sin(theta_i)/m) ! get transmitted angle using Snell
     rperp(i) = (cos(theta_i) - m*cos(theta_t))/(cos(theta_i) + m*cos(theta_t))
     tperp(i) = (2*cos(theta_i))/(cos(theta_i) + m*cos(theta_t))
     rpar(i) = (m*cos(theta_i) - cos(theta_t))/(cos(theta_t) + m*cos(theta_i))
     tpar(i) = (2*cos(theta_i))/(cos(theta_t) + m*cos(theta_i))
+
 end do  
 
 
@@ -3561,7 +3937,10 @@ end do
 isVisible = .true. ! start by assuming that all facets are unblocked and visible to the beam
 isVisiblePlusShadows = .true. ! start by assuming that all facets are unblocked and visible to the beam
 do i = 1, size(Face1,1)
-    if(Norm(Face2(i),3) < 0.01) isVisible(i) = .false. ! down facing-facets are not visible (for now)
+    if(Norm(Face2(i),3) < 0.01) then
+        isVisible(i) = .false. ! down facing-facets are not visible (for now)
+        ! print*,'i=',i,'facing wrong way'
+    end if
 end do
 
 ! allocations
@@ -3654,12 +4033,12 @@ do BB = 1, boundingBoxFSize ! for each bounding box
         do m = 1, numIndicesToLookAt ! looping through all blockers
             if(apertures(indicesToLookat(m)) .eq. apertures(k)) areBlocking2(m) = .false. ! set as non-blocking if part of same aperture
         end do
-        
+        if(any(areBlocking(1:numIndicesToLookAt)) .and. isVisible(k)) print*,'facet',k,'blocked by facet ID: ',indicesToLookat(findloc(areBlocking(1:numIndicesToLookAt),.true.))  
         if(any(areBlocking(1:numIndicesToLookAt))) isVisible(k) = .false. ! visibility of up-facing facets
         if(any(areBlocking2(1:numIndicesToLookAt))) isVisiblePlusShadows(k) = .false. ! visibility of all facets of illuminated apertures, including shadow region
         
         !if(k.eq.7573) then ! debugging statement
-        !print*,'looking for facets which block facet: ',k
+        ! print*,'looking for facets which block facet: ',k
         !print*,'this facet is in BB: ',BB
         !print*,'this BB has midpoints:',boundingBoxMidpoints(BB,1),boundingBoxMidpoints(BB,2)
         !print*,'indicesToLookAt(1:numIndicesToLookAt)',indicesToLookAt(1:numIndicesToLookAt)
@@ -3676,7 +4055,7 @@ do BB = 1, boundingBoxFSize ! for each bounding box
         !print*,'areBlocking(i2)',areBlocking(i2)
         !print*,'is visible?',isVisible(k)
         !print*,'is visible (plus shadow)?',isVisiblePlusShadows(k)
-        !!print*,'blocked by facet ID: ',indicesToLookat(findloc(areBlocking(1:numIndicesToLookAt),.true.))        
+        ! if(.not. isVisible(k)) print*,'facet',k,'blocked by facet ID: ',indicesToLookat(findloc(areBlocking(1:numIndicesToLookAt),.true.))        
         !!print*,'blocked (shadow) by facet ID: ',indicesToLookat(findloc(areBlocking2(1:numIndicesToLookAt),.true.))        
         !!stop
         !end if ! debugging statement
@@ -3828,7 +4207,7 @@ do BB = 1, boundingBoxFSize ! for each bounding box
     !print*,'care, only using first BB atm'
     numUpFacingIndices = 0 ! make a counter to count the number of faces within non-fuzzy bounding box
     do i = 1, size(Face1,1) ! initial loop through to find how many facets are visible and within this bounding box
-        !if(F3(i) .eq. BB .and. flippedNorm(Face2(i),3) > -0.01) then
+        !if(F3(i) .eq. BB .and. flippedNorm(Face2(i),3) > -0.01) thenk
         if(F3(i) .eq. BB) then
             numUpFacingIndices = numUpFacingIndices + 1 ! count number of faces within non-fuzzy bounding box
             upFacingIndices(numUpFacingIndices) = i
