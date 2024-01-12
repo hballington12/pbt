@@ -167,10 +167,10 @@ end subroutine
 subroutine recursion_int(beam,geometry,job_params)
 
 type(geometry_type), intent(in) :: geometry
-type(geometry_type) :: rot_geometry
 type(job_parameters_type), intent(in) :: job_params
 type(beam_type), intent(inout) :: beam ! current beam to be traced
 
+type(geometry_type) :: rot_geometry
 integer(8) i, j, ai
 real(8) rot(1:3,1:3)
 real(8) rot2(1:2,1:2)
@@ -630,27 +630,24 @@ end subroutine
 
 subroutine energy_checks(   beam_outbeam_tree, &
                             beam_outbeam_tree_counter, &
-                            norm, &
-                            face2, &
-                            faceAreas, &
                             energy_out_beam, &
-                            energy_in, &
+                            output_parameters, &
                             ext_diff_outbeam_tree, &
                             energy_out_ext_diff, &
                             energy_abs_beam, &
-                            job_params)
+                            job_params, &
+                            geometry)
 
     type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
     integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
-    real(8), dimension(:,:), allocatable :: norm ! face normals
-    integer(8), dimension(:), allocatable :: face2 ! face normal ID of each face
-    real(8), dimension(:), allocatable :: faceAreas ! area of each facet
-    real(8), intent(in) :: energy_in
+    type(output_parameters_type), intent(in) :: output_parameters
+    real(8) :: energy_in
     real(8), intent(out) :: energy_out_beam
     real(8), intent(out) :: energy_abs_beam
     real(8), intent(out) :: energy_out_ext_diff
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
     type(job_parameters_type), intent(in) ::  job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
+    type(geometry_type), intent(in) :: geometry
 
     integer(8) i
     integer(8) face_id
@@ -665,6 +662,7 @@ subroutine energy_checks(   beam_outbeam_tree, &
         print*,'========== start sr energy_checks'
     end if
 
+    energy_in = output_parameters%geo_cross_sec
     energy_out_beam = 0
     energy_abs_beam = ext_cross_section
 
@@ -672,8 +670,8 @@ subroutine energy_checks(   beam_outbeam_tree, &
         prop = beam_outbeam_tree(i)%prop_out
         face_id = beam_outbeam_tree(i)%FOut
         ampl = beam_outbeam_tree(i)%ampl
-        normal = norm(face2(face_id),1:3)
-        area = faceAreas(face_id)
+        normal = geometry%n(geometry%f(face_id)%ni,:)
+        area = geometry%f(face_id)%area
         cos_theta = dot_product(prop,normal)
         intensity_out = real(0.5*(   ampl(1,1)*conjg(ampl(1,1)) + &
                                 ampl(1,2)*conjg(ampl(1,2)) + &
@@ -695,8 +693,8 @@ subroutine energy_checks(   beam_outbeam_tree, &
         prop = ext_diff_outbeam_tree(i)%prop_out
         face_id = ext_diff_outbeam_tree(i)%FOut
         ampl = ext_diff_outbeam_tree(i)%ampl
-        normal = norm(face2(face_id),1:3)
-        area = faceAreas(face_id)
+        normal = geometry%n(geometry%f(face_id)%ni,:)
+        area = geometry%f(face_id)%area
         cos_theta = -dot_product(prop,normal)
         intensity_out = real(0.5*(   ampl(1,1)*conjg(ampl(1,1)) + &
                                 ampl(1,2)*conjg(ampl(1,2)) + &
@@ -859,135 +857,23 @@ subroutine beam_loop(   ampl_beam, &
         print*,'start beam loop...'
     end if
 
-    la = job_params%la
-    rbi = job_params%rbi
-    ibi = job_params%ibi
-    rec = job_params%rec
-    is_multithreaded = job_params%is_multithreaded
-    ! is_multithreaded = .false.
-    ! bodge conversion while i refactor
-    allocate(verts(1:geometry%nv,1:3))
-    verts(:,:) = geometry%v(:,:)
-    allocate(num_face_vert(1:geometry%nf))
-    num_face_vert(:) = geometry%f(:)%nv
-    allocate(apertures(1:geometry%nf))
-    apertures(:) = geometry%f(:)%ap
-    allocate(Face1(1:geometry%nf,1:maxval(num_face_vert)))
-    do i = 1, geometry%nf
-        do j = 1, num_face_vert(i)
-            Face1(i,j) = geometry%f(i)%vi(j)
-        end do
-    end do
+    beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
+    allocate(beam_outbeam_tree(1:1000000)) ! set to 1000000 as guess for max outbeams
 
-    call make_normals(Face1, verts, Face2, Norm) ! recalculate normals
-
-    call midPointsAndAreas(Face1, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas
-    
-    call init(  Face1, isVisible, isVisiblePlusShadows, isWithinBeam, distances, beamIDs, &
-                isWithinBeam_ps, distances_ps, beamIDs_ps, isShadow, ampl_in, ampl_in_ps, la, waveno, &
-                rperp, rpar, tperp, tpar, vk71, vk72, vk73, vk91, vk92, vk93, rot_ampl, new_in_ampl, &
-                new_in_ampl_ps, trans_ampl_ps, trans_ampl, refl_ampl, refl_ampl_ps, &
-                beam_outbeam_tree, beam_outbeam_tree_counter, interactionCounter) ! initialise some variables
-    ! move beam_loop_mod variables into separate beam_loop_init subroutine and out of main program later...
-
-    ! ############# beam_loop_mod #############
-        
-    call initApertures(apertures, Norm, Face2, Midpoints, apertureNormals, apertureMidpoints, apertureAreas, illuminatedApertureAreas, sufficientlyIlluminated, &
-                             aperturePropagationVectors) ! initialise the aperture variables
-
-    call findVisibleFacets(verts, Face1, Norm, Face2, midPoints, isVisible, isVisiblePlusShadows, apertures, num_face_vert) ! find external visible facets in this orientation
-    ! stop
-    call findWithinBeam(Face1, Midpoints, isVisible, isWithinBeam, distances, beamIDs, beam_geometry) ! find visible facets within the incident beam
-    
-    call findWithinBeam(Face1, Midpoints, isVisiblePlusShadows, isWithinBeam_ps, distances_ps, beamIDs_ps, beam_geometry) ! find visible facets (including shadow) within the incident beam
-    
-    call getShadow(isWithinBeam,isWithinBeam_ps,isShadow)
-    
-
-
-
-
-    call getApertureAreas(apertures, isWithinBeam, apertureAreas, illuminatedApertureAreas, apertureNormals, faceAreas)
-    
-    call getIlluminatedGeoCrossSection(faceAreas, isWithinBeam, Norm, Face2, illuminatedGeoCrossSection) ! get illuminated geometric cross section using particle in current orientation
-
-    call getThreshold(la,threshold,job_params) ! get minimum illuminatino required to create a new beam
-    
-    call getSufficientlyIlluminated(illuminatedApertureAreas,threshold,sufficientlyIlluminated) ! get logical array containing which apertures were sufficiently illuminated
-    
-    call propagateBeam(ampl_in, ampl_in_ps, ampl_beam, isWithinBeam, isWithinBeam_ps, beamIDs, beamIDs_ps, waveno, distances, distances_ps, Face1) ! use distances to propagate fields to the points of intersection
-    
-    call getFresnel(Face1, isShadow, Norm, Face2, apertureNormals, apertures, rbi, rperp, rpar, tperp, tpar, ibi) ! calculate fresnel coefficients based on facet normals (or aperture normals for shadow facets)
-    
-    call getPropagationVectors(aperturePropagationVectors,sufficientlyIlluminated,apertureNormals,rbi) ! get propagation vectors based on aperture normals
-    
-    call getReflectionVectors(Norm, Face2, isShadow, apertureNormals, apertures, &
-                                    vk71, vk72, vk73, vk91, vk92, vk93) ! get reflection vectors based on facet normals (WILL NOT WORK FOR RE-ENTRY)
-    
-    call getRotationMatrices(rot_ampl, vk71, vk72, vk73, 1D0, 0D0, 0D0, 0D0, 0D0, -1D0) ! get rotation matrix for rotating into new scattering plane
-
-    call rotateAmplitudeMatrices(rot_ampl,ampl_in,new_in_ampl) ! rotate amplitude matrices into new scattering plane
-
-    call rotateAmplitudeMatrices(rot_ampl,ampl_in_ps,new_in_ampl_ps) ! rotate amplitude matrices, including shadowed facets, into new scattering plane
-
-    call applyFresnelMatrices(new_in_ampl, rperp, rpar, tperp, tpar, refl_ampl, trans_ampl) ! apply fresnel matrices
-    
-    call applyFresnelMatrices(new_in_ampl_ps, rperp, rpar, tperp, tpar, refl_ampl_ps, trans_ampl_ps) ! apply fresnel matrices, including shadow facets
-    
-    ! call make_external_diff_outbeam_tree(new_in_ampl, ampl_diff, isVisible, ext_diff_outbeam_tree, vk71, vk72, vk73, verts, Face1) ! save amplitude matrix after rotation into scattering plane for later
-    ! stop
-    ! call add_refl_to_outbeam_tree(beam_outbeam_tree, beam_outbeam_tree_counter, isWithinBeam, &
-                                        ! refl_ampl, vk91, vk92, vk93, vk71, vk72, vk73, apertures, interactionCounter)
-
-    ! this sr needs optimising (currently has facets with 0 ampl. matrix being passed to main loop)
-    call init_for_main_loop(      Face1, trans_ampl_ps, F1Mapping, &
-                                  refl_ampl_out11Int, refl_ampl_out12Int, refl_ampl_out21Int, refl_ampl_out22Int, &
-                                  aperturePropagationVectors, propagationVectors, &
-                                  vk71, vk72, vk73, vk71Int, vk72Int, vk73Int)
-
-    ! appears to do what is intended, but needs more testing with different geometries
-    ! also, only works for simple incident plane wave beam
-    ! init the beam tree
-    allocate(beam_tree(1:10000)) ! allocate some space to hold beams to be traced (might need to add more space later)
     num_beams = 0 ! total number of beams in the beam tree
+    allocate(beam_tree(1:10000)) ! allocate some space to hold beams to be traced (might need to add more space later)
 
-    call recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree)
+    call recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree) ! do the initial incidence
 
-    call add_to_beam_tree_external(beam_tree,beam_inc,num_beams,geometry,job_params)
+    call add_to_beam_tree_external(beam_tree,beam_inc,num_beams,geometry,job_params) ! add beams to be propagated to the tree
 
-    call add_to_outbeam_tree2(beam_outbeam_tree,beam_outbeam_tree_counter,beam_inc)
+    call add_to_outbeam_tree2(beam_outbeam_tree,beam_outbeam_tree_counter,beam_inc) ! add externally reflected beams to diffraction tree
 
-    ! stop
-
-    ! ! now attempt to write some stuff into a beam tree
-    ! do i = 1, size(propagationVectors,1) ! for each aperture
-    !     if(sufficientlyIlluminated(i)) then ! if this aperture was sufficiently illuminated, add beam to tree
-    !         num_beams = num_beams + 1 ! update the total number of beams in the tree
-    !         beam_tree(num_beams)%ap = i ! record the aperture number                
-    !         beam_tree(num_beams)%prop(:) = propagationVectors(i,:,1) ! propagation vector
-    !         beam_tree(num_beams)%is_int = .true. ! beam will propagate inside the particle
-    !         ! now we need to figure out how many facets from each aperture are here
-    !         counter = 0 ! init
-    !         do j = 1, size(F1Mapping,1) ! for each illuminated facet
-    !             if(geometry%f(F1Mapping(j,1))%ap == i) counter = counter + 1 ! count the number of faces
-    !         end do
-    !         beam_tree(num_beams)%nf_in = counter ! record the total number of faces
-    !         allocate(beam_tree(num_beams)%field_in(1:beam_tree(num_beams)%nf_in)) ! allocate space
-    !         counter = 0 ! init
-    !         do j = 1, size(F1Mapping,1) ! for each of the total faces
-    !             if(geometry%f(F1Mapping(j,1))%ap == i) then ! if the facet was part of this aperture, add it to the current beam tree entry
-    !                 counter = counter + 1
-    !                 beam_tree(num_beams)%field_in(counter)%fi = F1Mapping(j,1)
-    !                 beam_tree(num_beams)%field_in(counter)%e_perp(:) = (/vk71Int(j,1),vk72Int(j,1),vk73Int(j,1)/)
-    !                 beam_tree(num_beams)%field_in(counter)%ampl(:,:) = trans_ampl_ps(:,:,j)
-    !             end if
-    !         end do
-    !     end if
-    ! end do
+    call get_geo_cross_section(geometry,beam_inc,output_parameters) ! for the first recursion, get the illuminated geometric cross section
 
     ! main loop
     i_start = 1 ! entry in beam tree to start at
-    do i = 1, rec ! for each recursion
+    do i = 1, job_params%rec ! for each recursion
         i_end = num_beams ! entry in beam tree to stop at
 
         if(job_params%debug >= 2) then
@@ -1031,21 +917,19 @@ subroutine beam_loop(   ampl_beam, &
         end if
     end if
 
-    call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, verts, Face1)    
+    call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter,geometry)    
 
     call energy_checks( beam_outbeam_tree, &
                         beam_outbeam_tree_counter, &
-                        norm, &
-                        face2, &
-                        faceAreas, &
                         energy_out_beam, &
-                        illuminatedGeoCrossSection, &
+                        output_parameters, &
                         ext_diff_outbeam_tree, &
                         energy_out_ext_diff, &
                         energy_abs_beam, &
-                        job_params)
+                        job_params, &
+                        geometry)
 
-    output_parameters%geo_cross_sec = illuminatedGeoCrossSection
+    
 
     ! get storage size:
     ! double precision is 8 bytes (64 bits)
@@ -1083,20 +967,19 @@ subroutine beam_loop(   ampl_beam, &
 
 end subroutine
 
-subroutine get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, verts, Face1)
+subroutine get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, geometry)
 
     ! uses the FOut data to add vertex information to a beamtree
 
 type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
 integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
-real(8), dimension(:,:), allocatable, intent(in) :: verts ! unique vertices
-integer(8), dimension(:,:), allocatable, intent(in) :: Face1 ! face vertex IDs
+type(geometry_type), intent(in) :: geometry
 
-integer(8) i, face_id
+integer(8) i, fi
 
 do i = 1, beam_outbeam_tree_counter ! for each beam
-    face_id = beam_outbeam_tree(i)%FOut ! get the face id
-    beam_outbeam_tree(i)%verts = transpose(verts(Face1(face_id,1:3),1:3)) ! retrieve vertex information
+    fi = beam_outbeam_tree(i)%FOut ! get the face id
+    beam_outbeam_tree(i)%verts = transpose(geometry%v(geometry%f(fi)%vi(:),:))
 end do
 
 end subroutine
@@ -3462,6 +3345,29 @@ end do
 ! print*,'illuminated geometric cross section: ',illuminatedGeoCrossSection
 
 ! print*,'========== end sr getIlluminatedGeoCrossSection'
+
+end subroutine
+
+subroutine get_geo_cross_section(geometry,inc_beam,output_parameters)
+
+type(output_parameters_type), intent(inout) :: output_parameters
+type(geometry_type), intent(in) :: geometry
+type(beam_type), intent(in) :: inc_beam
+
+integer(8) i, fi
+real(8) geo_cross_sec
+real(8) area
+real(8) norm(1:3)
+
+geo_cross_sec = 0 ! init
+do i = 1, inc_beam%nf_out ! for each face illuminated by the incident beam
+    fi = inc_beam%field_out(i)%fi
+    area = geometry%f(fi)%area
+    norm = geometry%n(geometry%f(fi)%ni,:)
+    geo_cross_sec = geo_cross_sec + area*norm(3)
+end do 
+
+output_parameters%geo_cross_sec = geo_cross_sec
 
 end subroutine
 
