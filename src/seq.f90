@@ -28,7 +28,7 @@ implicit none
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i_loop, loop_start, i, j
+integer(8) i_loop, loop_start, i
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -48,9 +48,6 @@ type(beam_type) :: beam_inc
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
 type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing beams from external diffraction
 integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
-real(8) energy_out_beam
-real(8) energy_out_ext_diff
-real(8) energy_abs_beam
 
 ! sr diff_main
 complex(8), dimension(:,:), allocatable:: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! total

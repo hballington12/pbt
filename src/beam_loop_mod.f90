@@ -13,24 +13,24 @@ module beam_loop_mod
     
     subroutine recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree)
         
-        type(geometry_type), intent(in) :: geometry
-        type(job_parameters_type), intent(in) :: job_params
+        type(geometry_type), intent(in) :: geometry ! geometry data structure
+        type(job_parameters_type), intent(in) :: job_params ! job parameters
         type(beam_type), intent(inout) :: beam_inc ! current beam to be traced
-        type(geometry_type), intent(in) :: beam_geometry
-        type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
+        type(geometry_type), intent(in) :: beam_geometry ! geometry of the incident beam
+        type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree ! external diffraction tree
         
-        integer(8) i, j, ai
-        real(8) rot(1:3,1:3)
-        real(8) rot2(1:2,1:2)
-        logical, dimension(:), allocatable :: in_beam
-        real(8), dimension(:), allocatable :: dist_beam
-        integer(8), dimension(:), allocatable :: id_beam
-        logical, dimension(:), allocatable :: is_shad
-        logical, dimension(:), allocatable :: is_vis
+        integer(8) i, j ! some counters
+        integer(8) ai ! an aperture id
+        real(8) rot2(1:2,1:2) ! a 2x2 rotation matrix
+        logical, dimension(:), allocatable :: in_beam ! whether each facet was within the beam
+        real(8), dimension(:), allocatable :: dist_beam ! the distance from the beam to each facet
+        integer(8), dimension(:), allocatable :: id_beam ! the facet id of the beam face which illuminated each facet
+        logical, dimension(:), allocatable :: is_shad ! whether each facet was in the shadow of another
+        logical, dimension(:), allocatable :: is_vis ! whether each facet was visible as viewed along the beam propagation direction
         real(8) prop(1:3) ! incoming propagation direction in unrotated system
         real(8) prop_int(1:3) ! reflected/refracted propagation vector
         real(8) prop_ext(1:3) ! reflected/refracted propagation vector
-        integer(8) num_ill_facets    
+        integer(8) num_ill_facets ! a counter
         integer(8) n ! a counter
         real(8) an(1:3) ! an aperture normal
         real(8) ran(1:3) ! a rotated aperture normal
@@ -50,8 +50,6 @@ module beam_loop_mod
         real(8) theta_t ! transmitted angle
         complex(8) fr(1:2,1:2) ! fresnel reflection matrix
         complex(8) ft(1:2,1:2) ! fresnel reflection matrix
-        real(8) abs_intensity ! absorbed intensity
-        real(8) intensity_out ! intensity after absorption
         real(8) norm(1:3) ! a facet normal
         
         waveno = 2*pi/job_params%la ! wavenumber
@@ -135,11 +133,7 @@ module beam_loop_mod
                 ! compute the transmitted propagation vector (from the whole aperture)
                 norm(:) = -an(:) ! get aperture normal
                 call get_trans_prop(theta_i,theta_t,prop,norm,prop_int) ! get the transmitted propagation vector
-                
-                ! save some stuff to the external diffraction tree (outside)
-                
-                ! save reflection to diffraction tree (outside)
-                
+                        
                 ! save stuff to the beam structure
                 beam_inc%field_out(n)%ampl_ext(:,:) = refl_ampl(:,:) ! save the transmitted amplitude matrix
                 beam_inc%field_out(n)%ampl_int(:,:) = trans_ampl(:,:) ! save the reflected amplitude matrix
@@ -164,18 +158,19 @@ module beam_loop_mod
     
     subroutine recursion_int(beam,geometry,job_params)
         
-        type(geometry_type), intent(in) :: geometry
-        type(job_parameters_type), intent(in) :: job_params
+        type(geometry_type), intent(in) :: geometry ! geometry data structure
+        type(job_parameters_type), intent(in) :: job_params ! job parameters
         type(beam_type), intent(inout) :: beam ! current beam to be traced
-        
-        type(geometry_type) :: rot_geometry
-        integer(8) i, j, ai
-        real(8) rot(1:3,1:3)
-        real(8) rot2(1:2,1:2)
-        logical, dimension(:), allocatable :: is_shad
-        logical, dimension(:), allocatable :: in_beam
-        integer(8), dimension(:), allocatable :: id_beam
-        real(8), dimension(:), allocatable :: dist_beam
+
+        type(geometry_type) :: rot_geometry ! the geometry structure after rotating
+        integer(8) i, j ! some counters
+        integer(8) ai ! an aperture id
+        real(8) rot(1:3,1:3) ! a 3x3 rotation matrix
+        real(8) rot2(1:2,1:2) ! a 2x2 rotation matrix
+        logical, dimension(:), allocatable :: is_shad ! whether each facet was in the shadow of another
+        logical, dimension(:), allocatable :: in_beam ! whether each facet was within the beam
+        integer(8), dimension(:), allocatable :: id_beam ! the facet id of the beam face which illuminated each facet
+        real(8), dimension(:), allocatable :: dist_beam ! the distance from the beam to each facet
         real(8) prop(1:3) ! incoming propagation direction in unrotated system
         real(8) prop_int(1:3) ! reflected/refracted propagation vector
         real(8) prop_ext(1:3) ! reflected/refracted propagation vector
@@ -334,7 +329,7 @@ module beam_loop_mod
         real(8), intent(in) :: norm(1:3)
         
         real(8) A, B, alpha, nf
-        real(8), dimension(1:3) :: a_vec, b_vec, c_vec
+        real(8), dimension(1:3) :: a_vec, b_vec
         
         alpha = pi - theta_t
         A = sin(theta_t-theta_i)/sin(theta_i)
@@ -512,7 +507,7 @@ module beam_loop_mod
         real(8) theta_1, theta_2
         real(8) rot1(1:3,1:3), rot2(1:3,1:3)
         real(8) temp_vector(1:3)
-        integer(8) i, j
+        integer(8) i
         
         rot1 = 0 ! initialise
         rot2 = 0 ! initialise
@@ -568,7 +563,6 @@ module beam_loop_mod
         type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
         type(job_parameters_type), intent(in) ::  job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
         type(geometry_type), intent(in) :: geometry
-        real(8) ext_cross_section
         
         integer(8) i
         integer(8) face_id
@@ -1016,7 +1010,7 @@ module beam_loop_mod
         type(geometry_type), intent(in) :: geometry
         type(geometry_type), intent(in) :: beam_geometry
         
-        integer(8) i, k, m, fi, vi
+        integer(8) i, k, m
         integer(8) j
         logical, dimension(:), allocatable :: is_beam
         logical, dimension(:), allocatable, intent(out) :: is_vis
@@ -1028,15 +1022,10 @@ module beam_loop_mod
         real(8) vecb1, vecb2
         real(8) edge_norm1, edge_norm2
         real(8) edge_check
-        real(8) beamXmax0, beamXmin0, beamYmax0, beamYmin0
-        real(8) beamXmax, beamXmin, beamYmax, beamYmin
         logical, dimension(:,:), allocatable :: F5
         real(8) start, finish
         integer(8), dimension(:), allocatable :: mapping
         type(geometry_type) bb_geometry ! bounding box geometry
-        real(8) vec_a(1:3) ! vector from one face midpoint to another
-        real(8) a_dot_n ! dot product of face normal with vec_a
-        real(8) n_dot_k ! dot product of face normal with incident propagation direction
         
         ! ################################
         ! start new ray tracing algorithm
