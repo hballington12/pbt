@@ -161,7 +161,6 @@ do i = 1, num_remaining_orients
                     rotated_geometry)
     end if
 
-    ! stop
     ! fast implementation of the incident beam
     call makeIncidentBeam(  rotated_geometry,          & ! <-  unique vertices
                             beam_geometry, &

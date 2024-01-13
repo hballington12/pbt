@@ -12,6 +12,12 @@ module beam_loop_mod
     contains
     
     subroutine recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree)
+
+        ! recursion_inc
+        ! propagates the incident beam
+        ! finds the visible facets as viewed along the initial propagation direction (-z)
+        ! propagates the field from the incident beam to the visible facets
+        ! initialises the array for the external diffraction
         
         type(geometry_type), intent(in) :: geometry ! geometry data structure
         type(job_parameters_type), intent(in) :: job_params ! job parameters
@@ -157,6 +163,11 @@ module beam_loop_mod
     end subroutine
     
     subroutine recursion_int(beam,geometry,job_params)
+
+        ! recursion_int
+        ! propagates an internal beam
+        ! finds the visible facets as viewed along the initial propagation direction (-z)
+        ! propagates the field from the incident beam to the visible facets      
         
         type(geometry_type), intent(in) :: geometry ! geometry data structure
         type(job_parameters_type), intent(in) :: job_params ! job parameters
@@ -321,6 +332,10 @@ module beam_loop_mod
     end subroutine
     
     subroutine get_trans_prop(theta_i,theta_t,prop_in,norm,prop_out)
+
+        ! get_trans_prop
+        ! gets a transmitted propagation vector from an incident angle,
+        !   transmitted angle, incident propagation vector, and surface normal
         
         real(8), intent(in) :: theta_i
         real(8), intent(in) :: theta_t
@@ -344,7 +359,10 @@ module beam_loop_mod
     
     subroutine add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
         
-        ! for beams which propagated internally
+        ! add_to_beam_tree_internal
+        ! for an internally propagating beam, adds the new beams to the beam tree
+        ! after an internal beam has been propagated in sr recursion_int, it passed here to add
+        !   the new beams to the beam tree, which may be then later traced
         
         type(beam_type), dimension(:), allocatable, intent(inout) :: beam_tree
         type(beam_type), intent(in) :: beam ! current beam to be traced
@@ -403,8 +421,11 @@ module beam_loop_mod
     
     subroutine add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params)
         
-        ! for beams which propagated internally
-        
+        ! add_to_beam_tree_external
+        ! for an externally propagating beam, adds the new beams to the beam tree
+        ! after an external beam has been propagated in sr recursion_int, it passed here to add
+        !   the new beams to the beam tree, which may be then later traced
+
         type(beam_type), dimension(:), allocatable, intent(inout) :: beam_tree
         type(beam_type), intent(in) :: beam ! current beam to be traced
         integer(8), intent(inout) :: num_beams
@@ -462,6 +483,7 @@ module beam_loop_mod
     
     subroutine get_suff_illuminated(geometry,beam,job_params,suff_ill,num_ill)
         
+        ! get_suff_illuminated
         ! this subroutine examines the facets illuminated by a beam
         ! if the total area is greater than a threshold amount, the aperture is sufficiently illuminated
         ! sufficiently illuminated apertures create new beams that are propagated
@@ -498,6 +520,11 @@ module beam_loop_mod
     end subroutine
     
     subroutine rotate(beam,geometry,rot_geometry,rot)
+
+        ! rotate
+        ! rotates a geometry
+        ! the geometry is rotated so the the propagation direction of a beam is
+        !   along the -z direction
         
         type(geometry_type), intent(in) :: geometry
         type(geometry_type), intent(out) :: rot_geometry
@@ -554,6 +581,9 @@ module beam_loop_mod
         job_params, &
         geometry)
         
+        ! energy_checks
+        ! performs some energy checks after the beam loop has finished
+
         type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
         integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
         type(output_parameters_type), intent(inout) :: output_parameters
@@ -651,7 +681,12 @@ module beam_loop_mod
         beam_geometry, &
         beam_inc)
         
-        ! main beam loop
+        ! beam_loop
+        ! performs the main beam loop
+        ! to be called from the main program
+        ! for an incident beam and a geometry, this returns the near field
+        !   in the form of the beam_outbeam_tree, as well as the externally
+        !   diffracted near field, in the form of the ext_diff_outbeam_tree
         
         ! inputs
         ! character(100), intent(in) :: afn ! apertures filename
@@ -740,11 +775,7 @@ module beam_loop_mod
             if(job_params%timing) then
                 finish = omp_get_wtime()
                 print*,'=========='
-                print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"
-                ! print*,'=========='
-                write(101,*)'=========='
-                write(101,'(A,f16.8,A)')"end beam loop - time elapsed: ",finish-start," secs"
-                ! write(101,*)'=========='    
+                print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"   
             end if
         end if
         
@@ -773,7 +804,9 @@ module beam_loop_mod
     
     subroutine get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter, geometry)
         
-        ! uses the FOut data to add vertex information to a beamtree
+        ! get_beamtree_vert
+        ! adds information about the particle geometry to the diffraction tree
+        ! to be removed at a later date
         
         type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
         integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
@@ -790,7 +823,8 @@ module beam_loop_mod
     
     subroutine find_vis_int(in_beam, dist_beam, id_beam, is_shad, beam, rot_geometry)
         
-        ! for subroutine beam_scan
+        ! find_vis_int
+        ! finds the facets illuminated by a an internally propagating beam
         ! for a given particle orientation with assumed propagation along the -z axis,
         ! computes the internally illuminated facets for a given illuminating aperture
         ! uses a z-buffer technique to increase speed, among a few other tricks
@@ -996,11 +1030,7 @@ module beam_loop_mod
     
     subroutine find_vis_incidence(in_beam, is_vis, dist_beam, id_beam, is_shad, beam, geometry, beam_geometry)
         
-        ! for the initial incidence
-        ! for subroutine beam_scan
-        ! for a given particle orientation with assumed propagation along the -z axis,
-        ! computes the internally illuminated facets for a given illuminating aperture
-        ! uses a z-buffer technique to increase speed, among a few other tricks
+ 
         
         logical, dimension(:), allocatable, intent(out) :: in_beam
         real(8), dimension(:), allocatable, intent(out) :: dist_beam
@@ -1145,6 +1175,7 @@ module beam_loop_mod
     
     subroutine get_rot_matrix(rot, vk7, ev1, ev3)
         
+        ! get_rot_matrix
         ! get rotation matrix for rotation about vector ev3 from plane perp to ev1 to plane perp to vk7
         
         real(8), intent(in) :: vk7(1:3) ! reflected e-perp vector from each facet
@@ -1172,6 +1203,11 @@ module beam_loop_mod
     end subroutine
     
     subroutine get_geo_cross_section(geometry,inc_beam,output_parameters)
+
+        ! get_geo_cross_section
+        ! gets the illuminated geometric cross section for a beam
+        ! currently adds this directly to the output parameters, but could be
+        !   used more generally
         
         type(output_parameters_type), intent(inout) :: output_parameters
         type(geometry_type), intent(in) :: geometry
@@ -1195,6 +1231,11 @@ module beam_loop_mod
     end subroutine
     
     subroutine beam_aligned_bounding_boxes(geometry,bb_geometry)
+
+    ! beam_aligned_bounding_boxes
+    ! makes some 2-dimensional bounding boxes to help speed up some other subroutines
+    ! this method was quick to implement but should be replaced in the future by a
+    !   method which does not need to be re-called for every beam that is propagated
         
         type(geometry_type), intent(in) :: geometry
         type(geometry_type), intent(out) :: bb_geometry
@@ -1268,6 +1309,9 @@ module beam_loop_mod
     
     subroutine add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam)
         
+        ! add_to_outbeam_tree
+        ! adds the external field after a beam has propagated to the outbeam tree, ready for diffraction
+
         integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
         type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
         type(beam_type), intent(in) :: beam ! current beam to be traced
