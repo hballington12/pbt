@@ -17,11 +17,8 @@ use outputs_mod
 implicit none
 
 ! to do:
-! add vector re-normalisation checks after rotations (ie. sr rotate_into_aperture_system)
 ! add quad support
 ! add support to avoid crash if nan detected
-! automatic meshing
-! automatic apertures
 
 ! ############################################################################################################
 
