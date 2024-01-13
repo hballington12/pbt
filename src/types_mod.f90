@@ -39,6 +39,8 @@ type output_parameters_type ! type for hold various output paramters
     real(8) ext_eff ! extinction efficiency
     real(8) geo_cross_sec ! illuminated geometric cross section
     real(8) back_scatt ! back-scattering cross section
+    real(8) beam_energy_out ! beam energy into far-field
+    real(8) ext_energy_out ! external diffraction energy into far-field
 end type output_parameters_type 
 
 type job_parameters_type
@@ -108,7 +110,7 @@ type beam_type
     integer(8) nf_in ! total number of facets that belong to this beam
     integer(8) nf_out ! total number of facets illuminated by this beam
     integer(8) ap ! the aperture from which this beam is propagating
-    real(8) cross_ext ! extinction cross section (energy absorbed)
+    real(8) abs_cross ! absorption cross section (energy absorbed)
     logical is_int ! whether or not the beam is propagating inside the particle
 end type beam_type
 

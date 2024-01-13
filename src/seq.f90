@@ -177,9 +177,6 @@ do i = 1, num_remaining_orients
     call beam_loop( beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
                     ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
-                    energy_out_beam,           & !  -> total energy out from beams (before diffraction)
-                    energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
-                    energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
                     job_params,                 &
                     rotated_geometry, &
@@ -220,11 +217,8 @@ do i = 1, num_remaining_orients
                     ampl_far_ext_diff12, & ! <-  amplitude matrix (1,2) due to external diffraction
                     ampl_far_ext_diff21, & ! <-  amplitude matrix (2,1) due to external diffraction
                     ampl_far_ext_diff22, & ! <-  amplitude matrix (2,2) due to external diffraction
-                    energy_out_beam,     & ! <-  total energy out from beams (before diffraction)
-                    energy_out_ext_diff, & ! <-  total energy out from external diffraction (before diffraction)
                     mueller,             & !  -> 2d mueller matrix
                     mueller_1d,          & !  -> 1d mueller matrix
-                    energy_abs_beam,     & ! <-  energy absorbed within the particle
                     output_parameters,   & !  -> some output parameters
                     job_params)
                     

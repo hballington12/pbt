@@ -36,11 +36,8 @@
                         ampl_far_ext_diff12, & ! amplitude matrix (1,2) due to external diffraction
                         ampl_far_ext_diff21, & ! amplitude matrix (2,1) due to external diffraction
                         ampl_far_ext_diff22, & ! amplitude matrix (2,2) due to external diffraction
-                        energy_out_beam,     & ! beam energy remaining before diffraction
-                        energy_out_ext_diff, & ! external diffraction energy remaining before diffraction
                         mueller,             & ! 2d mueller matrix
                         mueller_1d,          & ! 1d mueller matrix
-                        energy_abs_beam,     & ! energy absorbed inside the particle
                         output_parameters,   & ! output parameters
                         job_params)
       
@@ -54,15 +51,12 @@
       complex(8), dimension(:,:), allocatable, intent(inout) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
       complex(8), dimension(:,:), allocatable, intent(inout)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
       real(8), dimension(:), allocatable :: theta_vals, phi_vals
-      real(8), intent(in) :: energy_out_beam
-      real(8), intent(in) :: energy_out_ext_diff
       real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
       real(8) la ! wavelength
-      real(8), intent(in) :: energy_abs_beam
       type(output_parameters_type), intent(out) :: output_parameters 
       type(job_parameters_type), intent(in) :: job_params
-      
+
       complex(8), dimension(:,:), allocatable :: ampl_far11, ampl_far12, ampl_far21, ampl_far22 ! total
       real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
       real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
@@ -127,12 +121,12 @@
       call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
       
       if(job_params%debug >= 1) then  
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
          print'(A40,f16.8)','scattering cross section (total):',scatt
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
       end if
 
       if (job_params%scaling) then
@@ -140,16 +134,16 @@
             print'(A40)','applying diffraction energy scaling...'
          end if
          ! scale the beam diffraction energy to match near field
-         ampl_far_beam11 = ampl_far_beam11/sqrt(scatt_beam/energy_out_beam)
-         ampl_far_beam12 = ampl_far_beam12/sqrt(scatt_beam/energy_out_beam)
-         ampl_far_beam21 = ampl_far_beam21/sqrt(scatt_beam/energy_out_beam)
-         ampl_far_beam22 = ampl_far_beam22/sqrt(scatt_beam/energy_out_beam)
+         ampl_far_beam11 = ampl_far_beam11/sqrt(scatt_beam/output_parameters%beam_energy_out)
+         ampl_far_beam12 = ampl_far_beam12/sqrt(scatt_beam/output_parameters%beam_energy_out)
+         ampl_far_beam21 = ampl_far_beam21/sqrt(scatt_beam/output_parameters%beam_energy_out)
+         ampl_far_beam22 = ampl_far_beam22/sqrt(scatt_beam/output_parameters%beam_energy_out)
 
          ! scale the external diffraction energy to match near field
-         ampl_far_ext_diff11 = ampl_far_ext_diff11/sqrt(scatt_ext_diff/energy_out_ext_diff)
-         ampl_far_ext_diff12 = ampl_far_ext_diff12/sqrt(scatt_ext_diff/energy_out_ext_diff)
-         ampl_far_ext_diff21 = ampl_far_ext_diff21/sqrt(scatt_ext_diff/energy_out_ext_diff)
-         ampl_far_ext_diff22 = ampl_far_ext_diff22/sqrt(scatt_ext_diff/energy_out_ext_diff)
+         ampl_far_ext_diff11 = ampl_far_ext_diff11/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
+         ampl_far_ext_diff12 = ampl_far_ext_diff12/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
+         ampl_far_ext_diff21 = ampl_far_ext_diff21/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
+         ampl_far_ext_diff22 = ampl_far_ext_diff22/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
 
          ampl_far11 = ampl_far_beam11 + ampl_far_ext_diff11
          ampl_far12 = ampl_far_beam12 + ampl_far_ext_diff12
@@ -192,7 +186,7 @@
       ! write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (imag):',ext 
       ! print'(A40,f16.8)','ext. cross (opt. theorem) imag:',ext 
       
-      absorption = energy_abs_beam
+      absorption = output_parameters%abs
       
       ext = absorption + scatt
       albedo = 1-(ext-scatt)/ext
@@ -208,10 +202,10 @@
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
          print'(A40,f16.8)','scattering cross section (total):',scatt
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
          write(101,'(A40,f16.8)')'abs. cross section:',absorption
          print'(A40,f16.8)','abs. cross:',absorption 
          write(101,'(A40,f16.8)')'ext. cross section:',ext
