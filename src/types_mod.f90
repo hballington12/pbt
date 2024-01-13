@@ -97,6 +97,9 @@ type field_out_type
     logical is_tir ! whether or not this was total internal reflection
     real(8) prop_int(1:3) ! internal propagation direction (computed from aperture normal)
     real(8) prop_ext(1:3) ! external propagation direction (computed from facet normal)
+    real(8) scatt_int ! the internal scattering cross section contribution of this facet
+    real(8) scatt_ext ! the external scattering cross section contribution of this facet
+    real(8) proj_area ! the area of this facet projected along the incoming beam propagation direction
 end type field_out_type
 
 type beam_type
@@ -110,8 +113,13 @@ type beam_type
     integer(8) nf_in ! total number of facets that belong to this beam
     integer(8) nf_out ! total number of facets illuminated by this beam
     integer(8) ap ! the aperture from which this beam is propagating
-    real(8) abs_cross ! absorption cross section (energy absorbed)
+    real(8) abs ! absorption cross section (energy absorbed)
+    real(8) scatt_in ! input scattering cross section of the beam
+    real(8) scatt_out ! output scattering cross section of the beam
     logical is_int ! whether or not the beam is propagating inside the particle
+    integer(8) id ! a label for the position of a beam in a beam tree
+    real(8) proj_area_in ! the total area of all facets in this beam when projected along the beam propagation direction
+    real(8) proj_area_out ! the total area of all illuminated facets when projected along the beam propagation direction
 end type beam_type
 
 type facet_type

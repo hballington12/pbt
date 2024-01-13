@@ -225,7 +225,7 @@ do i = my_start, my_end
                     rotated_geometry)
 
     ! fast implementation of the incident beam
-    call makeIncidentBeam(  rotated_geometry,          & ! <-  unique vertices
+    call make_incident_beam(rotated_geometry,          & ! <-  unique vertices
                             beam_geometry, &
                             beam_inc)      
 

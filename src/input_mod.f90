@@ -1965,7 +1965,7 @@ close(10)
 
 end subroutine
 
-subroutine makeIncidentBeam(geometry, beam_geometry, beam_inc)
+subroutine make_incident_beam(geometry, beam_geometry, beam_inc)
 
 ! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle (currently set to 1000)
 ! the width and length of the wavefront is set larger than the maximum x and y vertex values of the particle (full illumination)
@@ -2100,6 +2100,10 @@ end do
 beam_inc%prop(:) = (/0D0,0D0,-1D0/)
 beam_inc%nf_in = beam_geometry%nf
 beam_inc%is_int = .false.
+beam_inc%id = 0D0
+beam_inc%scatt_in = 0D0
+beam_inc%scatt_out = 0D0
+beam_inc%proj_area_in = 0D0
 allocate(beam_inc%field_in(1:beam_inc%nf_in))
 do i = 1, beam_inc%nf_in ! for each facet in the incident beam
     beam_inc%field_in(i)%ampl(1,1) = 1D0 ! set amplitude matrix
@@ -2107,6 +2111,8 @@ do i = 1, beam_inc%nf_in ! for each facet in the incident beam
     beam_inc%field_in(i)%e_perp(:) = (/1D0,0D0,0D0/) ! set e-perp vector
     beam_inc%field_in(i)%fi = i ! set facet id in beam geometry
 end do
+
+
 
 end subroutine
 

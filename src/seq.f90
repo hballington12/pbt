@@ -159,7 +159,7 @@ do i = 1, num_remaining_orients
     end if
 
     ! fast implementation of the incident beam
-    call makeIncidentBeam(  rotated_geometry,          & ! <-  unique vertices
+    call make_incident_beam(rotated_geometry,          & ! <-  unique vertices
                             beam_geometry, &
                             beam_inc)
 
@@ -172,7 +172,7 @@ do i = 1, num_remaining_orients
                     rotated_geometry, &
                     beam_geometry, &
                     beam_inc)
-    
+    stop
     if(num_remaining_orients .gt. 1) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
         ! print*,'total time elapsed: ',omp_get_wtime()-start
