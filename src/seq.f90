@@ -22,7 +22,6 @@ implicit none
 ! add support to avoid crash if nan detected
 ! automatic meshing
 ! automatic apertures
-! add ext cross to beam loop back
 
 ! ############################################################################################################
 
@@ -41,8 +40,7 @@ type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 
 ! sr makeIncidentBeam
 type(geometry_type) beam_geometry
-complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of incident beam
-type(beam_type) :: beam_inc
+type(beam_type) beam_inc
 
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
@@ -166,7 +164,6 @@ do i = 1, num_remaining_orients
     ! stop
     ! fast implementation of the incident beam
     call makeIncidentBeam(  rotated_geometry,          & ! <-  unique vertices
-                            ampl_beam, &       !  -> amplitude matrix of incident beam       
                             beam_geometry, &
                             beam_inc)
 

@@ -1965,7 +1965,7 @@ close(10)
 
 end subroutine
 
-subroutine makeIncidentBeam(geometry, ampl_beam, beam_geometry, beam_inc)
+subroutine makeIncidentBeam(geometry, beam_geometry, beam_inc)
 
 ! subroutine makeIncidentBeam makes a simple square incident beam wavefront at a location above the maximum z value of the particle (currently set to 1000)
 ! the width and length of the wavefront is set larger than the maximum x and y vertex values of the particle (full illumination)
@@ -1977,7 +1977,6 @@ integer(8), allocatable, dimension(:) :: beamF2
 real(8), dimension(:,:) ,allocatable :: verts
 real(8), dimension(:,:) ,allocatable :: beamMidpoints
 ! integer(8), dimension(:,:) ,allocatable, intent(in) :: face_ids
-complex(8), allocatable, dimension(:,:,:), intent(out) :: ampl_beam ! amplitude matrix of incident beam
 type(geometry_type), intent(out) :: beam_geometry
 type(beam_type), intent(out) :: beam_inc
 
@@ -2051,10 +2050,10 @@ beamV(1:4,3) = 1000 ! changed for comparing with Matlab
 allocate(beamMidpoints(1:1,1:3))
 beamMidpoints(1,1:3) = sum(beamV(beamF1(1,1:4),1:3),1)/4
 
-allocate(ampl_beam(1:2,1:2,1:1)) ! 4 (2x2) components, 1 facet
-ampl_beam = 0
-ampl_beam(1,1,1) = 1 ! set diagonal elements to 1
-ampl_beam(2,2,1) = 1
+! allocate(ampl_beam(1:2,1:2,1:1)) ! 4 (2x2) components, 1 facet
+! ampl_beam = 0
+! ampl_beam(1,1,1) = 1 ! set diagonal elements to 1
+! ampl_beam(2,2,1) = 1
 
 ! print'(A16,f6.4,A,f6.4,A,f6.4,A,f6.4,A)',' beam ampl in: (',real(ampl_beam(1,1,1)),' + ',imag(ampl_beam(1,1,1)),'i, ',real(ampl_beam(1,2,1)),' + ',imag(ampl_beam(1,2,1)),'i)'
 ! print'(A16,f6.4,A,f6.4,A,f6.4,A,f6.4,A)','               (',real(ampl_beam(2,1,1)),' + ',imag(ampl_beam(2,1,1)),'i, ',real(ampl_beam(2,2,1)),' + ',imag(ampl_beam(2,2,1)),'i)'
