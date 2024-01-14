@@ -22,17 +22,17 @@ module beam_loop_mod
         if(job_params%debug >= 3) then
             print*,'-----------------------------------------------'
             if(beam%is_int) then
-                print'(A,I6,A)','beam ',beam%id,': is internally propagating'
+                print'(a,i6,a)','beam ',beam%id,': is internally propagating'
             else
-                print'(A,I6,A)','beam ',beam%id,': is externally propagating'
+                print'(a,i6,a)','beam ',beam%id,': is externally propagating'
             end if
-            print'(A,I6,A,I8)','beam ',beam%id,': originates from aperture: ',beam%ap
-            print'(A,I6,A,I8)','beam ',beam%id,': number of facets in this beam: ',beam%nf_in
-            print'(A,I6,A,I8)','beam ',beam%id,': number of facets illuminated: ',beam%nf_out
-            print'(A,I6,A,F8.2)','beam ',beam%id,': scatt. cross section in: ',beam%scatt_in
-            print'(A,I6,A,F8.2)','beam ',beam%id,': scatt. cross section out: ',beam%scatt_out
-            print'(A,I6,A,F8.2)','beam ',beam%id,': geo cross section in: ',beam%proj_area_in
-            print'(A,I6,A,F8.2)','beam ',beam%id,': geo cross section out: ',beam%proj_area_out
+            print'(a,i6,a,i8)','beam ',beam%id,': originates from aperture: ',beam%ap
+            print'(a,i6,a,i8)','beam ',beam%id,': number of facets in this beam: ',beam%nf_in
+            print'(a,i6,a,i8)','beam ',beam%id,': number of facets illuminated: ',beam%nf_out
+            print'(a,i6,a,f14.8)','beam ',beam%id,': scatt. cross section in: ',beam%scatt_in
+            print'(a,i6,a,f14.8)','beam ',beam%id,': scatt. cross section out: ',beam%scatt_out
+            print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section in: ',beam%proj_area_in
+            print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section out: ',beam%proj_area_out
         end if
 
 
@@ -146,8 +146,8 @@ module beam_loop_mod
                 ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*dist)
 
                 ! compute fresnel matrices
-                fr(:,:) = 0D0 ! init fresnel reflection matrix
-                ft(:,:) = 0D0 ! init fresnel transmission matrix
+                fr(:,:) = 0d0 ! init fresnel reflection matrix
+                ft(:,:) = 0d0 ! init fresnel transmission matrix
                 if(is_shad(i)) then ! if facet is in shadow (needs careful consideration)
                     theta_i = acos(an(3)) ! using incident angle as that of the aperture if in shadow
                 else
@@ -177,7 +177,7 @@ module beam_loop_mod
                 refl_ampl(2,2)*conjg(refl_ampl(2,2))))
 
                 ! possibly remove reflection from shadow facets here
-                ! if(is_shad(i)) refl_ampl(:,:) = 0D0
+                ! if(is_shad(i)) refl_ampl(:,:) = 0d0
                 
                 ! get projected facet area
                 theta_i_facet = acos(geometry%n(geometry%f(i)%ni,3))
@@ -205,7 +205,7 @@ module beam_loop_mod
                 ext_diff_outbeam_tree(n)%vk7(:) = vk7(:)
                 ext_diff_outbeam_tree(n)%prop_out(:) = prop(:)
                 ext_diff_outbeam_tree(n)%prop_in(:) = prop(:)
-                ext_diff_outbeam_tree(n)%FOut = i ! face ID from which the beam was emitted
+                ext_diff_outbeam_tree(n)%fout = i ! face id from which the beam was emitted
                 ext_diff_outbeam_tree(n)%verts(:,:) = transpose(geometry%v(geometry%f(i)%vi(:),:)) ! verts needs readjusting for arbitrary number of vertices
             end if
         end do
@@ -328,7 +328,7 @@ module beam_loop_mod
                 ampl(2,2)*conjg(ampl(2,2))))
 
                 ! compute absorbed intensity (before applying the absorption factor)
-                abs_intensity = in_intensity * (1D0-exp(-2*waveno*ibi_int*sqrt(dist))**2)
+                abs_intensity = in_intensity * (1d0-exp(-2*waveno*ibi_int*sqrt(dist))**2)
                 
                 ! apply absorption factor
                 ampl(:,:) = ampl(:,:) * exp(-2*waveno*ibi_int*sqrt(dist))
@@ -340,15 +340,15 @@ module beam_loop_mod
                 ampl(2,2)*conjg(ampl(2,2))))
                 
                 ! compute fresnel matrices
-                fr(:,:) = 0D0 ! init fresnel reflection matrix
-                ft(:,:) = 0D0 ! init fresnel transmission matrix
+                fr(:,:) = 0d0 ! init fresnel reflection matrix
+                ft(:,:) = 0d0 ! init fresnel transmission matrix
                 theta_i = acos(-ran(3)) ! using incident angle as that of the aperture
                 if(beam%is_int .and. theta_i >= asin(1/rbi_int)) then ! if tir
                     is_tir = .true. 
-                    fr(2,2) = -1D0
-                    ft(2,2) = 0D0
-                    fr(1,1) = -1D0
-                    ft(1,1) = 0D0
+                    fr(2,2) = -1d0
+                    ft(2,2) = 0d0
+                    fr(1,1) = -1d0
+                    ft(1,1) = 0d0
                 else ! if not tir
                     is_tir = .false.
                     theta_t = asin(sin(theta_i)*rbi_int)
@@ -375,7 +375,7 @@ module beam_loop_mod
                 trans_ampl(2,2)*conjg(trans_ampl(2,2))))
 
                 ! possibly remove transmission from shadow facets here
-                if(is_shad(i)) trans_ampl(:,:) = 0D0
+                if(is_shad(i)) trans_ampl(:,:) = 0d0
                 
                 ! get projected facet area
                 theta_i_facet = acos(-(rot_geometry%n(rot_geometry%f(i)%ni,3)))
@@ -403,15 +403,12 @@ module beam_loop_mod
                 beam%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
                 beam%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
                 beam%field_out(n)%scatt_int = int_intensity * proj_area ! save the scattering cross section contribution
-                
                 beam%field_out(n)%scatt_ext = ext_intensity * proj_area * (cos(theta_t)/cos(theta_i_facet)) ! save the scattering cross section contribution
                 beam%field_out(n)%proj_area = proj_area ! save the geometric cross section
 
                 beam%proj_area_out = beam%proj_area_out + proj_area ! sum the total projected area for this beam
             end if
         end do
-
-        if(job_params%debug >= 2) call print_beam_info(beam,job_params) ! print some info about the beam
 
     end subroutine
     
@@ -427,15 +424,15 @@ module beam_loop_mod
         real(8), intent(out) :: prop_out(1:3)
         real(8), intent(in) :: norm(1:3)
         
-        real(8) A, B, alpha, nf
+        real(8) a, b, alpha, nf
         real(8), dimension(1:3) :: a_vec, b_vec
         
         alpha = pi - theta_t
-        A = sin(theta_t-theta_i)/sin(theta_i)
-        B = sin(alpha)/sin(theta_i)
+        a = sin(theta_t-theta_i)/sin(theta_i)
+        b = sin(alpha)/sin(theta_i)
         b_vec(:) = prop_in(:)
         a_vec(:) = norm(:)
-        prop_out(:) = B*b_vec(:) - A*a_vec(:)
+        prop_out(:) = b*b_vec(:) - a*a_vec(:)
         nf = sqrt(prop_out(1)**2 + prop_out(2)**2 + prop_out(3)**2)
         prop_out(:) = prop_out(:) / nf
         
@@ -510,7 +507,7 @@ module beam_loop_mod
             beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
         end do
         
-        if(job_params%debug >= 3) print'(A,I6,A,I8,A,I8,A)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
+        if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
         
     end subroutine
     
@@ -581,7 +578,7 @@ module beam_loop_mod
             beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
         end do
         
-        if(job_params%debug >= 3) print'(A,I6,A,I8,A,I8,A)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
+        if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
 
     end subroutine
     
@@ -606,7 +603,7 @@ module beam_loop_mod
         allocate(ap_areas(1:geometry%na)) ! allocate
         allocate(suff_ill(1:geometry%na)) ! allocate
         allocate(num_ill(1:geometry%na)) ! allocate
-        ap_areas = 0D0 ! init
+        ap_areas = 0d0 ! init
         suff_ill = .false. ! init
         num_ill = 0 ! init
         
@@ -716,7 +713,7 @@ module beam_loop_mod
         
         do i = 1, beam_outbeam_tree_counter
             prop = beam_outbeam_tree(i)%prop_out
-            face_id = beam_outbeam_tree(i)%FOut
+            face_id = beam_outbeam_tree(i)%fout
             ampl = beam_outbeam_tree(i)%ampl
             normal = geometry%n(geometry%f(face_id)%ni,:)
             area = geometry%f(face_id)%area
@@ -739,7 +736,7 @@ module beam_loop_mod
         
         do i = 1, size(ext_diff_outbeam_tree,1)
             prop = ext_diff_outbeam_tree(i)%prop_out
-            face_id = ext_diff_outbeam_tree(i)%FOut
+            face_id = ext_diff_outbeam_tree(i)%fout
             ampl = ext_diff_outbeam_tree(i)%ampl
             normal = geometry%n(geometry%f(face_id)%ni,:)
             area = geometry%f(face_id)%area
@@ -756,19 +753,19 @@ module beam_loop_mod
         
         if(job_params%debug >= 1) then
             write(101,*)'------------------------------------------------------'
-            write(101,'(A41,f16.8)')'energy in (ill. geom. cross sec.): ', energy_in
-            write(101,'(A41,f16.8)')'beam energy out: ',energy_out_beam
-            write(101,'(A41,f16.8)')'absorbed beam energy: ',output_parameters%abs
-            write(101,'(A41,f16.8)')'ext diff energy out: ',energy_out_ext_diff
-            write(101,'(A41,f16.8,A2)')'beam energy conservation: ',(energy_out_beam+output_parameters%abs)/energy_in*100,' %'
-            write(101,'(A41,f16.8,A2)')'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
+            write(101,'(a41,f16.8)')'energy in (ill. geom. cross sec.): ', energy_in
+            write(101,'(a41,f16.8)')'beam energy out: ',energy_out_beam
+            write(101,'(a41,f16.8)')'absorbed beam energy: ',output_parameters%abs
+            write(101,'(a41,f16.8)')'ext diff energy out: ',energy_out_ext_diff
+            write(101,'(a41,f16.8,a2)')'beam energy conservation: ',(energy_out_beam+output_parameters%abs)/energy_in*100,' %'
+            write(101,'(a41,f16.8,a2)')'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
             
-            print'(A40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
-            print'(A40,f16.8)','beam energy out: ',energy_out_beam
-            print'(A40,f16.8)','absorbed beam energy: ',output_parameters%abs
-            print'(A40,f16.8)','ext diff energy out: ',energy_out_ext_diff
-            print'(A40,f16.8,A2)','beam energy conservation: ',(energy_out_beam+output_parameters%abs)/energy_in*100,' %'
-            print'(A40,f16.8,A2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
+            print'(a40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
+            print'(a40,f16.8)','beam energy out: ',energy_out_beam
+            print'(a40,f16.8)','absorbed beam energy: ',output_parameters%abs
+            print'(a40,f16.8)','ext diff energy out: ',energy_out_ext_diff
+            print'(a40,f16.8,a2)','beam energy conservation: ',(energy_out_beam+output_parameters%abs)/energy_in*100,' %'
+            print'(a40,f16.8,a2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
             
             print*,'========== end sr energy_checks'
         end if
@@ -811,7 +808,14 @@ module beam_loop_mod
         integer(8) num_beams
         integer(8) i_start, i_end
         type(beam_type) beam ! current beam to be traced
+        integer(8) num_threads
         
+        ! init
+        start = 0d0
+        start1 = 0d0
+        finish = 0d0
+        finish1 = 0d0
+
         if(job_params%timing) then
             start = omp_get_wtime()
         endif
@@ -844,10 +848,10 @@ module beam_loop_mod
         if(job_params%timing) then
             if(job_params%debug >= 2) then
                 finish1 = omp_get_wtime()
-                print*,'--------------------------------------'
-                print'(A,f16.8,A)',"incidence - time elapsed: ",finish1-start1," secs"
-                write(101,'(A,f16.8,A)')"incidence - time elapsed: ",finish1-start1," secs"
-                print*,'--------------------------------------'
+                print*,'======================================'
+                print'(a,f16.8,a)',"incidence - time taken: ",finish1-start1," secs"
+                write(101,'(a,f16.8,a)')"incidence - time taken: ",finish1-start1," secs"
+                print*,'======================================'
             end if
         end if
 
@@ -862,45 +866,56 @@ module beam_loop_mod
                     start1 = omp_get_wtime()
                 end if
             end if
-            
+
+            ! get number of threads required
+            if(job_params%is_multithreaded) then ! if multithreading enabled
+                num_threads = min(omp_get_max_threads(),i_end-i_start+1) ! set threads
+            else ! if multithreading disabled
+                num_threads = 1
+            end if
+
             ! loop over each beam for this recursion
-            do j = i_start, i_end ! for each entry in the beam tree that belongs to this recursion (omp)
+            !$omp parallel num_threads(num_threads) private(beam)
+            !$omp do
+            do j = i_start, i_end ! for each entry in the beam tree that belongs to this recursion
                 beam = beam_tree(j) ! get a beam from the beam_tree
                 beam%id = j ! save the position of the beam in the beam tree
                 ! propagate this beam
                 if(beam%is_int) then ! if the beam is internally propagating
                     call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
-                    if(job_params%ibi > 0D0) then
-                        output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
-                    end if
                 else ! if the beam is externally propagating
                     print*,'external propagation not supported yet'
-                    stop
-                end if            
+                    cycle
+                end if ! end: if the beam is internally propagating
+                !$omp critical      
+                if(job_params%debug >= 2) call print_beam_info(beam,job_params) ! print some info about the beam
+                if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
                 ! add the new beams to the beam tree (need to also add the new information about the current beam)
                 call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
                 ! add the outgoing surface field to the diffraction structure
                 call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params)
-            end do
+                !$omp end critical
+            end do ! end: for each entry in the beam tree that belongs to this recursion
+            !$omp end parallel
             
             if(job_params%timing) then
                 if(job_params%debug >= 2) then
                     finish1 = omp_get_wtime()
-                    print*,'--------------------------------------'
-                    print'(A,I3,A,f16.8,A)',"recursion",i," - time elapsed: ",finish1-start1," secs"
-                    write(101,'(A,I3,A,f16.8,A)')"recursion",i," - time elapsed: ",finish1-start1," secs"
-                    print*,'--------------------------------------'
+                    print*,'======================================'
+                    print'(a,i3,a,f16.8,a)',"recursion",i," - time taken: ",finish1-start1," secs"
+                    write(101,'(a,i3,a,f16.8,a)')"recursion",i," - time taken: ",finish1-start1," secs"
+                    print*,'======================================'
                 end if
             end if
             
             i_start = i_end + 1 ! update the starting index for the next recursion
-        end do
+        end do ! end: for each recursion
         
         if(job_params%debug >= 1) then
             if(job_params%timing) then
                 finish = omp_get_wtime()
                 print*,'=========='
-                print'(A,f16.8,A)',"end beam loop - time elapsed: ",finish-start," secs"   
+                print'(a,f16.8,a)',"end beam loop - time elapsed: ",finish-start," secs"   
             end if
         end if
         
@@ -914,13 +929,13 @@ module beam_loop_mod
         geometry)
         
         if(job_params%debug >= 2) then
-            print'(A)','memory usage breakdown (per mpi process):'
-            print'(A,f8.2,A)','particle geometry: ',real(sizeof(geometry))/1048576D0,' MB'
-            print'(A,f8.2,A)','beam tree: ',real(sizeof(beam_tree))/1048576D0,' MB'
-            print'(A,f8.2,A)','ext. diffraction tree: ',real(sizeof(ext_diff_outbeam_tree))/1048576D0,' MB'
-            print'(A,f8.2,A)','outbeam tree: ',real(sizeof(beam_outbeam_tree))/1048576D0,' MB'
-            ! print'(A)','note: this is an underestimate of the total memory usage.'
-            print'(A)',' =========='
+            print'(a)','memory usage breakdown (per mpi process):'
+            print'(a,f8.2,a)','particle geometry: ',real(sizeof(geometry))/1048576d0,' mb'
+            print'(a,f8.2,a)','beam tree: ',real(sizeof(beam_tree))/1048576d0,' mb'
+            print'(a,f8.2,a)','ext. diffraction tree: ',real(sizeof(ext_diff_outbeam_tree))/1048576d0,' mb'
+            print'(a,f8.2,a)','outbeam tree: ',real(sizeof(beam_outbeam_tree))/1048576d0,' mb'
+            ! print'(a)','note: this is an underestimate of the total memory usage.'
+            print'(a)',' =========='
         end if
         
         ! stop
@@ -940,7 +955,7 @@ module beam_loop_mod
         integer(8) i, fi
         
         do i = 1, beam_outbeam_tree_counter ! for each beam
-            fi = beam_outbeam_tree(i)%FOut ! get the face id
+            fi = beam_outbeam_tree(i)%fout ! get the face id
             beam_outbeam_tree(i)%verts = transpose(geometry%v(geometry%f(fi)%vi(:),:))
         end do
         
@@ -965,17 +980,17 @@ module beam_loop_mod
         integer(8) j
         logical, dimension(:), allocatable :: is_beam
         logical, dimension(:), allocatable :: is_vis
-        integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
-        integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
+        integer(8), dimension(:), allocatable :: f3 ! bounding box ids
+        integer(8), dimension(:,:), allocatable :: f4 ! fuzzy bounding box ids
         real(8), dimension(:), allocatable :: dist_to_bb, dist_to_fbb
-        integer(8) BB
+        integer(8) bb
         logical within_bounds
         real(8) vecb1, vecb2
         real(8) edge_norm1, edge_norm2
         real(8) edge_check
-        real(8) beamXmax0, beamXmin0, beamYmax0, beamYmin0
-        real(8) beamXmax, beamXmin, beamYmax, beamYmin
-        logical, dimension(:,:), allocatable :: F5
+        real(8) beamxmax0, beamxmin0, beamymax0, beamymin0
+        real(8) beamxmax, beamxmin, beamymax, beamymin
+        logical, dimension(:,:), allocatable :: f5
         real(8) start, finish
         integer(8), dimension(:), allocatable :: mapping
         type(geometry_type) bb_geometry ! bounding box geometry
@@ -983,33 +998,33 @@ module beam_loop_mod
         ! ################################
         ! start new ray tracing algorithm
         
-        call CPU_TIME(start)
+        call cpu_time(start)
         
         ! use the current crystal vertices to create some bounding boxes in x-y plane
         call beam_aligned_bounding_boxes(rot_geometry,bb_geometry)
         call compute_geometry_midpoints(bb_geometry)
         call compute_geometry_areas(bb_geometry)
         
-        allocate(F3(1:rot_geometry%nf)) ! array to hold index of bounding box that each face belongs to
-        allocate(F4(1:rot_geometry%nf,1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
+        allocate(f3(1:rot_geometry%nf)) ! array to hold index of bounding box that each face belongs to
+        allocate(f4(1:rot_geometry%nf,1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
         allocate(dist_to_bb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
         allocate(dist_to_fbb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
         
         do i = 1, rot_geometry%nf ! for each face
             dist_to_bb(:) = sqrt((bb_geometry%f(:)%mid(1) - rot_geometry%f(i)%mid(1))**2 + (bb_geometry%f(:)%mid(2) - rot_geometry%f(i)%mid(2))**2) ! distance to each bb
-            F3(i) = minloc(dist_to_bb,1) ! record which bounding box midpoint this facet was closest to
+            f3(i) = minloc(dist_to_bb,1) ! record which bounding box midpoint this facet was closest to
             do j = 1, 3 ! for each vertex
                 dist_to_fbb(:) = sqrt((bb_geometry%f(:)%mid(1) - rot_geometry%v(rot_geometry%f(i)%vi(j),1))**2 + (bb_geometry%f(:)%mid(2) - rot_geometry%v(rot_geometry%f(i)%vi(j),2))**2) ! distance to each fuzzy bb
-                F4(i,j) = minloc(dist_to_fbb,1) ! record which bounding box midpoint this facet vertex was closest to
+                f4(i,j) = minloc(dist_to_fbb,1) ! record which bounding box midpoint this facet vertex was closest to
             end do 
         end do
         
         ! more optimisation
-        allocate(F5(1:rot_geometry%nf,1:bb_geometry%nf))
-        F5 = .false. ! init
+        allocate(f5(1:rot_geometry%nf,1:bb_geometry%nf))
+        f5 = .false. ! init
         do i = 1, rot_geometry%nf
             do j = 1, bb_geometry%nf
-                if(F4(i,1) .eq. j .or. F4(i,2) .eq. j .or. F4(i,3) .eq. j) F5(i,j) = .true.
+                if(f4(i,1) .eq. j .or. f4(i,2) .eq. j .or. f4(i,3) .eq. j) f5(i,j) = .true.
             end do
         end do
         
@@ -1040,34 +1055,34 @@ module beam_loop_mod
         ! init some stuff
         fi = beam%field_in(1)%fi ! get the first facet in the beam
         vi = rot_geometry%f(fi)%vi(1) ! get the vertex id of the first vertex in this facet
-        beamXmax = rot_geometry%v(vi,1) ! save the x coordinate
-        beamXmin = rot_geometry%v(vi,1) ! save the x coordinate
-        beamYmax = rot_geometry%v(vi,2) ! save the y coordinate
-        beamYmin = rot_geometry%v(vi,2) ! save the y coordinate
+        beamxmax = rot_geometry%v(vi,1) ! save the x coordinate
+        beamxmin = rot_geometry%v(vi,1) ! save the x coordinate
+        beamymax = rot_geometry%v(vi,2) ! save the y coordinate
+        beamymin = rot_geometry%v(vi,2) ! save the y coordinate
         
         do i = 1, beam%nf_in ! for each face in the incident beam
             fi = beam%field_in(i)%fi ! get the facet id
             do j = 1, rot_geometry%f(fi)%nv ! for each vertex in this face
                 vi = rot_geometry%f(fi)%vi(j) ! get the vertex id
-                beamXmax0 = rot_geometry%v(vi,1) ! get the x coordinate
-                beamXmin0 = rot_geometry%v(vi,1) ! get the x coordinate
-                beamYmax0 = rot_geometry%v(vi,2) ! get the y coordinate
-                beamYmin0 = rot_geometry%v(vi,2) ! get the y coordinate
-                if(beamXmax0 .gt. beamXmax) beamXmax = beamXmax0
-                if(beamXmin0 .lt. beamXmin) beamXmin = beamXmin0
-                if(beamYmax0 .gt. beamYmax) beamYmax = beamYmax0
-                if(beamYmin0 .lt. beamYmin) beamYmin = beamYmin0 
+                beamxmax0 = rot_geometry%v(vi,1) ! get the x coordinate
+                beamxmin0 = rot_geometry%v(vi,1) ! get the x coordinate
+                beamymax0 = rot_geometry%v(vi,2) ! get the y coordinate
+                beamymin0 = rot_geometry%v(vi,2) ! get the y coordinate
+                if(beamxmax0 .gt. beamxmax) beamxmax = beamxmax0
+                if(beamxmin0 .lt. beamxmin) beamxmin = beamxmin0
+                if(beamymax0 .gt. beamymax) beamymax = beamymax0
+                if(beamymin0 .lt. beamymin) beamymin = beamymin0 
             end do
         end do
         
         do i = 1, rot_geometry%nf
-            if(rot_geometry%f(i)%mid(1) .lt. beamXmin) then
+            if(rot_geometry%f(i)%mid(1) .lt. beamxmin) then
                 is_vis(i) = .false.
-            else if(rot_geometry%f(i)%mid(1) .gt. beamXmax) then
+            else if(rot_geometry%f(i)%mid(1) .gt. beamxmax) then
                 is_vis(i) = .false.
-            else if(rot_geometry%f(i)%mid(2) .lt. beamYmin) then
+            else if(rot_geometry%f(i)%mid(2) .lt. beamymin) then
                 is_vis(i) = .false.
-            else if(rot_geometry%f(i)%mid(2) .gt. beamYmax) then
+            else if(rot_geometry%f(i)%mid(2) .gt. beamymax) then
                 is_vis(i) = .false.
             end if
         end do
@@ -1079,12 +1094,12 @@ module beam_loop_mod
                 if(rot_geometry%ap(rot_geometry%f(m)%ap)%n(3) .gt. -0.01) then ! if aperture is downfacing
                     is_vis(m) = .false. ! set not visible
                 else ! if aperture was facing towards incidence
-                    BB = F3(m) ! get bounding box ID
+                    bb = f3(m) ! get bounding box id
                     do j = 1, rot_geometry%nf ! for each potentially blocking facet j
-                        ! if(rotatedNorm(Face2(j),3) .lt. 0.01) then ! sign flip here for internal
-                        ! if(F4(j,1) .eq. BB .or. F4(j,2) .eq. BB .or. F4(j,3) .eq. BB) then ! 
-                        if(F5(j,BB)) then ! 
-                            ! if(any(F4(j,1:3)) .eq. BB) then ! if blocker was in fuzzy bounding box
+                        ! if(rotatednorm(face2(j),3) .lt. 0.01) then ! sign flip here for internal
+                        ! if(f4(j,1) .eq. bb .or. f4(j,2) .eq. bb .or. f4(j,3) .eq. bb) then ! 
+                        if(f5(j,bb)) then ! 
+                            ! if(any(f4(j,1:3)) .eq. bb) then ! if blocker was in fuzzy bounding box
                             if(j .ne. m) then ! ignore self-block
                                 if(rot_geometry%n(rot_geometry%f(j)%ni,3) .lt. 0.01) then ! if down-facing, sign flip here for internal
                                     ! do nothing
@@ -1105,7 +1120,7 @@ module beam_loop_mod
                                             end if
                                             vecb1 = rot_geometry%f(m)%mid(1) - rot_geometry%v(rot_geometry%f(j)%vi(k),1) ! vector from vertex k of potential blocker j to centroid of facet m
                                             vecb2 = rot_geometry%f(m)%mid(2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
-                                            edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B
+                                            edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor b
                                             if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
                                         end do
                                         if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
@@ -1149,7 +1164,7 @@ module beam_loop_mod
             end if
         end do
         
-        call CPU_TIME(finish)
+        call cpu_time(finish)
         
     end subroutine
     
@@ -1169,15 +1184,15 @@ module beam_loop_mod
         integer(8) j
         logical, dimension(:), allocatable :: is_beam
         logical, dimension(:), allocatable, intent(out) :: is_vis
-        integer(8), dimension(:), allocatable :: F3 ! bounding box IDs
-        integer(8), dimension(:,:), allocatable :: F4 ! fuzzy bounding box IDs
+        integer(8), dimension(:), allocatable :: f3 ! bounding box ids
+        integer(8), dimension(:,:), allocatable :: f4 ! fuzzy bounding box ids
         real(8), dimension(:), allocatable :: dist_to_bb, dist_to_fbb
-        integer(8) BB
+        integer(8) bb
         logical within_bounds
         real(8) vecb1, vecb2
         real(8) edge_norm1, edge_norm2
         real(8) edge_check
-        logical, dimension(:,:), allocatable :: F5
+        logical, dimension(:,:), allocatable :: f5
         real(8) start, finish
         integer(8), dimension(:), allocatable :: mapping
         type(geometry_type) bb_geometry ! bounding box geometry
@@ -1185,33 +1200,33 @@ module beam_loop_mod
         ! ################################
         ! start new ray tracing algorithm
         
-        call CPU_TIME(start)
+        call cpu_time(start)
         
         ! use the current crystal vertices to create some bounding boxes in x-y plane
         call beam_aligned_bounding_boxes(geometry,bb_geometry)
         call compute_geometry_midpoints(bb_geometry)
         call compute_geometry_areas(bb_geometry)
         
-        allocate(F3(1:geometry%nf)) ! array to hold index of bounding box that each face belongs to
-        allocate(F4(1:geometry%nf,1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
+        allocate(f3(1:geometry%nf)) ! array to hold index of bounding box that each face belongs to
+        allocate(f4(1:geometry%nf,1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
         allocate(dist_to_bb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
         allocate(dist_to_fbb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
         
         do i = 1, geometry%nf ! for each face in the particle geometry
             dist_to_bb(:) = sqrt((bb_geometry%f(:)%mid(1) - geometry%f(i)%mid(1))**2 + (bb_geometry%f(:)%mid(2) - geometry%f(i)%mid(2))**2) ! distance to each bb
-            F3(i) = minloc(dist_to_bb,1) ! record which bounding box midpoint this facet was closest to
+            f3(i) = minloc(dist_to_bb,1) ! record which bounding box midpoint this facet was closest to
             do j = 1, 3 ! for each vertex
                 dist_to_fbb(:) = sqrt((bb_geometry%f(:)%mid(1) - geometry%v(geometry%f(i)%vi(j),1))**2 + (bb_geometry%f(:)%mid(2) - geometry%v(geometry%f(i)%vi(j),2))**2) ! distance to each fuzzy bb
-                F4(i,j) = minloc(dist_to_fbb,1) ! record which bounding box midpoint this facet vertex was closest to
+                f4(i,j) = minloc(dist_to_fbb,1) ! record which bounding box midpoint this facet vertex was closest to
             end do 
         end do
         
         ! more optimisation
-        allocate(F5(1:geometry%nf,1:bb_geometry%nf))
-        F5 = .false. ! init
+        allocate(f5(1:geometry%nf,1:bb_geometry%nf))
+        f5 = .false. ! init
         do i = 1, geometry%nf
             do j = 1, bb_geometry%nf
-                if(F4(i,1) .eq. j .or. F4(i,2) .eq. j .or. F4(i,3) .eq. j) F5(i,j) = .true.
+                if(f4(i,1) .eq. j .or. f4(i,2) .eq. j .or. f4(i,3) .eq. j) f5(i,j) = .true.
             end do
         end do
         
@@ -1243,9 +1258,9 @@ module beam_loop_mod
                 is_vis(m) = .false. ! set not visible
                 in_beam(m) = .false. ! set not in beam
             else ! if aperture was facing towards incidence
-                BB = F3(m) ! get bounding box ID
+                bb = f3(m) ! get bounding box id
                 do j = 1, geometry%nf ! for each potentially blocking facet j
-                    if(F5(j,BB)) then ! 
+                    if(f5(j,bb)) then ! 
                         if(j .ne. m) then ! ignore self-block
                             if(geometry%n(geometry%f(j)%ni,3) .lt. 0.01) then ! if down-facing
                                 ! do nothing
@@ -1266,7 +1281,7 @@ module beam_loop_mod
                                         end if
                                         vecb1 = geometry%f(m)%mid(1) - geometry%v(geometry%f(j)%vi(k),1) ! vector from vertex k of potential blocker j to centroid of facet m
                                         vecb2 = geometry%f(m)%mid(2) - geometry%v(geometry%f(j)%vi(k),2)
-                                        edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor B (sign flip)
+                                        edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor b (sign flip)
                                         if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
                                     end do
                                     if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
@@ -1294,7 +1309,7 @@ module beam_loop_mod
             end if
         end do
         
-        call CPU_TIME(finish)
+        call cpu_time(finish)
         
     end subroutine
     
@@ -1398,8 +1413,8 @@ module beam_loop_mod
         bb_geometry%nv = num_verts
         bb_geometry%nf = num_faces
         
-        !print*,'size(boundingBoxV,1)',size(boundingBoxV,1)
-        !print*,'boundingBoxFSize',boundingBoxFSize
+        !print*,'size(boundingboxv,1)',size(boundingboxv,1)
+        !print*,'boundingboxfsize',boundingboxfsize
         
         ! make the bounding box vertices (meshgrid style)
         bb_geometry%v(:,3) = 0 ! init
@@ -1457,11 +1472,11 @@ module beam_loop_mod
                 beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(:) = beam%field_out(i)%prop_int(:) ! incident propagation direction
                 beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(:) = beam%field_out(i)%prop_ext(:) ! outgoing propagation direction
                 beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(:) = beam%field_out(i)%e_perp(:) ! perpendicular field vector
-                beam_outbeam_tree(beam_outbeam_tree_counter)%FOut = beam%field_out(i)%fi ! facet id
+                beam_outbeam_tree(beam_outbeam_tree_counter)%fout = beam%field_out(i)%fi ! facet id
             end if
         end do
 
-        if(job_params%debug >= 3) print'(A,I6,A,I8,A,I8,A)','beam ',beam%id,': added ',counter,' beams to outbeam tree -->',beam_outbeam_tree_counter,' total outbeams'
+        if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',counter,' beams to outbeam tree -->',beam_outbeam_tree_counter,' total outbeams'
 
     end subroutine
     

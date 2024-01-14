@@ -2076,7 +2076,6 @@ allocate(beam_geometry%v(1:beam_geometry%nv,1:3))
 allocate(beam_geometry%n(1:beam_geometry%nn,1:3))
 
 do i = 1, beam_geometry%nf
-    print*,'i=',i
     beam_geometry%f(i)%nv = 4
     allocate(beam_geometry%f(i)%vi(1:beam_geometry%f(i)%nv)) ! just 1 face with 4 vertices
     do j = 1, beam_geometry%f(i)%nv
