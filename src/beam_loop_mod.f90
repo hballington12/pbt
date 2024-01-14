@@ -196,7 +196,7 @@ module beam_loop_mod
                 beam_inc%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
                 beam_inc%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
                 beam_inc%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
-                beam_inc%field_out(n)%scatt_int = int_intensity * proj_area * rbi_int * (cos(theta_t)/cos(theta_i_facet)) ! save the scattering cross section contribution
+                beam_inc%field_out(n)%scatt_int = int_intensity * proj_area * (rbi_int * (cos(theta_t)/cos(theta_i_facet))) ! save the scattering cross section contribution
                 beam_inc%field_out(n)%scatt_ext = ext_intensity * proj_area ! save the scattering cross section contribution
                 beam_inc%field_out(n)%proj_area = proj_area ! save the geometric cross section
                 
@@ -725,6 +725,7 @@ module beam_loop_mod
             
             if (isnan(out_intensity)) then
                 print*,'oh dear - nan ibeam = ',i
+                stop
                 beam_outbeam_tree(i)%ampl = 0
             else
                 energy_out_beam = energy_out_beam + out_intensity*area*cos_theta

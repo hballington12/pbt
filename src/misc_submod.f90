@@ -1226,6 +1226,7 @@
 
             do i = 1, geometry%nf
                 allocate(geometry%f(i)%vi(1:3))
+                geometry%f(i)%nv = 3
                 geometry%f(i)%vi(:) = face_ids_out(i,:)
                 geometry%f(i)%ap = apertures_out(i)
                 geometry%f(i)%ni = norm_ids(i)
@@ -1236,6 +1237,9 @@
             do i = 1, geometry%nn
                 geometry%n(i,1:3) = norms(i,1:3)
             end do
+
+            ! recompute a load of geometry stuff
+            call compute_geometry_areas(geometry)
 
         end subroutine
         
@@ -1392,7 +1396,7 @@
             type(geometry_type) geometry
             
             integer(8) num_verts, num_faces, i, j, k, num_norms
-            character(100) my_string, my_string2
+            character(100) my_string, my_string2, my_string3
             logical output_norms
             
             print*,'========== start sr PDAS'
@@ -1415,9 +1419,13 @@
                 my_string = "f "
                 call StripSpaces(my_string)
                 do j = 1, geometry%f(i)%nv
+                    ! write(my_string2,*) geometry%f(i)%vi(j)
                     write(my_string2,*) geometry%f(i)%vi(j)
                     call StripSpaces(my_string2)
                     my_string = trim(my_string)//" "//trim(my_string2)
+                    write(my_string2,*) geometry%f(i)%ni
+                    call StripSpaces(my_string2)
+                    my_string = trim(my_string)//"/0/"//trim(my_string2)
                 end do
                 write(10,'(A100)') adjustl(my_string)
             end do

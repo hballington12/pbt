@@ -2105,6 +2105,7 @@ beam_inc%scatt_out = 0D0
 beam_inc%proj_area_in = 0D0
 allocate(beam_inc%field_in(1:beam_inc%nf_in))
 do i = 1, beam_inc%nf_in ! for each facet in the incident beam
+    beam_inc%field_in(i)%ampl(:,:) = 0D0 ! init amplitude matrix
     beam_inc%field_in(i)%ampl(1,1) = 1D0 ! set amplitude matrix
     beam_inc%field_in(i)%ampl(2,2) = 1D0 
     beam_inc%field_in(i)%e_perp(:) = (/1D0,0D0,0D0/) ! set e-perp vector
