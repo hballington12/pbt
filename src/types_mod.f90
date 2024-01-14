@@ -120,6 +120,7 @@ type beam_type
     integer(8) id ! a label for the position of a beam in a beam tree
     real(8) proj_area_in ! the total area of all facets in this beam when projected along the beam propagation direction
     real(8) proj_area_out ! the total area of all illuminated facets when projected along the beam propagation direction
+    integer(8) rec ! the recursion that this beam belongs to
 end type beam_type
 
 type facet_type

@@ -468,7 +468,8 @@ module beam_loop_mod
         allocate(mapping(1:geometry%na)) ! maps each aperture to a position in the beam tree (if suff. illuminated)
         mapping = 0
         num_new_beams = 0 ! init
-        
+
+        ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(suff_ill(i)) then ! if it was sufficiently illuminated by this beam
                 num_new_beams = num_new_beams + 1 ! update counter
@@ -487,9 +488,12 @@ module beam_loop_mod
                 beam_tree(num_beams)%scatt_out = 0 ! init
                 beam_tree(num_beams)%abs = 0 ! init
                 beam_tree(num_beams)%proj_area_in = 0 ! init
+                beam_tree(num_beams)%id = num_beams ! save position in beam tree
+                beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
             end if
         end do
         
+        ! add information about the field of the new beams to the beam tree
         do i = 1, beam%nf_out ! for each illuminated facet
             fi = beam%field_out(i)%fi ! get the facet id
             ai = beam%field_out(i)%ap ! get the aperture id
@@ -542,6 +546,7 @@ module beam_loop_mod
         mapping = 0
         num_new_beams = 0 ! init
 
+        ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(suff_ill(i)) then ! if it was sufficiently illuminated by this beam
                 num_new_beams = num_new_beams + 1 ! update counter
@@ -558,9 +563,12 @@ module beam_loop_mod
                 beam_tree(num_beams)%is_int = .true. ! is internally propagating
                 beam_tree(num_beams)%scatt_in = 0 ! init
                 beam_tree(num_beams)%scatt_out = 0 ! init
+                beam_tree(num_beams)%id = num_beams ! save position in beam tree
+                beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
             end if
         end do
         
+        ! add information about the field of the new beams to the beam tree
         do i = 1, beam%nf_out ! for each illuminated facet
             fi = beam%field_out(i)%fi ! get the facet id
             ai = beam%field_out(i)%ap ! get the aperture id
@@ -880,7 +888,6 @@ module beam_loop_mod
             !$omp do
             do j = i_start, i_end ! for each entry in the beam tree that belongs to this recursion
                 beam = beam_tree(j) ! get a beam from the beam_tree
-                beam%id = j ! save the position of the beam in the beam tree
                 ! propagate this beam
                 if(beam%is_int) then ! if the beam is internally propagating
                     call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
@@ -888,7 +895,8 @@ module beam_loop_mod
                     print*,'external propagation not supported yet'
                     cycle
                 end if ! end: if the beam is internally propagating
-                !$omp critical      
+                !$omp critical     
+                beam_tree(beam%id) = beam ! update the information about the propagated beam in the beam tree
                 if(job_params%debug >= 2) call print_beam_info(beam,job_params) ! print some info about the beam
                 if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
                 ! add the new beams to the beam tree (need to also add the new information about the current beam)
