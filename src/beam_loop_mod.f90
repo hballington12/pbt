@@ -11,6 +11,49 @@ module beam_loop_mod
     
     contains
     
+    subroutine get_theta_t_complex(theta_i,m1,m2,theta_t)
+
+        ! get_theta_t_complex
+        ! gets the angle of transmission using complex version of Snell's law
+        ! taken from rt_c.f90 by macke 1996
+        !  Calculates the angle of refraction for transmission from 
+        !  (nr1, ni1) -> (nr2,ni2)
+
+        real(8), intent(in) :: theta_i ! angle of incidence
+        complex(8), intent(in) :: m1 ! complex refractive index (incident)
+        complex(8), intent(in) :: m2 ! complex refractive index (transmitted)
+        real(8), intent(out) :: theta_t ! angle of refraction
+
+        real(8) k1 ! imag (inc) / real (inc)
+        real(8) k2 ! imag (trans) / real (trans)
+        real(8) ref1, ref2, ref3, ref6, krel, nrel
+        real(8) sintiq, ref4, ref5, q4, q2, g, test1, test2
+        real(8) ref7, rnstar
+
+        k1 = imag(m1)/real(m1)
+        k2 = imag(m2)/real(m2)
+        krel = (k2 - k1)/(1 + k1*k2)
+        nrel = real(m2)/real(m1)*(1 + k1*k2)/(1 + k1*k1)
+        ref1 = nrel*nrel
+        ref2 = krel*krel
+        ref3 = (1 + ref2)*(1 + ref2)
+        ref6 = ref1*ref3/(1 + krel*k2)/(1 + krel*k2)
+
+        sintiq = sin(theta_i)*sin(theta_i)
+        ref4 = 1 - (1 - ref2)/ref1/ref3*sintiq
+        ref5 = 2*krel/ref1/ref3*sintiq
+        q4 = ref4*ref4 + ref5*ref5
+        q2 = sqrt(q4)
+        g = asin(ref5/q2)/2
+        test1 = acos(ref4/q2)/2
+        test2 = atan(ref5/ref4)/2
+        g = test1
+        ref7 = (cos(g) - k2*sin(g))*(cos(g) - k2*sin(g))
+        rnstar = sqrt(sintiq + ref6*q2*ref7)        
+        theta_t = asin(sin(theta_i)/rnstar)
+
+    end subroutine
+
     subroutine print_beam_info(beam,job_params)
 
         ! print_beam_info
@@ -77,6 +120,7 @@ module beam_loop_mod
         real(8) rbi_int ! internal real part refractive index
         real(8) ibi_int ! internal imaginary part refractive index
         complex(8) m_int ! internal complex refractive index
+        complex(8) m_ext ! external complex refractive index
         real(8) dist ! distance travelled
         logical is_tir ! whether or not there is total internal reflection
         real(8) theta_i ! incident angle with the aperture
@@ -92,7 +136,8 @@ module beam_loop_mod
         waveno = 2*pi/job_params%la ! wavenumber
         rbi_int = job_params%rbi ! real part refractive index
         ibi_int = job_params%ibi ! imaginary part refractive index
-        m_int = cmplx(rbi_int,ibi_int,kind=8) ! refractive index
+        m_int = cmplx(rbi_int,ibi_int,kind=8) ! internl refractive index
+        m_ext = cmplx(1d0,0d0,kind=8) ! external refractive index
         
         ! no need to rotate as propagation is already along the -z direction
         
@@ -154,12 +199,12 @@ module beam_loop_mod
                     theta_i = acos(geometry%n(geometry%f(i)%ni,3))
                 end if
                 is_tir = .false.
-                theta_t = asin(sin(theta_i)/real(m_int))
+                call get_theta_t_complex(theta_i,m_ext,m_int,theta_t) ! get angle of refraction
                 fr(2,2) = (cos(theta_i) - m_int*cos(theta_t))/(cos(theta_i) + m_int*cos(theta_t))
                 ft(2,2) = (2*cos(theta_i))/(cos(theta_i) + m_int*cos(theta_t))
                 fr(1,1) = (m_int*cos(theta_i) - cos(theta_t))/(cos(theta_t) + m_int*cos(theta_i))
                 ft(1,1) = (2*cos(theta_i))/(cos(theta_t) + m_int*cos(theta_i))
-                
+
                 ! apply fresnel matrices to amplitude matrix
                 refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
                 trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
@@ -249,6 +294,7 @@ module beam_loop_mod
         real(8) rbi_int ! internal real part refractive index
         real(8) ibi_int ! internal imaginary part refractive index
         complex(8) m_int ! internal complex refractive index
+        complex(8) m_ext ! external complex refractive index
         real(8) dist ! distance travelled
         logical is_tir ! whether or not there is total internal reflection
         real(8) theta_i ! incident angle
@@ -268,6 +314,7 @@ module beam_loop_mod
         rbi_int = job_params%rbi ! real part refractive index
         ibi_int = job_params%ibi ! imaginary part refractive index
         m_int = cmplx(rbi_int,ibi_int,kind=8) ! refractive index
+        m_ext = cmplx(1d0,0d0,kind=8) ! external refractive index
         
         ! rotate geometry so that the propagation is along the z-axis, save the rotation matrix
         call rotate(beam,geometry,rot_geometry,rot)
@@ -352,6 +399,7 @@ module beam_loop_mod
                 else ! if not tir
                     is_tir = .false.
                     theta_t = asin(sin(theta_i)*rbi_int)
+                    call get_theta_t_complex(theta_i,m_int,m_ext,theta_t)
                     fr(2,2) = (m_int*cos(theta_i) - cos(theta_t))/(m_int*cos(theta_i) + cos(theta_t))
                     ft(2,2) = (2*m_int*cos(theta_i))/(m_int*cos(theta_i) + cos(theta_t))
                     fr(1,1) = (cos(theta_i) - m_int*cos(theta_t))/(m_int*cos(theta_t) + cos(theta_i))
