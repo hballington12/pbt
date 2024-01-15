@@ -398,7 +398,6 @@ module beam_loop_mod
                     ft(1,1) = 0d0
                 else ! if not tir
                     is_tir = .false.
-                    theta_t = asin(sin(theta_i)*rbi_int)
                     call get_theta_t_complex(theta_i,m_int,m_ext,theta_t)
                     fr(2,2) = (m_int*cos(theta_i) - cos(theta_t))/(m_int*cos(theta_i) + cos(theta_t))
                     ft(2,2) = (2*m_int*cos(theta_i))/(m_int*cos(theta_i) + cos(theta_t))
