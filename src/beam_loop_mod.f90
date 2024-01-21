@@ -58,19 +58,20 @@ module beam_loop_mod
 
     end subroutine
     
-    subroutine open_beam_json(filename, beam_tree, num_beams, beam_id)
+    subroutine open_beam_json(filename, beam_tree, beam_id)
 
         character(len=*), intent(in) :: filename
-        type(beam_type), dimension(:), allocatable, intent(in) :: beam_tree
+        type(beam_type), dimension(:), intent(in) :: beam_tree
         integer(4), intent(in), optional :: beam_id
-        integer(8), intent(in) :: num_beams
 
+        integer(8) num_beams
         integer(8) unit
         integer(8) i
         integer(8) ierr
 
         unit = 10
-        
+        num_beams = size(beam_tree,1)
+
         ! Open the file for writing
         open(unit, file=filename, status='unknown', action='write', iostat=ierr)
         if (ierr /= 0) then
@@ -1309,7 +1310,7 @@ module beam_loop_mod
             print'(a)',' =========='
         end if
         
-        ! call open_beam_json("beam.json", beam_tree, num_beams, 3) ! optional, write beam tree or individual beam to json file
+        ! call open_beam_json("beam.json", beam_tree(1:num_beams)) ! optional, write beam tree or individual beam to json file
         
     end subroutine
     
