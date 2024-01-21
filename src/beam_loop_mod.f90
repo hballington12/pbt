@@ -727,7 +727,9 @@ module beam_loop_mod
         
         integer(8) i
         integer(8) num_new_beams ! number of beams to add to the beam tree
-        logical, dimension(:), allocatable :: suff_ill ! whether each aperture was sufficiently illuminated
+        logical, dimension(:), allocatable :: suff_area ! whether each aperture was sufficiently illuminated
+        logical, dimension(:), allocatable :: suff_energy ! whether each aperture had a sufficient amount of energy remaining
+        logical, dimension(:), allocatable :: create_new_beam ! whether a new beam should be created for each aperture
         integer(8), dimension(:), allocatable :: num_ill ! number of illuminated facets in each aperture
         integer(8), dimension(:), allocatable :: mapping ! a mapping
         integer(8) ai ! aperture id
@@ -736,16 +738,26 @@ module beam_loop_mod
         integer(8) nf ! a counter for the number of facets in a beam tree entry
         real(8) proj_area ! the face area projected along the new propagation direction
         
-        ! determine which apertures were sufficiently illuminated to create new beams
-        call get_suff_illuminated(geometry,beam,job_params,suff_ill,num_ill)
+        allocate(create_new_beam(1:geometry%na)) ! init
+        create_new_beam = .false. ! init
+
+        ! determine which apertures were sufficiently illuminated to create new beams based on area of illumination
+        call is_sufficient_area(geometry,beam,job_params,suff_area,num_ill)
         
+        ! determine which apertures were sufficiently illuminated to create new internal beams based on area of illumination
+        call is_sufficient_energy(geometry,beam,job_params,suff_energy,.true.)
+
+        do i = 1, geometry%na ! for each aperture
+            if(suff_area(i) .and. suff_energy(i)) create_new_beam(i) = .true. ! decide if a new beam should be created
+        end do
+
         allocate(mapping(1:geometry%na)) ! maps each aperture to a position in the beam tree (if suff. illuminated)
         mapping = 0
         num_new_beams = 0 ! init
         
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
-            if(suff_ill(i)) then ! if it was sufficiently illuminated by this beam
+            if(create_new_beam(i)) then ! if it was sufficiently illuminated by this beam
                 num_new_beams = num_new_beams + 1 ! update counter
                 num_beams = num_beams + 1 ! add an internally reflected beam to the beam tree
                 if(num_beams > size(beam_tree,1)) then
@@ -767,20 +779,22 @@ module beam_loop_mod
         
         ! add information about the field of the new beams to the beam tree
         do i = 1, beam%nf_out ! for each illuminated facet
-            fi = beam%field_out(i)%fi ! get the facet id
             ai = beam%field_out(i)%ap ! get the aperture id
-            index = mapping(ai) ! get the position of new beam in the beam tree
-            nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
-            nf = nf + 1 ! update the number of facets
-            proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
-            
-            beam_tree(index)%nf_in = nf ! save updated number of facets
-            beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
-            beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
-            beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
-            beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time)
-            beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of reflected power of all facets in the new beam
-            beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
+            if(create_new_beam(ai)) then ! if it was part of an aperture sufficiently illuminated by this beam
+                fi = beam%field_out(i)%fi ! get the facet id
+                index = mapping(ai) ! get the position of new beam in the beam tree
+                nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
+                nf = nf + 1 ! update the number of facets
+                proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
+                
+                beam_tree(index)%nf_in = nf ! save updated number of facets
+                beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
+                beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
+                beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
+                beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time)
+                beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of reflected power of all facets in the new beam
+                beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
+            end if
         end do
         
         if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
@@ -802,7 +816,9 @@ module beam_loop_mod
         
         integer(8) i
         integer(8) num_new_beams ! number of beams to add to the beam tree
-        logical, dimension(:), allocatable :: suff_ill ! whether each aperture was sufficiently illuminated
+        logical, dimension(:), allocatable :: suff_area ! whether each aperture was sufficiently illuminated
+        logical, dimension(:), allocatable :: suff_energy ! whether each aperture had a sufficient amount of energy remaining
+        logical, dimension(:), allocatable :: create_new_beam ! whether a new beam should be created for each aperture
         integer(8), dimension(:), allocatable :: num_ill ! number of illuminated facets in each aperture
         integer(8), dimension(:), allocatable :: mapping ! a mapping
         integer(8) ai ! aperture id
@@ -811,8 +827,18 @@ module beam_loop_mod
         integer(8) nf ! a counter for the number of facets in a beam tree entry
         real(8) proj_area ! the face area projected along the new propagation direction
         
+        allocate(create_new_beam(1:geometry%na)) ! init
+        create_new_beam = .false. ! init
+
         ! determine which apertures were sufficiently illuminated to create new beams
-        call get_suff_illuminated(geometry,beam,job_params,suff_ill,num_ill)
+        call is_sufficient_area(geometry,beam,job_params,suff_area,num_ill)
+
+        ! determine which apertures were sufficiently illuminated to create new internal beams based on area of illumination
+        call is_sufficient_energy(geometry,beam,job_params,suff_energy,.false.)
+
+        do i = 1, geometry%na ! for each aperture
+            if(suff_area(i)) create_new_beam(i) = .true. ! decide if a new beam should be created
+        end do
         
         allocate(mapping(1:geometry%na)) ! maps each aperture to a position in the beam tree (if suff. illuminated)
         mapping = 0
@@ -820,7 +846,7 @@ module beam_loop_mod
         
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
-            if(suff_ill(i)) then ! if it was sufficiently illuminated by this beam
+            if(create_new_beam(i)) then ! if it was part of an aperture sufficiently illuminated by this beam
                 num_new_beams = num_new_beams + 1 ! update counter
                 num_beams = num_beams + 1 ! add an internally reflected beam to the beam tree
                 if(num_beams > size(beam_tree,1)) then
@@ -843,29 +869,89 @@ module beam_loop_mod
         
         ! add information about the field of the new beams to the beam tree
         do i = 1, beam%nf_out ! for each illuminated facet
-            fi = beam%field_out(i)%fi ! get the facet id
             ai = beam%field_out(i)%ap ! get the aperture id
-            index = mapping(ai) ! get the position of new beam in the beam tree
-            nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
-            nf = nf + 1 ! update the number of facets
-            proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
-            
-            beam_tree(index)%nf_in = nf ! save updated number of facets
-            beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
-            beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
-            beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
-            beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time but they are all the same)            
-            beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pt ! incident power for new beam is the sum of transmitted power of all facets in the new beam
-            beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
+            if(create_new_beam(ai)) then ! if it was sufficiently illuminated by this beam
+                fi = beam%field_out(i)%fi ! get the facet id
+                index = mapping(ai) ! get the position of new beam in the beam tree
+                nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
+                nf = nf + 1 ! update the number of facets
+                proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
+                
+                beam_tree(index)%nf_in = nf ! save updated number of facets
+                beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
+                beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
+                beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
+                beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time but they are all the same)            
+                beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pt ! incident power for new beam is the sum of transmitted power of all facets in the new beam
+                beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
+            end if
         end do
         
         if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
         
     end subroutine
     
-    subroutine get_suff_illuminated(geometry,beam,job_params,suff_ill,num_ill)
+    subroutine is_sufficient_energy(geometry,beam,job_params,suff_energy,is_new_beam_int)
         
-        ! get_suff_illuminated
+        ! is_sufficient_area
+        ! this subroutine examines the facets illuminated by a beam
+        ! if the total area is greater than a threshold amount, the aperture is sufficiently illuminated
+        ! sufficiently illuminated apertures create new beams that are propagated
+        
+        type(geometry_type), intent(in) :: geometry
+        type(beam_type), intent(in) :: beam
+        type(job_parameters_type), intent(in) :: job_params
+        logical, intent(in) :: is_new_beam_int
+
+        integer(8) i
+        real(8), dimension(:), allocatable :: ap_energies ! the areas of each aperture that were illuminated
+        logical, dimension(:), allocatable, intent(out) :: suff_energy ! whether each aperture was sufficiently illuminated
+        integer(8) ai ! aperture id
+        integer(8) fi ! face id
+        
+        allocate(ap_energies(1:geometry%na)) ! allocate
+        allocate(suff_energy(1:geometry%na)) ! allocate
+        ap_energies = 0d0 ! init
+        suff_energy = .false. ! init
+
+        ! sum the relevant transmitted or reflected power
+        if(beam%is_int) then ! if this beam was internally propagating
+            if(is_new_beam_int) then ! if the new beam is also internally propagating
+                do i = 1, beam%nf_out ! for each facet illuminated by the beam
+                    ai = beam%field_out(i)%ap ! get the aperture id of the illuminated face
+                    ap_energies(ai) = ap_energies(ai) + beam%field_out(i)%pr ! add the energy of the reflected beam facets
+                end do
+            else ! if the new beam is externally propagating 
+                do i = 1, beam%nf_out ! for each facet illuminated by the beam
+                    ai = beam%field_out(i)%ap ! get the aperture id of the illuminated face
+                    ap_energies(ai) = ap_energies(ai) + beam%field_out(i)%pt ! add the energy of the transmitted beam facets
+                end do
+            end if
+        else ! if this beam was externally propagating
+            if(is_new_beam_int) then ! if the new beam is internally propagating
+                do i = 1, beam%nf_out ! for each facet illuminated by the beam
+                    ai = beam%field_out(i)%ap ! get the aperture id of the illuminated face
+                    ap_energies(ai) = ap_energies(ai) + beam%field_out(i)%pt ! add the energy of the transmitted beam facets
+                end do
+            else ! if the new beam is externally propagating 
+                do i = 1, beam%nf_out ! for each facet illuminated by the beam
+                    ai = beam%field_out(i)%ap ! get the aperture id of the illuminated face
+                    ap_energies(ai) = ap_energies(ai) + beam%field_out(i)%pr ! add the energy of the reflected beam facets
+                end do
+            end if 
+        end if
+
+        do i = 1, geometry%na ! for each aperture
+            if(ap_energies(i) > job_params%thresh_energy) then
+                suff_energy(i) = .true. ! if energy large enough, set suff. energy
+            end if
+        end do
+
+    end subroutine
+
+    subroutine is_sufficient_area(geometry,beam,job_params,suff_area,num_ill)
+        
+        ! is_sufficient_area
         ! this subroutine examines the facets illuminated by a beam
         ! if the total area is greater than a threshold amount, the aperture is sufficiently illuminated
         ! sufficiently illuminated apertures create new beams that are propagated
@@ -876,16 +962,16 @@ module beam_loop_mod
         
         integer(8) i
         real(8), dimension(:), allocatable :: ap_areas ! the areas of each aperture that were illuminated
-        logical, dimension(:), allocatable, intent(out) :: suff_ill ! whether each aperture was sufficiently illuminated
+        logical, dimension(:), allocatable, intent(out) :: suff_area ! whether each aperture was sufficiently illuminated
         integer(8), dimension(:), allocatable, intent(out) :: num_ill ! number of illuminated facets in each aperture
         integer(8) ai ! aperture id
         integer(8) fi ! face id
         
         allocate(ap_areas(1:geometry%na)) ! allocate
-        allocate(suff_ill(1:geometry%na)) ! allocate
+        allocate(suff_area(1:geometry%na)) ! allocate
         allocate(num_ill(1:geometry%na)) ! allocate
         ap_areas = 0d0 ! init
-        suff_ill = .false. ! init
+        suff_area = .false. ! init
         num_ill = 0 ! init
         
         do i = 1, beam%nf_out ! for each facet illuminated by the beam
@@ -896,7 +982,7 @@ module beam_loop_mod
         end do
         
         do i = 1, geometry%na ! for each aperture
-            if(ap_areas(i) > job_params%threshold) suff_ill(i) = .true. ! if area large enough, set suff. illuminated
+            if(ap_areas(i) > job_params%thresh_area) suff_area(i) = .true. ! if area large enough, set suff. illuminated
         end do
         
     end subroutine
@@ -1151,12 +1237,12 @@ module beam_loop_mod
                 end if
             end if
             
-            ! ! get number of threads required
-            ! if(job_params%is_multithreaded) then ! if multithreading enabled
-            !     num_threads = min(omp_get_max_threads(),i_end-i_start+1) ! set threads
-            ! else ! if multithreading disabled
+            ! get number of threads required
+            if(job_params%is_multithreaded) then ! if multithreading enabled
+                num_threads = min(omp_get_max_threads(),i_end-i_start+1) ! set threads
+            else ! if multithreading disabled
                 num_threads = 1
-            ! end if
+            end if
 
             ! loop over each beam for this recursion
             !$omp parallel num_threads(num_threads) private(beam)
@@ -1666,8 +1752,8 @@ module beam_loop_mod
         type(geometry_type), intent(out) :: bb_geometry
         
         real(8) min_x, min_y, max_x, max_y, min_z, max_z
-        integer(8), parameter :: bounding_box_x_dim = 8 ! bounding box x dimension
-        integer(8), parameter :: bounding_box_y_dim = 8 ! bounding box y dimension
+        integer(8), parameter :: bounding_box_x_dim = 4 ! bounding box x dimension
+        integer(8), parameter :: bounding_box_y_dim = 4 ! bounding box y dimension
         real(8), parameter :: fac = 1.1
         real(8), dimension(1:bounding_box_x_dim+1, 1:bounding_box_y_dim+1) :: xvals, yvals ! bounding box x and y vertices
         integer(8) i,j, vert_counter, face_counter

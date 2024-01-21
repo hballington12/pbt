@@ -184,7 +184,7 @@ do i = 1, num_remaining_orients
             end if      
         end if
     end if
-
+    
     ! diffraction
     call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & ! <-  counts the current number of beam outbeams

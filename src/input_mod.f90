@@ -298,7 +298,8 @@ job_params%gamma_lims = (/0D0,360D0/)
 job_params%output_eulers = .false.
 job_params%debug = 1 ! default value is some debugging output
 job_params%timing = .false. ! default is no timing
-job_params%threshold = 0 ! default is no threshold
+job_params%thresh_area = 1d0 ! default area threshold is 0
+job_params%thresh_energy = 1d-4 ! default energy threshold 1d-4
 
 
 ! print*,'command_argument_count(): ',command_argument_count()

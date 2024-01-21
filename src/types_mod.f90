@@ -75,7 +75,8 @@ type job_parameters_type
     logical output_eulers ! enables an output of the euler angles to a file
     integer debug ! level of debugging output (0-3)
     logical timing ! code timing output
-    real(8) threshold ! area threshold for new beams
+    real(8) thresh_area ! area threshold for new beams
+    real(8) thresh_energy ! energy threshold for new beams
 end type job_parameters_type
 
 type field_in_type
