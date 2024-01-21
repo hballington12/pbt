@@ -4,6 +4,7 @@
    module outputs_mod
    
    use misc_submod
+   use types_mod
    
    implicit none
    
@@ -13,11 +14,11 @@
 
       ! saves the remaining orientation numbers to cached file
 
-      integer, intent(in) :: i
+      integer(8), intent(in) :: i
       character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
-      integer j
-      integer, dimension(:), allocatable, intent(in) :: remaining_orients
-      integer, intent(in) ::  num_remaining_orients
+      integer(8) j
+      integer(8), dimension(:), allocatable, intent(in) :: remaining_orients
+      integer(8), intent(in) ::  num_remaining_orients
 
       open(10,file=trim(cache_dir)//"/orient_remaining.dat") ! open file
          do j = i + 1, num_remaining_orients
@@ -35,11 +36,8 @@
                         ampl_far_ext_diff12, & ! amplitude matrix (1,2) due to external diffraction
                         ampl_far_ext_diff21, & ! amplitude matrix (2,1) due to external diffraction
                         ampl_far_ext_diff22, & ! amplitude matrix (2,2) due to external diffraction
-                        energy_out_beam,     & ! beam energy remaining before diffraction
-                        energy_out_ext_diff, & ! external diffraction energy remaining before diffraction
                         mueller,             & ! 2d mueller matrix
                         mueller_1d,          & ! 1d mueller matrix
-                        energy_abs_beam,     & ! energy absorbed inside the particle
                         output_parameters,   & ! output parameters
                         job_params)
       
@@ -53,15 +51,12 @@
       complex(8), dimension(:,:), allocatable, intent(inout) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
       complex(8), dimension(:,:), allocatable, intent(inout)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
       real(8), dimension(:), allocatable :: theta_vals, phi_vals
-      real(8), intent(in) :: energy_out_beam
-      real(8), intent(in) :: energy_out_ext_diff
       real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
       real(8) la ! wavelength
-      real(8), intent(in) :: energy_abs_beam
       type(output_parameters_type), intent(out) :: output_parameters 
       type(job_parameters_type), intent(in) :: job_params
-      
+
       complex(8), dimension(:,:), allocatable :: ampl_far11, ampl_far12, ampl_far21, ampl_far22 ! total
       real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
       real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
@@ -126,12 +121,12 @@
       call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
       
       if(job_params%debug >= 1) then  
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
          print'(A40,f16.8)','scattering cross section (total):',scatt
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
       end if
 
       if (job_params%scaling) then
@@ -139,16 +134,16 @@
             print'(A40)','applying diffraction energy scaling...'
          end if
          ! scale the beam diffraction energy to match near field
-         ampl_far_beam11 = ampl_far_beam11/sqrt(scatt_beam/energy_out_beam)
-         ampl_far_beam12 = ampl_far_beam12/sqrt(scatt_beam/energy_out_beam)
-         ampl_far_beam21 = ampl_far_beam21/sqrt(scatt_beam/energy_out_beam)
-         ampl_far_beam22 = ampl_far_beam22/sqrt(scatt_beam/energy_out_beam)
+         ampl_far_beam11 = ampl_far_beam11/sqrt(scatt_beam/output_parameters%beam_energy_out)
+         ampl_far_beam12 = ampl_far_beam12/sqrt(scatt_beam/output_parameters%beam_energy_out)
+         ampl_far_beam21 = ampl_far_beam21/sqrt(scatt_beam/output_parameters%beam_energy_out)
+         ampl_far_beam22 = ampl_far_beam22/sqrt(scatt_beam/output_parameters%beam_energy_out)
 
          ! scale the external diffraction energy to match near field
-         ampl_far_ext_diff11 = ampl_far_ext_diff11/sqrt(scatt_ext_diff/energy_out_ext_diff)
-         ampl_far_ext_diff12 = ampl_far_ext_diff12/sqrt(scatt_ext_diff/energy_out_ext_diff)
-         ampl_far_ext_diff21 = ampl_far_ext_diff21/sqrt(scatt_ext_diff/energy_out_ext_diff)
-         ampl_far_ext_diff22 = ampl_far_ext_diff22/sqrt(scatt_ext_diff/energy_out_ext_diff)
+         ampl_far_ext_diff11 = ampl_far_ext_diff11/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
+         ampl_far_ext_diff12 = ampl_far_ext_diff12/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
+         ampl_far_ext_diff21 = ampl_far_ext_diff21/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
+         ampl_far_ext_diff22 = ampl_far_ext_diff22/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
 
          ampl_far11 = ampl_far_beam11 + ampl_far_ext_diff11
          ampl_far12 = ampl_far_beam12 + ampl_far_ext_diff12
@@ -191,7 +186,7 @@
       ! write(101,'(A40,f16.8)'),'ext. cross section via opt. theorem (imag):',ext 
       ! print'(A40,f16.8)','ext. cross (opt. theorem) imag:',ext 
       
-      absorption = energy_abs_beam
+      absorption = output_parameters%abs
       
       ext = absorption + scatt
       albedo = 1-(ext-scatt)/ext
@@ -207,10 +202,10 @@
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
          print'(A40,f16.8)','scattering cross section (total):',scatt
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/energy_out_beam*100," %)"
-         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/energy_out_ext_diff*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
+         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
          write(101,'(A40,f16.8)')'abs. cross section:',absorption
          print'(A40,f16.8)','abs. cross:',absorption 
          write(101,'(A40,f16.8)')'ext. cross section:',ext
@@ -346,7 +341,7 @@
          open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
          do i = 1, size(theta_vals,1)
             do j = 1, size(phi_vals,1)
-               write(10,'(f12.4,f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)') &
+               write(10,fmt_mueller_2d) &
                theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
                mueller(j,i,1), mueller(j,i,2), mueller(j,i,3), mueller(j,i,4), &
                mueller(j,i,5), mueller(j,i,6), mueller(j,i,7), mueller(j,i,8), &
@@ -358,7 +353,7 @@
       end if
       open(10,file=trim(output_dir)//"/"//"mueller_scatgrid_1d")
       do j = 1, size(theta_vals,1)
-         write(10,'(f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)') &
+         write(10,fmt_mueller_1d) &
          theta_vals(j)*180/pi, &
          mueller_1d(j,1), mueller_1d(j,2), mueller_1d(j,3), mueller_1d(j,4), &
          mueller_1d(j,5), mueller_1d(j,6), mueller_1d(j,7), mueller_1d(j,8), &
@@ -379,6 +374,7 @@
       write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs / output_parameters_total%geo_cross_sec
       write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt / output_parameters_total%geo_cross_sec
       write(10,'(A30,f16.8)') 'ext. efficiency: ',output_parameters_total%ext / output_parameters_total%geo_cross_sec
+      
       ! below is commented because: different orientations have dif. geo. cross sections, so the efficiencies dont add linearly
       ! write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs_eff
       ! write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt_eff
@@ -519,45 +515,35 @@
 
    end subroutine
 
-   subroutine cache_job(vert_in,                    & ! unrotated vertices
-                        face_ids,                   & ! face ids
-                        num_face_vert,              & ! num vertices per face
-                        apertures,                  & ! apertures
-                        job_params,                 & ! job parameters
+   subroutine cache_job(job_params,                 & ! job parameters
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
                         mueller_total,              & ! total 2d mueller
                         mueller_1d_total,           & ! total 1d mueller
-                        cache_dir)
+                        cache_dir,                  &
+                        geometry)
       
       ! saves the job to the cache directory, possibly to be resumed later
       
-      real(8), dimension(:,:), allocatable, intent(in) :: vert_in ! unique vertices (unrotated)
-      integer, dimension(:,:), allocatable, intent(in) :: face_ids ! face vertex IDs
-      integer, dimension(:), allocatable, intent(in) :: num_face_vert ! number of vertices in each face
-      integer, dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
+      real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
+      integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
+      integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
+      integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
       type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
-      integer, intent(in) :: i_loop
+      integer(8), intent(in) :: i_loop
       type(output_parameters_type), intent(inout) :: output_parameters_total
       real(8), dimension(:,:,:), allocatable , intent(in):: mueller_total ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d_total ! phi-integrated mueller matrices
       character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
+      type(geometry_type), intent(in) :: geometry
       
       print*,'job exit point detected. saving job files to cache...'
       ! call make_cache_dir("cache/",cache_dir)
       print*,'cache directory is "',trim(cache_dir),'"'
       
-      call PDAS(  vert_in,        & ! <-  rotated vertices
-      face_ids,       & ! <-  face vertex IDs
-      cache_dir,      & ! <-  output directory
-      num_face_vert,  & ! <-  number of verices in each face
-      "unrotated")      ! <-  filename
-      
-      call save_apertures(apertures,  & ! <-  apertures
-      cache_dir)    ! <-  cache directory
-      
+      call PDAS(cache_dir, "unrotated", geometry)
+      call save_apertures(geometry, cache_dir)
       call save_params(job_params,i_loop,cache_dir,output_parameters_total)
-      
       call writeup(mueller_total, mueller_1d_total, cache_dir, output_parameters_total, job_params) ! write to file
       
       print*,'saved job files to cache.'
