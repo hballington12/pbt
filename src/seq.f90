@@ -17,17 +17,14 @@ use outputs_mod
 implicit none
 
 ! to do:
-! add vector re-normalisation checks after rotations (ie. sr rotate_into_aperture_system)
 ! add quad support
 ! add support to avoid crash if nan detected
-! automatic meshing
-! automatic apertures
 
 ! ############################################################################################################
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer i_loop, loop_start, i
+integer(8) i_loop, loop_start, i
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -35,33 +32,17 @@ character(len=255) :: output_dir ! output directory
 type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
-integer num_vert ! number of unique vertices
-integer num_face !  number of faces
-integer, dimension(:,:), allocatable :: face_ids ! face vertex IDs
-real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
-real(8), dimension(:,:), allocatable :: vert ! unique vertices (rotated)
-integer, dimension(:), allocatable :: num_face_vert ! number of vertices in each face
-integer, dimension(:), allocatable :: apertures ! apertures asignments for each facet
-
-! sr make_normals
-integer, dimension(:) ,allocatable :: norm_ids ! face vertex IDs
-real(8), dimension(:,:) ,allocatable :: norms ! unique vertices
+type(geometry_type) geometry ! particle geometry data structure
+type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 
 ! sr makeIncidentBeam
-real(8), allocatable, dimension(:,:) :: beamV ! beam vertices
-real(8), allocatable, dimension(:,:) :: beamN ! beam normals
-real(8), allocatable, dimension(:,:) :: beamMidpoints ! beam  midpoints
-integer, allocatable, dimension(:,:) :: beamF1 ! beam face vertex indices
-integer, allocatable, dimension(:) :: beamF2 ! beam face normal indices
-complex(8), allocatable, dimension(:,:,:) :: ampl_beam ! amplitude matrix of incident beam
+type(geometry_type) beam_geometry
+type(beam_type) beam_inc
 
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
 type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing beams from external diffraction
-integer beam_outbeam_tree_counter ! counts the current number of beam outbeams
-real(8) energy_out_beam
-real(8) energy_out_ext_diff
-real(8) energy_abs_beam
+integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
 
 ! sr diff_main
 complex(8), dimension(:,:), allocatable:: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! total
@@ -80,8 +61,8 @@ real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 integer my_rank
 integer seed(1:8)
 character(len=255) cache_dir ! cached files directory (if job stops early)
-integer, dimension(:), allocatable :: remaining_orients
-integer num_remaining_orients
+integer(8), dimension(:), allocatable :: remaining_orients
+integer(8) num_remaining_orients
 
 ! ############################################################################################################
 ! start main
@@ -92,7 +73,6 @@ loop_start = 1
 seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
 
 call parse_command_line(job_params)
-
 
 if(job_params%resume) then
     print*,'attempting to resume job using cache #',job_params%cache_id
@@ -109,21 +89,22 @@ open(101,file=trim(output_dir)//"/"//"log") ! open global non-standard log file 
 ! write job parameters to log file
 call write_job_params(job_params)
 
-! get input particle information
-call PDAL2( num_vert,       & !  -> number of unique vertices
-            num_face,       & !  -> number of faces
-            face_ids,       & !  -> face vertex IDs
-            vert_in,        & !  -> unique vertices
-            num_face_vert,  & !  -> number of vertices in each face
-            apertures,      & !  -> apertures
-            job_params)       ! <-  job parameters
+! get input particle geometry
+call PDAL2( job_params,     & ! <-  job parameters
+            geometry)         !  -> particle geometry            
+
 
 if (job_params%tri) then
     print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
     print*,'================================='
-    call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,job_params%tri_edge_length,'-Q -q',apertures,job_params%tri_roughness, my_rank, output_dir) ! triangulate the particle
-    call merge_vertices(vert_in, face_ids, num_vert, 1D-1) ! merge vertices that are close enough
-    call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
+    call triangulate(   job_params%tri_edge_length, &
+                        '-Q -q', &
+                        job_params%tri_roughness, &
+                        my_rank, &
+                        output_dir, &
+                        geometry) ! triangulate the particle
+    ! call merge_vertices(vert_in, face_ids, 1D-1, geometry) ! merge vertices that are close enough
+    ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! max_edge_length = job_params%la*2
     ! max_area = max_edge_length**2*sqrt(3D0)/4D0
     ! print*,'area threshold: ',max_area
@@ -131,20 +112,10 @@ if (job_params%tri) then
     print*,'================================='
 end if
 
-call make_normals(face_ids, vert_in, norm_ids, norms)
-
-! stop
 ! write unrotated particle to file (optional)            
-call PDAS(  vert_in,        & ! <-  rotated vertices
-            face_ids,       & ! <-  face vertex IDs
-            output_dir,     & ! <-  output directory
-            num_face_vert,  & ! <-  number of verices in each face
+call PDAS(  output_dir,     & ! <-  output directory
             "unrotated",    & ! <-  filename
-            norms,          &
-            norm_ids)
-
-! also write the apertures
-call save_apertures(apertures, output_dir)
+            geometry)
 
 call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 call init_loop( alpha_vals, &
@@ -172,52 +143,36 @@ do i = 1, num_remaining_orients
     i_loop = remaining_orients(i)
 
     ! rotate particle
-    call PROT_MPI(  vert_in,    & ! <-> unique vertices (unrotated in, rotated out) to do: remove inout intent and add a rotated vertices variable
-                    vert,       &
-                    alpha_vals, &
+    call PROT_MPI(  alpha_vals, &
                     beta_vals,  &
                     gamma_vals, &
                     i_loop,     &
-                    job_params)
+                    job_params, &
+                    geometry,   &
+                    rotated_geometry)
 
     ! write rotated particle to file (optional)
     if (job_params%num_orients .eq. 1) then
-        call PDAS(  vert,           & ! <-  rotated vertices
-                    face_ids,       & ! <-  face vertex IDs
-                    output_dir,     & ! <-  output directory
-                    num_face_vert,  & ! <-  number of verices in each face
-                    "rotated")
+        call PDAS(  output_dir,     & ! <-  output directory
+                    "rotated",    & ! <-  filename
+                    rotated_geometry)
     end if
 
     ! fast implementation of the incident beam
-    call makeIncidentBeam(  beamV,         & ! ->  beam vertices
-                            beamF1,        & ! ->  beam face vertex indices
-                            beamN,         & ! ->  beam normals
-                            beamF2,        & ! ->  beam face normal indices
-                            vert,          & ! <-  unique vertices
-                            beamMidpoints, & !  -> beam  midpoints
-                            ampl_beam)       !  -> amplitude matrix of incident beam       
+    call make_incident_beam(rotated_geometry,          & ! <-  unique vertices
+                            beam_geometry, &
+                            beam_inc)
 
     ! beam loop
-    call beam_loop( face_ids,                  & ! <-  face vertex IDs
-                    vert,                      & ! <-  unique vertices
-                    apertures,                 & ! <-  apertures
-                    beamV,                     & ! <-  beam vertices
-                    beamF1,                    & ! <-  beam face vertex indices
-                    beamN,                     & ! <-  beam normals
-                    beamF2,                    & ! <-  beam face normal indices
-                    beamMidpoints,             & ! <-  beam  midpoints
-                    ampl_beam,                 & ! <-  amplitude matrix of incident beam
-                    beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
+    call beam_loop( beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
                     ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
-                    energy_out_beam,           & !  -> total energy out from beams (before diffraction)
-                    energy_out_ext_diff,       & !  -> total energy out from external diffraction (before diffraction)
-                    energy_abs_beam,           & !  -> total energy absorbed from beams (before diffraction)
                     output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
-                    num_face_vert,             & ! <-  number of verices in each face
-                    job_params)
-    
+                    job_params,                 &
+                    rotated_geometry, &
+                    beam_geometry, &
+                    beam_inc)
+
     if(num_remaining_orients .gt. 1) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
         ! print*,'total time elapsed: ',omp_get_wtime()-start
@@ -229,7 +184,7 @@ do i = 1, num_remaining_orients
             end if      
         end if
     end if
-
+    
     ! diffraction
     call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & ! <-  counts the current number of beam outbeams
@@ -252,11 +207,8 @@ do i = 1, num_remaining_orients
                     ampl_far_ext_diff12, & ! <-  amplitude matrix (1,2) due to external diffraction
                     ampl_far_ext_diff21, & ! <-  amplitude matrix (2,1) due to external diffraction
                     ampl_far_ext_diff22, & ! <-  amplitude matrix (2,2) due to external diffraction
-                    energy_out_beam,     & ! <-  total energy out from beams (before diffraction)
-                    energy_out_ext_diff, & ! <-  total energy out from external diffraction (before diffraction)
                     mueller,             & !  -> 2d mueller matrix
                     mueller_1d,          & !  -> 1d mueller matrix
-                    energy_abs_beam,     & ! <-  energy absorbed within the particle
                     output_parameters,   & !  -> some output parameters
                     job_params)
                     
@@ -267,16 +219,13 @@ do i = 1, num_remaining_orients
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
         call make_cache_dir("cache/",cache_dir)
         call cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients)
-        call cache_job( vert_in,                    & ! unrotated vertices
-                        face_ids,                   & ! face ids
-                        num_face_vert,              & ! num vertices per face
-                        apertures,                  & ! apertures
-                        job_params,                 & ! job parameters
+        call cache_job( job_params,                 & ! job parameters
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
                         mueller_total,              & ! total 2d mueller
                         mueller_1d_total,           & ! total 1d mueller
-                        cache_dir)
+                        cache_dir,                  &
+                        geometry)
         stop
     end if
 
