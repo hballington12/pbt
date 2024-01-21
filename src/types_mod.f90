@@ -99,6 +99,9 @@ type field_out_type
     real(8) prop_ext(1:3) ! external propagation direction (computed from facet normal)
     real(8) scatt_int ! the internal scattering cross section contribution of this facet
     real(8) scatt_ext ! the external scattering cross section contribution of this facet
+    real(8) pi ! incident power
+    real(8) pr ! reflected power
+    real(8) pt ! transmitted power
     real(8) proj_area ! the area of this facet projected along the incoming beam propagation direction
 end type field_out_type
 
@@ -121,6 +124,9 @@ type beam_type
     real(8) proj_area_in ! the total area of all facets in this beam when projected along the beam propagation direction
     real(8) proj_area_out ! the total area of all illuminated facets when projected along the beam propagation direction
     integer(8) rec ! the recursion that this beam belongs to
+    real(8) pi ! incident power
+    real(8) pr ! reflected power
+    real(8) pt ! transmitted power
 end type beam_type
 
 type facet_type
