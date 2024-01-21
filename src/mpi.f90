@@ -205,6 +205,7 @@ else ! if we are not resuming a cached job
     end do
 end if
 
+if(p > num_remaining_orients) error stop "error: number of mpi processes must not be greater than number of orientations"
 n1 = int(num_remaining_orients / p)
 n2 = mod(num_remaining_orients,  p)
 my_start = my_rank*(n1+1)+1
@@ -288,17 +289,11 @@ do i = my_start, my_end
     ! if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .and. i /= my_end) then
         i_finished_early = .true.
-        exit ! break out of the orientation loop
-
-        print*,'rank',my_rank,'time limit reached. breaking from orientation loop...'
-    
+        exit ! break out of the orientation loop    
     end if
 
 
 end do
-
-
-
 
 print*,'my rank:',my_rank,'finished'
 print*,'rank',my_rank,'finished early?',i_finished_early
@@ -321,7 +316,6 @@ call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
 ! broadcast job cache decision to all processes from rank 0
 call MPI_Bcast(is_job_cached, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
-print*,'my rank',my_rank,'is job to be cached?',is_job_cached
 
 if(is_job_cached) then ! if the job is to be cached
 
