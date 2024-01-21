@@ -11,25 +11,192 @@ module beam_loop_mod
     
     contains
     
-    subroutine get_theta_t_complex(theta_i,m1,m2,theta_t)
+    subroutine open_beam_json(filename, beam_tree, num_beams, beam_id)
 
+        character(len=*), intent(in) :: filename
+        type(beam_type), dimension(:), allocatable, intent(in) :: beam_tree
+        integer(4), intent(in), optional :: beam_id
+        integer(8), intent(in) :: num_beams
+
+        integer(8) unit
+        integer(8) i
+        integer(8) ierr
+
+        unit = 10
+        
+        ! Open the file for writing
+        open(unit, file=filename, status='unknown', action='write', iostat=ierr)
+        if (ierr /= 0) then
+            print *, "Error opening file ", filename
+            return
+        end if
+
+        write(unit, *) '{'
+        write(unit, *) '"beam tree":['
+
+        if(present(beam_id)) then
+            write(unit, *) '    {'
+            call write_beam_json(filename,beam_tree(beam_id),unit)
+            write(unit, *) '    }'
+        else
+            do i = 1, num_beams
+                write(unit, *) '    {'
+                call write_beam_json(filename,beam_tree(i),unit)
+                if(i /= num_beams) then
+                    write(unit, *) '    },'
+                else
+                    write(unit, *) '    }'
+                end if
+            end do
+        end if
+
+        write(unit, *) '    ]'
+        write(unit, *) '}'
+
+        ! Close the file
+        close(unit)
+
+
+    end subroutine
+
+    subroutine write_beam_json(filename, beam, unit)
+
+        ! write_beam_json
+        ! writes a beam to a file in json format
+
+        character(len=*), intent(in) :: filename
+        type(beam_type), intent(in) :: beam 
+        integer(8), intent(in) :: unit
+
+        integer(8) i
+        integer(8) ierr
+
+        ! Write the JSON data to the file
+        write(unit, *) '    "beam id": ', beam%id, ','
+        write(unit, *) '    "prop": ['
+        write(unit, *) '    ',beam%prop(1), ','
+        write(unit, *) '    ',beam%prop(2), ','
+        write(unit, *) '    ',beam%prop(3)
+        write(unit, *) '    ','],'
+        write(unit, *) '    "nf_in": ', beam%nf_in, ','
+        write(unit, *) '    "nf_out": ', beam%nf_out, ','
+        write(unit, *) '    "ap": ', beam%ap, ','
+        write(unit, *) '    "abs": ', beam%abs, ','
+        write(unit, *) '    "scatt_in": ', beam%scatt_in, ','
+        write(unit, *) '    "scatt_out": ', beam%scatt_out, ','
+        if(beam%is_int) then
+            write(unit, *) '    "is_int": ', 'true', ','
+        else
+            write(unit, *) '    "is_int": ', 'false', ','
+        end if
+        write(unit, *) '    "proj_area_in": ', beam%proj_area_in, ','
+        write(unit, *) '    "proj_area_out": ', beam%proj_area_out, ','
+        write(unit, *) '    "rec": ', beam%rec, ','
+        write(unit, *) '    "field_in": ['
+        do i = 1, size(beam%field_in)
+            write(unit, *) '    {'
+            write(unit, *) '        "fi": ', beam%field_in(i)%fi,','
+            write(unit, *) '        "ampl": ['
+            write(unit, *) '        ['
+            write(unit, *) '            [', real(beam%field_in(i)%ampl(1,1)), ',', imag(beam%field_in(i)%ampl(1,1)), '],'
+            write(unit, *) '            [', real(beam%field_in(i)%ampl(1,2)), ',', imag(beam%field_in(i)%ampl(1,2)), ']'
+            write(unit, *) '        ],'
+            write(unit, *) '        ['
+            write(unit, *) '            [', real(beam%field_in(i)%ampl(2,1)), ',', imag(beam%field_in(i)%ampl(2,1)), '],'
+            write(unit, *) '            [', real(beam%field_in(i)%ampl(2,2)), ',', imag(beam%field_in(i)%ampl(2,2)), ']'
+            write(unit, *) '        ]'
+            write(unit, *) '        ],' 
+            write(unit, *) '        "e_perp": ['
+            write(unit, *) '        ', beam%field_in(i)%e_perp(1),','
+            write(unit, *) '        ', beam%field_in(i)%e_perp(2),','
+            write(unit, *) '        ', beam%field_in(i)%e_perp(3)
+            write(unit, *)'         ]'
+            if (i /= size(beam%field_in)) then
+                write(unit, *) '    },'
+            else
+                write(unit, *) '    }'
+            end if
+        end do
+        write(unit, *) '    ],'
+        write(unit, *) '    "field_out": ['
+        if(allocated(beam%field_out)) then
+            do i = 1, size(beam%field_out)
+                write(unit, *) '    {'
+                write(unit, *) '    "fi": ', beam%field_out(i)%fi,','
+                write(unit, *) '      "ampl_int": ['
+                write(unit, *) '          ['
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_int(1,1)), ',', imag(beam%field_out(i)%ampl_int(1,1)), '],'
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_int(1,2)), ',', imag(beam%field_out(i)%ampl_int(1,2)), ']'
+                write(unit, *) '          ],'
+                write(unit, *) '          ['
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_int(2,1)), ',', imag(beam%field_out(i)%ampl_int(2,1)), '],'
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_int(2,2)), ',', imag(beam%field_out(i)%ampl_int(2,2)), ']'
+                write(unit, *) '          ]'
+                write(unit, *) '      ],' 
+                write(unit, *) '      "ampl_ext": ['
+                write(unit, *) '          ['
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_ext(1,1)), ',', imag(beam%field_out(i)%ampl_ext(1,1)), '],'
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_ext(1,2)), ',', imag(beam%field_out(i)%ampl_ext(1,2)), ']'
+                write(unit, *) '          ],'
+                write(unit, *) '          ['
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_ext(2,1)), ',', imag(beam%field_out(i)%ampl_ext(2,1)), '],'
+                write(unit, *) '              [', real(beam%field_out(i)%ampl_ext(2,2)), ',', imag(beam%field_out(i)%ampl_ext(2,2)), ']'
+                write(unit, *) '          ]'
+                write(unit, *) '      ],' 
+                write(unit, *) '      "e_perp": ['
+                write(unit, *) '         ', beam%field_out(i)%e_perp(1),','
+                write(unit, *) '         ', beam%field_out(i)%e_perp(2),','
+                write(unit, *) '         ', beam%field_out(i)%e_perp(3)
+                write(unit, *)'        ],'
+                write(unit, *) '      "ap": ', beam%field_out(i)%ap, ','
+                if(beam%field_out(i)%is_tir) then
+                    write(unit, *) '      "is_tir": ', 'true', ','
+                else
+                    write(unit, *) '      "is_tir": ', 'false', ','
+                end if
+                write(unit, *) '        "prop_int": ['
+                write(unit, *) '        ', beam%field_out(i)%prop_int(1),','
+                write(unit, *) '        ', beam%field_out(i)%prop_int(2),','
+                write(unit, *) '        ', beam%field_out(i)%prop_int(3)
+                write(unit, *)'         ],'
+                write(unit, *) '        "prop_ext": ['
+                write(unit, *) '        ', beam%field_out(i)%prop_ext(1),','
+                write(unit, *) '        ', beam%field_out(i)%prop_ext(2),','
+                write(unit, *) '        ', beam%field_out(i)%prop_ext(3)
+                write(unit, *)'         ],'
+                write(unit, *) '        "scatt_int": ', beam%field_out(i)%scatt_int, ','
+                write(unit, *) '        "scatt_ext": ', beam%field_out(i)%scatt_ext, ','
+                write(unit, *) '        "proj_area": ', beam%field_out(i)%proj_area
+                if (i /= size(beam%field_out)) then
+                    write(unit, *) '    },'
+                else
+                    write(unit, *) '    }'
+                end if
+            end do
+        end if
+        write(unit, *) '    ]'
+
+    end subroutine write_beam_json
+    
+    subroutine get_theta_t_complex(theta_i,m1,m2,theta_t)
+        
         ! get_theta_t_complex
         ! gets the angle of transmission using complex version of Snell's law
         ! taken from rt_c.f90 by macke 1996
         !  Calculates the angle of refraction for transmission from 
         !  (nr1, ni1) -> (nr2,ni2)
-
+        
         real(8), intent(in) :: theta_i ! angle of incidence
         complex(8), intent(in) :: m1 ! complex refractive index (incident)
         complex(8), intent(in) :: m2 ! complex refractive index (transmitted)
         real(8), intent(out) :: theta_t ! angle of refraction
-
+        
         real(8) k1 ! imag (inc) / real (inc)
         real(8) k2 ! imag (trans) / real (trans)
         real(8) ref1, ref2, ref3, ref6, krel, nrel
         real(8) sintiq, ref4, ref5, q4, q2, g, test1, test2
         real(8) ref7, rnstar
-
+        
         k1 = imag(m1)/real(m1)
         k2 = imag(m2)/real(m2)
         krel = (k2 - k1)/(1 + k1*k2)
@@ -38,7 +205,7 @@ module beam_loop_mod
         ref2 = krel*krel
         ref3 = (1 + ref2)*(1 + ref2)
         ref6 = ref1*ref3/(1 + krel*k2)/(1 + krel*k2)
-
+        
         sintiq = sin(theta_i)*sin(theta_i)
         ref4 = 1 - (1 - ref2)/ref1/ref3*sintiq
         ref5 = 2*krel/ref1/ref3*sintiq
@@ -51,17 +218,17 @@ module beam_loop_mod
         ref7 = (cos(g) - k2*sin(g))*(cos(g) - k2*sin(g))
         rnstar = sqrt(sintiq + ref6*q2*ref7)        
         theta_t = asin(sin(theta_i)/rnstar)
-
+        
     end subroutine
-
+    
     subroutine print_beam_info(beam,job_params)
-
+        
         ! print_beam_info
         ! prints useful debugging information about the propagation of a beam
-
+        
         type(beam_type), intent(in) :: beam
         type(job_parameters_type), intent(in) :: job_params
-
+        
         if(job_params%debug >= 3) then
             print*,'-----------------------------------------------'
             if(beam%is_int) then
@@ -77,12 +244,12 @@ module beam_loop_mod
             print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section in: ',beam%proj_area_in
             print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section out: ',beam%proj_area_out
         end if
-
-
+        
+        
     end subroutine
-
+    
     subroutine recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree)
-
+        
         ! recursion_inc
         ! propagates the incident beam
         ! finds the visible facets as viewed along the initial propagation direction (-z)
@@ -189,7 +356,7 @@ module beam_loop_mod
                 
                 ! apply distance phase factor
                 ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*dist)
-
+                
                 ! compute fresnel matrices
                 fr(:,:) = 0d0 ! init fresnel reflection matrix
                 ft(:,:) = 0d0 ! init fresnel transmission matrix
@@ -204,7 +371,7 @@ module beam_loop_mod
                 ft(2,2) = (2*cos(theta_i))/(cos(theta_i) + m_int*cos(theta_t))
                 fr(1,1) = (m_int*cos(theta_i) - cos(theta_t))/(cos(theta_t) + m_int*cos(theta_i))
                 ft(1,1) = (2*cos(theta_i))/(cos(theta_t) + m_int*cos(theta_i))
-
+                
                 ! apply fresnel matrices to amplitude matrix
                 refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
                 trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
@@ -214,24 +381,24 @@ module beam_loop_mod
                 trans_ampl(1,2)*conjg(trans_ampl(1,2)) + &
                 trans_ampl(2,1)*conjg(trans_ampl(2,1)) + &
                 trans_ampl(2,2)*conjg(trans_ampl(2,2))))
-
+                
                 ! compute external intensity
                 ext_intensity = real(0.5*(  refl_ampl(1,1)*conjg(refl_ampl(1,1)) + &
                 refl_ampl(1,2)*conjg(refl_ampl(1,2)) + &
                 refl_ampl(2,1)*conjg(refl_ampl(2,1)) + &
                 refl_ampl(2,2)*conjg(refl_ampl(2,2))))
-
+                
                 ! possibly remove reflection from shadow facets here
                 ! if(is_shad(i)) refl_ampl(:,:) = 0d0
                 
                 ! get projected facet area
                 theta_i_facet = acos(geometry%n(geometry%f(i)%ni,3))
                 proj_area = geometry%f(i)%area * cos(theta_i_facet)
-
+                
                 ! compute the transmitted propagation vector (from the whole aperture)
                 norm(:) = -an(:) ! get aperture normal
                 call get_trans_prop(theta_i,theta_t,prop,norm,prop_int) ! get the transmitted propagation vector
-                        
+                
                 ! save stuff to the beam structure
                 beam_inc%field_out(n)%ampl_ext(:,:) = refl_ampl(:,:) ! save the transmitted amplitude matrix
                 beam_inc%field_out(n)%ampl_int(:,:) = trans_ampl(:,:) ! save the reflected amplitude matrix
@@ -258,7 +425,7 @@ module beam_loop_mod
     end subroutine
     
     subroutine recursion_int(beam,geometry,job_params)
-
+        
         ! recursion_int
         ! propagates an internal beam
         ! finds the visible facets as viewed along the initial propagation direction (-z)
@@ -267,7 +434,7 @@ module beam_loop_mod
         type(geometry_type), intent(in) :: geometry ! geometry data structure
         type(job_parameters_type), intent(in) :: job_params ! job parameters
         type(beam_type), intent(inout) :: beam ! current beam to be traced
-
+        
         type(geometry_type) :: rot_geometry ! the geometry structure after rotating
         integer(8) i, j ! some counters
         integer(8) ai ! an aperture id
@@ -373,7 +540,7 @@ module beam_loop_mod
                 ampl(1,2)*conjg(ampl(1,2)) + &
                 ampl(2,1)*conjg(ampl(2,1)) + &
                 ampl(2,2)*conjg(ampl(2,2))))
-
+                
                 ! compute absorbed intensity (before applying the absorption factor)
                 abs_intensity = in_intensity * (1d0-exp(-2*waveno*ibi_int*sqrt(dist))**2)
                 
@@ -414,26 +581,26 @@ module beam_loop_mod
                 refl_ampl(1,2)*conjg(refl_ampl(1,2)) + &
                 refl_ampl(2,1)*conjg(refl_ampl(2,1)) + &
                 refl_ampl(2,2)*conjg(refl_ampl(2,2))))
-
+                
                 ! compute external intensity
                 ext_intensity = real(0.5*(  trans_ampl(1,1)*conjg(trans_ampl(1,1)) + &
                 trans_ampl(1,2)*conjg(trans_ampl(1,2)) + &
                 trans_ampl(2,1)*conjg(trans_ampl(2,1)) + &
                 trans_ampl(2,2)*conjg(trans_ampl(2,2))))
-
+                
                 ! possibly remove transmission from shadow facets here
                 if(is_shad(i)) trans_ampl(:,:) = 0d0
                 
                 ! get projected facet area
                 theta_i_facet = acos(-(rot_geometry%n(rot_geometry%f(i)%ni,3)))
                 proj_area = geometry%f(i)%area * cos(theta_i_facet)
-
+                
                 ! add to the beam absorption cross section
                 beam%abs = beam%abs + (abs_intensity * proj_area * rbi_int) ! sum the absorbed energy
-
+                
                 ! add to the beam output cross section
                 beam%scatt_out = beam%scatt_out + (out_intensity * proj_area * rbi_int)
-
+                
                 ! compute the transmitted propagation vector
                 if(.not. is_tir) then ! if no internal reflection
                     norm(:) = geometry%n(geometry%f(i)%ni,:)
@@ -452,15 +619,15 @@ module beam_loop_mod
                 beam%field_out(n)%scatt_int = int_intensity * proj_area ! save the scattering cross section contribution
                 beam%field_out(n)%scatt_ext = ext_intensity * proj_area * (cos(theta_t)/cos(theta_i_facet)) ! save the scattering cross section contribution
                 beam%field_out(n)%proj_area = proj_area ! save the geometric cross section
-
+                
                 beam%proj_area_out = beam%proj_area_out + proj_area ! sum the total projected area for this beam
             end if
         end do
-
+        
     end subroutine
     
     subroutine get_trans_prop(theta_i,theta_t,prop_in,norm,prop_out)
-
+        
         ! get_trans_prop
         ! gets a transmitted propagation vector from an incident angle,
         !   transmitted angle, incident propagation vector, and surface normal
@@ -508,14 +675,14 @@ module beam_loop_mod
         integer(8) index ! index of a beam in the beam tree
         integer(8) nf ! a counter for the number of facets in a beam tree entry
         real(8) proj_area ! the face area projected along the new propagation direction
-
+        
         ! determine which apertures were sufficiently illuminated to create new beams
         call get_suff_illuminated(geometry,beam,job_params,suff_ill,num_ill)
         
         allocate(mapping(1:geometry%na)) ! maps each aperture to a position in the beam tree (if suff. illuminated)
         mapping = 0
         num_new_beams = 0 ! init
-
+        
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(suff_ill(i)) then ! if it was sufficiently illuminated by this beam
@@ -548,7 +715,7 @@ module beam_loop_mod
             nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
             nf = nf + 1 ! update the number of facets
             proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
-
+            
             beam_tree(index)%nf_in = nf ! save updated number of facets
             beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
             beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
@@ -568,7 +735,7 @@ module beam_loop_mod
         ! for an externally propagating beam, adds the new beams to the beam tree
         ! after an external beam has been propagated in sr recursion_int, it passed here to add
         !   the new beams to the beam tree, which may be then later traced
-
+        
         type(beam_type), dimension(:), allocatable, intent(inout) :: beam_tree
         type(beam_type), intent(in) :: beam ! current beam to be traced
         integer(8), intent(inout) :: num_beams
@@ -592,7 +759,7 @@ module beam_loop_mod
         allocate(mapping(1:geometry%na)) ! maps each aperture to a position in the beam tree (if suff. illuminated)
         mapping = 0
         num_new_beams = 0 ! init
-
+        
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(suff_ill(i)) then ! if it was sufficiently illuminated by this beam
@@ -623,7 +790,7 @@ module beam_loop_mod
             nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
             nf = nf + 1 ! update the number of facets
             proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
-
+            
             beam_tree(index)%nf_in = nf ! save updated number of facets
             beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
             beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
@@ -634,7 +801,7 @@ module beam_loop_mod
         end do
         
         if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
-
+        
     end subroutine
     
     subroutine get_suff_illuminated(geometry,beam,job_params,suff_ill,num_ill)
@@ -676,7 +843,7 @@ module beam_loop_mod
     end subroutine
     
     subroutine rotate(beam,geometry,rot_geometry,rot)
-
+        
         ! rotate
         ! rotates a geometry
         ! the geometry is rotated so the the propagation direction of a beam is
@@ -739,7 +906,7 @@ module beam_loop_mod
         
         ! energy_checks
         ! performs some energy checks after the beam loop has finished
-
+        
         type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
         integer(8), intent(in) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
         type(output_parameters_type), intent(inout) :: output_parameters
@@ -871,7 +1038,7 @@ module beam_loop_mod
         start1 = 0d0
         finish = 0d0
         finish1 = 0d0
-
+        
         if(job_params%timing) then
             start = omp_get_wtime()
         endif
@@ -892,9 +1059,9 @@ module beam_loop_mod
                 start1 = omp_get_wtime()
             end if
         end if
-
+        
         call recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree) ! do the initial incidence
-
+        
         call add_to_beam_tree_external(beam_tree,beam_inc,num_beams,geometry,job_params) ! add beams to be propagated to the tree
         
         call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam_inc,job_params) ! add externally reflected beams to diffraction tree
@@ -910,7 +1077,7 @@ module beam_loop_mod
                 print*,'======================================'
             end if
         end if
-
+        
         ! main loop
         i_start = 1 ! entry in beam tree to start at
         do i = 1, job_params%rec ! for each recursion
@@ -922,13 +1089,13 @@ module beam_loop_mod
                     start1 = omp_get_wtime()
                 end if
             end if
-
-            ! get number of threads required
-            if(job_params%is_multithreaded) then ! if multithreading enabled
-                num_threads = min(omp_get_max_threads(),i_end-i_start+1) ! set threads
-            else ! if multithreading disabled
+            
+            ! ! get number of threads required
+            ! if(job_params%is_multithreaded) then ! if multithreading enabled
+            !     num_threads = min(omp_get_max_threads(),i_end-i_start+1) ! set threads
+            ! else ! if multithreading disabled
                 num_threads = 1
-            end if
+            ! end if
 
             ! loop over each beam for this recursion
             !$omp parallel num_threads(num_threads) private(beam)
@@ -994,7 +1161,7 @@ module beam_loop_mod
             print'(a)',' =========='
         end if
         
-        ! stop
+        ! call open_beam_json("beam.json", beam_tree, num_beams, 3) ! optional, write beam tree or individual beam to json file
         
     end subroutine
     
@@ -1226,7 +1393,7 @@ module beam_loop_mod
     
     subroutine find_vis_incidence(in_beam, is_vis, dist_beam, id_beam, is_shad, beam, geometry, beam_geometry)
         
- 
+        
         
         logical, dimension(:), allocatable, intent(out) :: in_beam
         real(8), dimension(:), allocatable, intent(out) :: dist_beam
@@ -1399,7 +1566,7 @@ module beam_loop_mod
     end subroutine
     
     subroutine get_geo_cross_section(geometry,inc_beam,output_parameters)
-
+        
         ! get_geo_cross_section
         ! gets the illuminated geometric cross section for a beam
         ! currently adds this directly to the output parameters, but could be
@@ -1427,11 +1594,11 @@ module beam_loop_mod
     end subroutine
     
     subroutine beam_aligned_bounding_boxes(geometry,bb_geometry)
-
-    ! beam_aligned_bounding_boxes
-    ! makes some 2-dimensional bounding boxes to help speed up some other subroutines
-    ! this method was quick to implement but should be replaced in the future by a
-    !   method which does not need to be re-called for every beam that is propagated
+        
+        ! beam_aligned_bounding_boxes
+        ! makes some 2-dimensional bounding boxes to help speed up some other subroutines
+        ! this method was quick to implement but should be replaced in the future by a
+        !   method which does not need to be re-called for every beam that is propagated
         
         type(geometry_type), intent(in) :: geometry
         type(geometry_type), intent(out) :: bb_geometry
@@ -1507,12 +1674,12 @@ module beam_loop_mod
         
         ! add_to_outbeam_tree
         ! adds the external field after a beam has propagated to the outbeam tree, ready for diffraction
-
+        
         integer(8), intent(inout) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
         type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
         type(beam_type), intent(in) :: beam ! current beam to be traced
         type(job_parameters_type), intent(in) :: job_params
-
+        
         integer(8) i, counter
         
         counter = 0 ! counts the number of beams added to the tree
@@ -1531,9 +1698,9 @@ module beam_loop_mod
                 beam_outbeam_tree(beam_outbeam_tree_counter)%fout = beam%field_out(i)%fi ! facet id
             end if
         end do
-
+        
         if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',counter,' beams to outbeam tree -->',beam_outbeam_tree_counter,' total outbeams'
-
+        
     end subroutine
     
 end module beam_loop_mod

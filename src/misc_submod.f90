@@ -20,7 +20,7 @@
         integer(8) i, j
         integer(8) counter
         integer(8) ni ! a normal id
-        real(8) nf ! normalisation factor
+        real(8) fac ! normalisation factor
 
         do i = 1, geometry%na ! for each aperture
             counter = 0 ! init counter to track number of faces in this aperture
@@ -37,8 +37,9 @@
                 end if
             end do
             geometry%ap(i)%mid(:) = geometry%ap(i)%mid(:) / counter ! normalise
-            nf = sqrt(geometry%ap(i)%n(1)**2 + geometry%ap(i)%n(2)**2 + geometry%ap(i)%n(3)**2)
-            geometry%ap(i)%n(:) = geometry%ap(i)%n(:) / nf ! normalise
+            fac = sqrt(geometry%ap(i)%n(1)**2 + geometry%ap(i)%n(2)**2 + geometry%ap(i)%n(3)**2)
+            geometry%ap(i)%n(:) = geometry%ap(i)%n(:) / fac ! normalise
+            geometry%ap(i)%nf = counter ! save the number of faces in this aperture
         end do
 
         end subroutine
