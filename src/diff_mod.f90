@@ -756,6 +756,7 @@ module diff_mod
     real(8) progressReal
     real work_done
     integer progressInt
+    integer(8) num_threads
 
 
     if(job_params%timing) then
@@ -801,236 +802,101 @@ module diff_mod
         print*,'start diff beam loop...'
     end if
 
-    ! call trim_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,job_params) ! removes very low energy outbeams from the beam tree
+    if(job_params%is_multithreaded) then
+        num_threads = omp_get_max_threads()
+    else
+        num_threads = 1
+    end if
 
-    if (is_multithreaded) then ! multi-threaded diffraction
-
-        ! print*,'multithreading: enabled'
-        ! print*,'max threads:',omp_get_max_threads()
-        !$OMP PARALLEL num_threads(omp_get_max_threads()) PRIVATE(amplC11s,amplC12s,amplC21s,amplC22s,ampl,perp0,prop0,v,start1,finish1)
-        if(job_params%timing) then
-            start1 = omp_get_wtime()
-        end if
-        !$OMP DO
-        do j = 1, beam_outbeam_tree_counter
-
-            ! if(omp_get_thread_num() .eq. 0) then
-            !     work_done = work_done + 1
-            !     progressReal = work_done*100/beam_outbeam_tree_counter*omp_get_num_threads()          ! my thread percent completion
-            !     if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
-            !         progressInt = int(progressReal)           ! update progress counter
-            !         call progress_bar(progressInt, 100)
-            !     end if
-            ! end if
-    
-            ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
-            perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
-            prop0(1:3) = beam_outbeam_tree(j)%prop_out(1:3)
-            v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
+    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC11s,amplC12s,amplC21s,amplC22s,ampl,perp0,prop0,v,start1,finish1)
+    if(job_params%timing) then
+        start1 = omp_get_wtime()
+    end if
+    !$OMP DO
+    do j = 1, beam_outbeam_tree_counter
         
-            ! get far-field contribution from this outbeam
-            call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)                                 
-
-            !$OMP CRITICAL
-            ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
-            !$OMP END CRITICAL
-        
-        end do
-
         if(omp_get_thread_num() .eq. 0) then
-            if(job_params%debug >= 1) then
-                print*,'end diff beam loop...'
-            if(job_params%timing) then
-                finish1 = omp_get_wtime()
-                print'(A,f16.8,A)',"beam diffraction took: ",finish1-start1," secs"
-                start1 = omp_get_wtime()
-            end if
-                print*,'start ext diff loop...'
-        end if
-        end if
-
-        work_done = 0
-        progressInt = 0
-        !$OMP DO
-        do j = 1, size(ext_diff_outbeam_tree,1)
-
-            ! if(omp_get_thread_num() .eq. 0) then
-            !     work_done = work_done + 1
-            !     progressReal = work_done*100/size(ext_diff_outbeam_tree,1)*omp_get_num_threads()          ! my thread percent completion
-            !     if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
-            !         progressInt = int(progressReal)           ! update progress counter
-            !         call progress_bar(progressInt, 100)
-            !     end if
-            ! end if
-
-            ampl(1:2,1:2) = ext_diff_outbeam_tree(j)%ampl(1:2,1:2)
-            perp0(1:3) = ext_diff_outbeam_tree(j)%vk7(1:3)
-            prop0(1:3) = ext_diff_outbeam_tree(j)%prop_out(1:3)
-            v(1:3,1:3) = ext_diff_outbeam_tree(j)%verts(1:3,1:3)
-        
-            call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
-
-            !$OMP CRITICAL
-            ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
-            !$OMP END CRITICAL
-                
-        end do
-
-        if(omp_get_thread_num() .eq. 0) then
-            if(job_params%debug >= 1) then
-                print*,'end ext diff loop...'
-                if(job_params%timing) then
-                    finish1 = omp_get_wtime()
-                    print'(A,f16.8,A)',"external diffraction took: ",finish1-start1," secs"
+            if(job_params%timing .and. job_params%debug >=1) then
+                work_done = work_done + 1
+                progressReal = work_done*100/beam_outbeam_tree_counter*omp_get_num_threads()          ! my thread percent completion
+                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
+                    progressInt = int(progressReal)           ! update progress counter
+                    call progress_bar(progressInt, 100)
                 end if
             end if
         end if
-        !$OMP END PARALLEL
 
-    else ! single-threaded diffraction
-
-        ! print*,'multithreading: disabled'
-
-        do j = 1, beam_outbeam_tree_counter
-        ! do j = 1, 0 ! disable beam diffraction
-
-            progressReal = j*100/beam_outbeam_tree_counter          ! percent completion
-            if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
-                progressInt = int(progressReal)           ! update progress counter
-            print*,'Completion: ',progressInt,'%'     ! print progress
-            end if
+        ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
+        perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
+        prop0(1:3) = beam_outbeam_tree(j)%prop_out(1:3)
+        v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
     
-            ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
-            perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
-            prop0(1:3) = beam_outbeam_tree(j)%prop_out(1:3)
-            v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
-        
-            ! ! get far-field contribution from this outbeam
-            call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
-        
-            ! !$OMP CRITICAL
-            ! ! sum
-            ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
-            ! !$OMP END CRITICAL
-        
-        end do
+        ! get far-field contribution from this outbeam
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)                                 
 
-        ! if (is_multithreaded) then
-            !!$OMP END PARALLEL
-        ! end if
-        ! stop
-        !!$OMP DO
-        ! do j = 1, beam_outbeam_tree_counter
-        ! ! do j = 1, 100
-        !     ! print*,'j = ',j
-
-        !     progressReal = j*100/beam_outbeam_tree_counter          ! percent completion
-        !     if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
-        !         progressInt = int(progressReal)           ! update progress counter
-        !     print*,'Completion: ',progressInt,'%'     ! print progress
-        !     end if
-
-        !     ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
-        !     perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
-        !     prop0(1:3) = beam_outbeam_tree(j)%prop_out(1:3)
-        !     v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
-        
-        !     ! get far-field contribution from this outbeam
-        !     call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s)
-        
-        !     !!$OMP CRITICAL
-        !     ! sum
-        !     ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
-        !     ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
-        !     ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
-        !     ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
-        !     !!$OMP END CRITICAL
-        
-        ! end do
-        
-        !!$OMP END PARALLEL
+        !$OMP CRITICAL
+        ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
+        !$OMP END CRITICAL
     
-        ! print*,'end diff beam loop...'
-        
-        ! print*,'start ext diff loop...'
-        
-        ! print*,'size(ext_diff_outbeam_tree,1)',size(ext_diff_outbeam_tree,1)
+    end do
 
-        ! progressInt = 0
-        do j = 1, size(ext_diff_outbeam_tree,1)
-        ! do j = 1, 0 ! disable external diff
-        ! do j = 90, 90 ! test
-
-            ! progressReal = j*100/size(ext_diff_outbeam_tree,1)        ! percent completion
-            ! if(int(progressReal) .gt. progressInt .and. mod(int(progressReal),10) .eq. 0) then  ! if at least 1% progress has been made
-            !     progressInt = int(progressReal)           ! update progress counter
-            ! print*,'Completion: ',progressInt,'%'     ! print progress
-            ! end if
-
-            ampl(1:2,1:2) = ext_diff_outbeam_tree(j)%ampl(1:2,1:2)
-            perp0(1:3) = ext_diff_outbeam_tree(j)%vk7(1:3)
-            prop0(1:3) = ext_diff_outbeam_tree(j)%prop_out(1:3)
-            v(1:3,1:3) = ext_diff_outbeam_tree(j)%verts(1:3,1:3)
-
-            ! if(abs(ampl(1,1)) .gt. 1e-5 .or. abs(ampl(1,2)) .gt. 1e-5 .or. abs(ampl(2,1)) .gt. 1e-5 .or. abs(ampl(2,2)) .gt. 1e-5) then
-        
-            call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
-        
-            ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
-            ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
-        
-            ! end if
-        
-        end do
+    if(omp_get_thread_num() .eq. 0) then
+        if(job_params%debug >= 1) then
+            print*,'end diff beam loop...'
+        if(job_params%timing) then
+            finish1 = omp_get_wtime()
+            print'(A,f16.8,A)',"beam diffraction took: ",finish1-start1," secs"
+            start1 = omp_get_wtime()
+        end if
+            print*,'start ext diff loop...'
+    end if
     end if
 
+    work_done = 0
+    progressInt = 0
+    !$OMP DO
+    do j = 1, size(ext_diff_outbeam_tree,1)
 
+        if(omp_get_thread_num() .eq. 0) then
+            if(job_params%timing .and. job_params%debug >=1) then
+                work_done = work_done + 1
+                progressReal = work_done*100/size(ext_diff_outbeam_tree,1)*omp_get_num_threads()          ! my thread percent completion
+                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
+                    progressInt = int(progressReal)           ! update progress counter
+                    call progress_bar(progressInt, 100)
+                end if
+            end if
+        end if
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    ! call kmp_set_stacksize_s(109715200)
-    ! print*,'stack size: (bytes)',kmp_get_stacksize_s()
+        ampl(1:2,1:2) = ext_diff_outbeam_tree(j)%ampl(1:2,1:2)
+        perp0(1:3) = ext_diff_outbeam_tree(j)%vk7(1:3)
+        prop0(1:3) = ext_diff_outbeam_tree(j)%prop_out(1:3)
+        v(1:3,1:3) = ext_diff_outbeam_tree(j)%verts(1:3,1:3)
     
-    
-    ! CALL get_environment_variable("OMP_STACKSIZE", stack_size)
-    ! print*,'stack size: ',trim(stack_size)
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
 
-    ! print*,'max omp threads: ',OMP_GET_MAX_THREADS()
+        !$OMP CRITICAL
+        ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
+        !$OMP END CRITICAL
+            
+    end do
 
-    !if (is_multithreaded) then
-        !!OMP_GET_MAX_THREADS
-        !!$OMP PARALLEL num_threads(omp_get_max_threads()) PRIVATE(amplC11s,amplC12s,amplC21s,amplC22s,ampl,perp0,prop0,v)
-    !end if
-    !!$OMP PARALLEL num_threads(4)
-    ! stop
-    !print*,'hello from thread #',OMP_GET_THREAD_NUM()
-
-    !!$OMP DO
-    
+    if(omp_get_thread_num() .eq. 0) then
+        if(job_params%debug >= 1) then
+            print*,'end ext diff loop...'
+            if(job_params%timing) then
+                finish1 = omp_get_wtime()
+                print'(A,f16.8,A)',"external diffraction took: ",finish1-start1," secs"
+            end if
+        end if
+    end if
+    !$OMP END PARALLEL
     
     ! print*,'end ext diff loop...'
     if(job_params%debug >= 1) then

@@ -2293,30 +2293,31 @@
                     step = nint(iteration * 100 / (1.0 * maximum))
                     done = floor(step / 10.0)  ! mark every 10%
                 
-                    do counter = 1, 36                    ! clear whole line - 36 chars
-                        write(6,'(a)',advance='no') '\b'  ! (\b - backslash)
-                    end do
+                    ! do counter = 1, 36                    ! clear whole line - 36 chars
+                    !     write(6,'(a)',advance='no') '\b'  ! (\b - backslash)
+                    ! end do
                 
-                    write(6,'(a)',advance='no') ' -> In progress... ['
-                    if (done .LE. 0) then
-                        do counter = 1, 10
-                            write(6,'(a)',advance='no') '='
-                        end do
-                    else if ((done .GT. 0) .and. (done .LT. 10)) then
-                        do counter = 1, done
-                            write(6,'(a)',advance='no') '#'
-                        end do
-                        do counter = done+1, 10
-                            write(6,'(a)',advance='no') '='
-                        end do 
-                    else
-                        do counter = 1, 10
-                            write(6,'(a)',advance='no') '#'
-                        end do
+                    
+                    if (done .LE. 1) then
+                        write(6,'(a)',advance='no') ' -> In progress... ['
                     end if
-                    write(6,'(a)',advance='no') '] '
-                    write(6,'(I3.1)',advance='no') step
-                    write(6,'(a)',advance='no') '%'
+                        ! do counter = 1, 10
+                        !     write(6,'(a)',advance='no') '='
+                        ! end do
+                    if ((done .GE. 0) .and. (done .LT. 10)) then
+                        ! do counter = 1, done
+                            write(6,'(i2,a2)',advance='no') step,'%|'
+                        ! end do
+                        ! do counter = done+1, 10
+                        !     write(6,'(a)',advance='no') '='
+                        ! end do 
+                    else
+                        ! do counter = 1, 10
+                            write(6,'(i3,a2)') step,'%]'
+                        ! end do
+                    end if
+                    ! write(6,'(I3.1)',advance='no') step
+                    ! write(6,'(a)',advance='no') '%'
                 end
 
         end module misc_submod
