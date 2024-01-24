@@ -348,6 +348,7 @@ module beam_loop_mod
         real(8) theta_i ! incident angle with the aperture
         real(8) theta_i_facet ! incident angle with the facet
         real(8) theta_t ! transmitted angle
+        real(8) theta_t_facet ! transmitted angle with the facet
         complex(8) fr(1:2,1:2) ! fresnel reflection matrix
         complex(8) ft(1:2,1:2) ! fresnel reflection matrix
         real(8) norm(1:3) ! a facet normal
@@ -415,17 +416,23 @@ module beam_loop_mod
                 ! compute fresnel matrices
                 fr(:,:) = 0d0 ! init fresnel reflection matrix
                 ft(:,:) = 0d0 ! init fresnel transmission matrix
+
+                ! compute angle of incidence
+                theta_i = acos(an(3)) ! using incident angle as that of the aperture
                 if(is_shad(i)) then ! if facet is in shadow (needs careful consideration)
-                    theta_i = acos(an(3)) ! using incident angle as that of the aperture if in shadow
+                    theta_i_facet = theta_i ! using incident angle as that of the aperture if in shadow
                 else
-                    theta_i = acos(geometry%n(geometry%f(i)%ni,3))
+                    theta_i_facet = acos(geometry%n(geometry%f(i)%ni,3))
                 end if
-                is_tir = .false.
-                call get_theta_t_complex(theta_i,m_ext,m_int,theta_t) ! get angle of refraction
-                fr(2,2) = (cos(theta_i) - m_int*cos(theta_t))/(cos(theta_i) + m_int*cos(theta_t))
-                ft(2,2) = (2*cos(theta_i))/(cos(theta_i) + m_int*cos(theta_t))
-                fr(1,1) = (m_int*cos(theta_i) - cos(theta_t))/(cos(theta_t) + m_int*cos(theta_i))
-                ft(1,1) = (2*cos(theta_i))/(cos(theta_t) + m_int*cos(theta_i))
+
+                is_tir = .false. ! no tir because this is external incidence
+
+                ! compute fresnel based angle of incidence and refraction at the facet
+                call get_theta_t_complex(theta_i_facet,m_ext,m_int,theta_t_facet) ! get angle of refraction at facet
+                fr(2,2) = (cos(theta_i_facet) - m_int*cos(theta_t_facet))/(cos(theta_i_facet) + m_int*cos(theta_t_facet))
+                ft(2,2) = (2*cos(theta_i_facet))/(cos(theta_i_facet) + m_int*cos(theta_t_facet))
+                fr(1,1) = (m_int*cos(theta_i_facet) - cos(theta_t_facet))/(cos(theta_t_facet) + m_int*cos(theta_i_facet))
+                ft(1,1) = (2*cos(theta_i_facet))/(cos(theta_t_facet) + m_int*cos(theta_i_facet))
                 
                 ! apply fresnel matrices to amplitude matrix
                 refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
@@ -446,11 +453,11 @@ module beam_loop_mod
                 ! possibly remove reflection from shadow facets here
                 ! if(is_shad(i)) refl_ampl(:,:) = 0d0
                 
-                ! get projected facet area
-                theta_i_facet = acos(geometry%n(geometry%f(i)%ni,3))
+                ! get projected facet area                
                 proj_area = geometry%f(i)%area * cos(theta_i_facet)
-                
-                ! compute the transmitted propagation vector (from the whole aperture)
+
+                ! compute the transmitted propagation vector using angle refracted from aperture
+                call get_theta_t_complex(theta_i,m_ext,m_int,theta_t) ! get angle of refraction at aperture
                 norm(:) = -an(:) ! get aperture normal
                 call get_trans_prop(theta_i,theta_t,prop,norm,prop_int) ! get the transmitted propagation vector
                 
@@ -526,6 +533,7 @@ module beam_loop_mod
         real(8) theta_i ! incident angle
         real(8) theta_i_facet ! incident angle with the facet
         real(8) theta_t ! transmitted angle
+        real(8) theta_t_facet ! transmitted angle
         complex(8) fr(1:2,1:2) ! fresnel reflection matrix
         complex(8) ft(1:2,1:2) ! fresnel reflection matrix
         real(8) abs_intensity ! absorbed intensity
