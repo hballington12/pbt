@@ -320,6 +320,7 @@ module beam_loop_mod
         integer(8) i, j ! some counters
         integer(8) ai ! an aperture id
         real(8) rot2(1:2,1:2) ! a 2x2 rotation matrix
+        real(8) rot1(1:2,1:2) ! a 2x2 rotation matrix
         logical, dimension(:), allocatable :: in_beam ! whether each facet was within the beam
         real(8), dimension(:), allocatable :: dist_beam ! the distance from the beam to each facet
         integer(8), dimension(:), allocatable :: id_beam ! the facet id of the beam face which illuminated each facet
@@ -332,10 +333,12 @@ module beam_loop_mod
         integer(8) n ! a counter
         real(8) an(1:3) ! an aperture normal
         real(8) ran(1:3) ! a rotated aperture normal
-        real(8) vk7(1:3) ! a reflected/refracted e-perp vector
-        real(8) e_perp(1:3) ! an incident e-perp vector
+        real(8) vk7(1:3) ! a reflected/refracted e-perp vector (at facet)
+        real(8) vk7a(1:3) ! a reflected/refracted e-perp vector (at aperture)
+        real(8) e_perp_inc(1:3) ! an incident e-perp vector
         integer(8) bfi ! an beam face id
         complex(8) ampl(1:2,1:2) ! an amplitude matrix
+        complex(8) ampl_ap(1:2,1:2) ! an amplitude matrix
         complex(8) refl_ampl(1:2,1:2) ! a reflected amplitude matrix
         complex(8) trans_ampl(1:2,1:2) ! a transmitted amplitude matrix
         real(8) waveno ! wave number
@@ -392,7 +395,7 @@ module beam_loop_mod
                 ran(:) = geometry%ap(ai)%n(:) ! get the aperture normal (in rotated system)
                 bfi = id_beam(i) ! get the beam facet id which illuminated this one
                 ampl(:,:) = beam_inc%field_in(bfi)%ampl(:,:) ! get the amplitude matrix of the illuminating facet
-                e_perp(:) = beam_inc%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
+                e_perp_inc(:) = beam_inc%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
                 dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
                 prop(:) = beam_inc%prop(:) ! incoming propagation direction in unrotated system
                 
@@ -402,22 +405,26 @@ module beam_loop_mod
                 prop_ext(3) = -1 + 2*geometry%ap(ai)%n(3)*geometry%ap(ai)%n(3) ! reflected propagation vector (in rotated system)
                 
                 ! get vk7, the new e-perp vector (normal x reflected prop vector)
-                call cross(an,prop,vk7,.true.)
+                call cross(an,prop,vk7a,.true.) ! get reflected e-perp vector (aperture)
+                call cross(geometry%n(geometry%f(i)%ni,:),prop,vk7,.true.) ! get reflected e-perp vector (facet)
                 
                 ! get the rotation matrix to rotate about prop. vector into new scattering plane
-                call get_rot_matrix(rot2,vk7,e_perp,prop)
-                
-                ! rotate the amplitude matrix into the new scattering plane
-                ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
+                call get_rot_matrix(rot1,vk7a,e_perp_inc,prop) ! (rotate about the aperture normal, for new beam propagation)
+                call get_rot_matrix(rot2,vk7,e_perp_inc,prop) ! (rotate about the facet normal, for diffraction into far-field)
                 
                 ! apply distance phase factor
                 ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*dist)
                 
+                ! rotate the amplitude matrix into the new scattering plane
+                ampl_ap(:,:) = matmul(rot1(:,:),ampl(:,:)) ! rotate at aperture (for new propagating beams)
+                ampl(:,:) = matmul(rot2(:,:),ampl(:,:)) ! rotate at facet (for beams diffracted into the far field)
+
                 ! compute fresnel matrices
                 fr(:,:) = 0d0 ! init fresnel reflection matrix
                 ft(:,:) = 0d0 ! init fresnel transmission matrix
 
-                ! compute angle of incidence
+                ! compute angle of incidence at aperture and at the facet
+                ! use the aperture incident angle if the facet is facing the wrong way
                 theta_i = acos(an(3)) ! using incident angle as that of the aperture
                 if(is_shad(i)) then ! if facet is in shadow (needs careful consideration)
                     theta_i_facet = theta_i ! using incident angle as that of the aperture if in shadow
@@ -428,15 +435,15 @@ module beam_loop_mod
                 is_tir = .false. ! no tir because this is external incidence
 
                 ! compute fresnel based angle of incidence and refraction at the facet
-                call get_theta_t_complex(theta_i_facet,m_ext,m_int,theta_t_facet) ! get angle of refraction at facet
+                call get_theta_t_complex(theta_i_facet,m_ext,m_int,theta_t_facet) ! get angle of refraction at facet based on complex Snell's law
                 fr(2,2) = (cos(theta_i_facet) - m_int*cos(theta_t_facet))/(cos(theta_i_facet) + m_int*cos(theta_t_facet))
                 ft(2,2) = (2*cos(theta_i_facet))/(cos(theta_i_facet) + m_int*cos(theta_t_facet))
                 fr(1,1) = (m_int*cos(theta_i_facet) - cos(theta_t_facet))/(cos(theta_t_facet) + m_int*cos(theta_i_facet))
                 ft(1,1) = (2*cos(theta_i_facet))/(cos(theta_t_facet) + m_int*cos(theta_i_facet))
                 
                 ! apply fresnel matrices to amplitude matrix
-                refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
-                trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
+                refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:)) ! use reflected field at facet for diffracted beams (change this later for re-entry)
+                trans_ampl(:,:) = matmul(ft(:,:),ampl_ap(:,:)) ! use transmitted field at aperture for new propagating beams
                 
                 ! compute internal intensity
                 int_intensity = real(0.5*(  trans_ampl(1,1)*conjg(trans_ampl(1,1)) + &
@@ -453,14 +460,14 @@ module beam_loop_mod
                 ! possibly remove reflection from shadow facets here
                 ! if(is_shad(i)) refl_ampl(:,:) = 0d0
                 
-                ! get projected facet area                
-                proj_area = geometry%f(i)%area * cos(theta_i_facet)
-
                 ! compute the transmitted propagation vector using angle refracted from aperture
-                call get_theta_t_complex(theta_i,m_ext,m_int,theta_t) ! get angle of refraction at aperture
+                call get_theta_t_complex(theta_i,m_ext,m_int,theta_t) ! get angle of transmission made with the aperture normal
                 norm(:) = -an(:) ! get aperture normal
                 call get_trans_prop(theta_i,theta_t,prop,norm,prop_int) ! get the transmitted propagation vector
                 
+                ! get the angle of transmission made with the facet normal based on geometry
+                theta_t_facet = acos(dot_product(-geometry%n(geometry%f(i)%ni,:),prop_int(:)))
+
                 ! save stuff to the beam structure
                 beam_inc%field_out(n)%ampl_ext(:,:) = refl_ampl(:,:) ! save the transmitted amplitude matrix
                 beam_inc%field_out(n)%ampl_int(:,:) = trans_ampl(:,:) ! save the reflected amplitude matrix
@@ -470,10 +477,10 @@ module beam_loop_mod
                 beam_inc%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
                 beam_inc%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
                 beam_inc%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
-                beam_inc%field_out(n)%pi = proj_area ! save incident power
-                beam_inc%field_out(n)%pr = ext_intensity * proj_area ! save reflected power
-                beam_inc%field_out(n)%pt = int_intensity * geometry%f(i)%area * rbi_int * cos(theta_t) ! save transmitted power
-                beam_inc%field_out(n)%proj_area = proj_area ! save the geometric cross section
+                beam_inc%field_out(n)%pi = geometry%f(i)%area * cos(theta_i_facet) ! save incident power
+                beam_inc%field_out(n)%pr = ext_intensity * geometry%f(i)%area * cos(theta_i_facet) ! save reflected power (angle made with facet)
+                beam_inc%field_out(n)%pt = int_intensity * geometry%f(i)%area * rbi_int * cos(theta_t_facet) ! save transmitted power (angle made with aperture, because the new propagation direction is along this direction)
+                beam_inc%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
                 beam_inc%pi = beam_inc%pi + beam_inc%field_out(n)%pi ! sum total incident power (bit different to other parts of the code because we do not care about conservation of energy for the initial wavefront)
                 beam_inc%pr = beam_inc%pr + beam_inc%field_out(n)%pr ! sum total reflected power
                 beam_inc%pt = beam_inc%pt + beam_inc%field_out(n)%pt ! sum total transmitted power
@@ -505,6 +512,7 @@ module beam_loop_mod
         integer(8) i, j ! some counters
         integer(8) ai ! an aperture id
         real(8) rot(1:3,1:3) ! a 3x3 rotation matrix
+        real(8) rot1(1:2,1:2) ! a 2x2 rotation matrix
         real(8) rot2(1:2,1:2) ! a 2x2 rotation matrix
         logical, dimension(:), allocatable :: is_shad ! whether each facet was in the shadow of another
         logical, dimension(:), allocatable :: in_beam ! whether each facet was within the beam
@@ -517,10 +525,12 @@ module beam_loop_mod
         integer(8) n ! a counter
         real(8) an(1:3) ! an aperture normal
         real(8) ran(1:3) ! a rotated aperture normal
-        real(8) vk7(1:3) ! a reflected/refracted e-perp vector
-        real(8) e_perp(1:3) ! an incident e-perp vector
+        real(8) vk7(1:3) ! a reflected/refracted e-perp vector (at facet)
+        real(8) vk7a(1:3) ! a reflected/refracted e-perp vector (at aperture)
+        real(8) e_perp_inc(1:3) ! an incident e-perp vector
         integer(8) bfi ! an beam face id
         complex(8) ampl(1:2,1:2) ! an amplitude matrix
+        complex(8) ampl_ap(1:2,1:2) ! an amplitude matrix
         complex(8) refl_ampl(1:2,1:2) ! a reflected amplitude matrix
         complex(8) trans_ampl(1:2,1:2) ! a transmitted amplitude matrix
         real(8) waveno ! wave number
@@ -580,7 +590,7 @@ module beam_loop_mod
                 ran(:) = rot_geometry%ap(ai)%n(:) ! get the aperture normal (in rotated system)
                 bfi = id_beam(i) ! get the beam facet id which illuminated this one
                 ampl(:,:) = beam%field_in(bfi)%ampl(:,:) ! get the amplitude matrix of the illuminating facet
-                e_perp(:) = beam%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
+                e_perp_inc(:) = beam%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
                 dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
                 prop(:) = beam%prop(:) ! incoming propagation direction in unrotated system
                 
@@ -591,13 +601,12 @@ module beam_loop_mod
                 prop_int(:) = matmul(transpose(rot),prop_int(:)) ! rotate reflected/refracted propagation vector back to original coordinate system
                 
                 ! get vk7, the new e-perp vector (normal x reflected prop vector)
-                call cross(-an,prop,vk7,.true.)
+                call cross(-an,prop,vk7a,.true.) ! get reflected e-perp vector (using aperture normal)
+                call cross(-geometry%n(geometry%f(i)%ni,:),prop,vk7,.true.) ! get reflected e-perp vector (using facet normal)
                 
                 ! get the rotation matrix to rotate about prop. vector into new scattering plane
-                call get_rot_matrix(rot2,vk7,e_perp,prop)
-                
-                ! rotate the amplitude matrix into the new scattering plane
-                ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
+                call get_rot_matrix(rot1,vk7a,e_perp_inc,prop) ! rotate about the aperture normal, for new beam propagation
+                call get_rot_matrix(rot2,vk7,e_perp_inc,prop) ! rotate about the facet normal, for diffraction into far-field
                 
                 ! apply distance phase factor
                 ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*rbi_int*dist)
@@ -619,12 +628,23 @@ module beam_loop_mod
                 ampl(1,2)*conjg(ampl(1,2)) + &
                 ampl(2,1)*conjg(ampl(2,1)) + &
                 ampl(2,2)*conjg(ampl(2,2))))
+
+                ! rotate the amplitude matrix into the new scattering plane
+                ampl_ap(:,:) = matmul(rot1(:,:),ampl(:,:)) ! rotate at aperture, for new propagating beams
+                ampl(:,:) = matmul(rot2(:,:),ampl(:,:)) ! rotate at facet, for diffracted beams
                 
                 ! compute fresnel matrices
                 fr(:,:) = 0d0 ! init fresnel reflection matrix
                 ft(:,:) = 0d0 ! init fresnel transmission matrix
                 theta_i = acos(-ran(3)) ! using incident angle as that of the aperture
-                if(beam%is_int .and. theta_i >= asin(1/rbi_int)) then ! if tir
+
+                if(is_shad(i)) then ! if facet is in shadow (care)
+                    theta_i_facet = theta_i ! use incident angle of the aperture
+                else ! else, if facet is not in shadow
+                    theta_i_facet = acos(-rot_geometry%n(rot_geometry%f(i)%ni,3)) ! use angle of incident made with the facet
+                end if
+
+                if(beam%is_int .and. theta_i >= asin(1/rbi_int)) then ! if tir (based on aperture normal)
                     is_tir = .true. 
                     fr(2,2) = -1d0
                     ft(2,2) = 0d0
@@ -632,16 +652,16 @@ module beam_loop_mod
                     ft(1,1) = 0d0
                 else ! if not tir
                     is_tir = .false.
-                    call get_theta_t_complex(theta_i,m_int,m_ext,theta_t)
-                    fr(2,2) = (m_int*cos(theta_i) - cos(theta_t))/(m_int*cos(theta_i) + cos(theta_t))
-                    ft(2,2) = (2*m_int*cos(theta_i))/(m_int*cos(theta_i) + cos(theta_t))
-                    fr(1,1) = (cos(theta_i) - m_int*cos(theta_t))/(m_int*cos(theta_t) + cos(theta_i))
-                    ft(1,1) = (2*m_int*cos(theta_i)) / (m_int*cos(theta_t) + cos(theta_i))
+                    call get_theta_t_complex(theta_i_facet,m_int,m_ext,theta_t_facet) ! get angle of transmission from facet
+                    fr(2,2) = (m_int*cos(theta_i_facet) - cos(theta_t_facet))/(m_int*cos(theta_i_facet) + cos(theta_t_facet))
+                    ft(2,2) = (2*m_int*cos(theta_i_facet))/(m_int*cos(theta_i_facet) + cos(theta_t_facet))
+                    fr(1,1) = (cos(theta_i_facet) - m_int*cos(theta_t_facet))/(m_int*cos(theta_t_facet) + cos(theta_i_facet))
+                    ft(1,1) = (2*m_int*cos(theta_i_facet)) / (m_int*cos(theta_t_facet) + cos(theta_i_facet))
                 end if
                 
                 ! apply fresnel matrices to amplitude matrix
-                refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
-                trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
+                refl_ampl(:,:) = matmul(fr(:,:),ampl_ap(:,:)) ! use reflected field at aperture for new propagating beams
+                trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:)) ! use transmitted field at fiacet for diffracted beams (change this later for re-entry)
                 
                 ! compute internal intensity
                 int_intensity = real(0.5*(  refl_ampl(1,1)*conjg(refl_ampl(1,1)) + &
@@ -659,18 +679,22 @@ module beam_loop_mod
                 if(is_shad(i)) trans_ampl(:,:) = 0d0
                 
                 ! get projected facet area
-                theta_i_facet = acos(-(rot_geometry%n(rot_geometry%f(i)%ni,3)))
                 proj_area = geometry%f(i)%area * cos(theta_i_facet)
                 
                 ! add to the beam absorption cross section
                 beam%abs = beam%abs + (abs_intensity * proj_area * rbi_int) ! sum the absorbed energy
                                 
-                ! compute the transmitted propagation vector
+                ! compute the transmitted propagation vector (at the facet, for diffracted beams)
                 if(.not. is_tir) then ! if no internal reflection
                     norm(:) = geometry%n(geometry%f(i)%ni,:)
                     call get_trans_prop(theta_i,theta_t,prop,norm,prop_ext) ! get the transmitted propagation vector
                 end if
                 
+                ! get the angle of transmission made with the facet normal based on geometry
+                theta_t_facet = acos(dot_product(geometry%n(geometry%f(i)%ni,:),prop_ext(:)))
+
+                print*,'theta t (ap) (facet)',theta_t,'|',theta_t_facet
+
                 ! save stuff to the beam structure
                 beam%field_out(n)%ampl_ext(:,:) = trans_ampl(:,:) ! save the transmitted amplitude matrix
                 beam%field_out(n)%ampl_int(:,:) = refl_ampl(:,:) ! save the reflected amplitude matrix
