@@ -512,7 +512,6 @@ module beam_loop_mod
         integer(8) i, j ! some counters
         integer(8) ai ! an aperture id
         real(8) rot(1:3,1:3) ! a 3x3 rotation matrix
-        real(8) rot1(1:2,1:2) ! a 2x2 rotation matrix
         real(8) rot2(1:2,1:2) ! a 2x2 rotation matrix
         logical, dimension(:), allocatable :: is_shad ! whether each facet was in the shadow of another
         logical, dimension(:), allocatable :: in_beam ! whether each facet was within the beam
@@ -525,12 +524,10 @@ module beam_loop_mod
         integer(8) n ! a counter
         real(8) an(1:3) ! an aperture normal
         real(8) ran(1:3) ! a rotated aperture normal
-        real(8) vk7(1:3) ! a reflected/refracted e-perp vector (at facet)
-        real(8) vk7a(1:3) ! a reflected/refracted e-perp vector (at aperture)
-        real(8) e_perp_inc(1:3) ! an incident e-perp vector
+        real(8) vk7(1:3) ! a reflected/refracted e-perp vector
+        real(8) e_perp(1:3) ! an incident e-perp vector
         integer(8) bfi ! an beam face id
         complex(8) ampl(1:2,1:2) ! an amplitude matrix
-        complex(8) ampl_ap(1:2,1:2) ! an amplitude matrix
         complex(8) refl_ampl(1:2,1:2) ! a reflected amplitude matrix
         complex(8) trans_ampl(1:2,1:2) ! a transmitted amplitude matrix
         real(8) waveno ! wave number
@@ -590,7 +587,7 @@ module beam_loop_mod
                 ran(:) = rot_geometry%ap(ai)%n(:) ! get the aperture normal (in rotated system)
                 bfi = id_beam(i) ! get the beam facet id which illuminated this one
                 ampl(:,:) = beam%field_in(bfi)%ampl(:,:) ! get the amplitude matrix of the illuminating facet
-                e_perp_inc(:) = beam%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
+                e_perp(:) = beam%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
                 dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
                 prop(:) = beam%prop(:) ! incoming propagation direction in unrotated system
                 
@@ -601,12 +598,13 @@ module beam_loop_mod
                 prop_int(:) = matmul(transpose(rot),prop_int(:)) ! rotate reflected/refracted propagation vector back to original coordinate system
                 
                 ! get vk7, the new e-perp vector (normal x reflected prop vector)
-                call cross(-an,prop,vk7a,.true.) ! get reflected e-perp vector (using aperture normal)
-                call cross(-geometry%n(geometry%f(i)%ni,:),prop,vk7,.true.) ! get reflected e-perp vector (using facet normal)
+                call cross(-an,prop,vk7,.true.)
                 
                 ! get the rotation matrix to rotate about prop. vector into new scattering plane
-                call get_rot_matrix(rot1,vk7a,e_perp_inc,prop) ! rotate about the aperture normal, for new beam propagation
-                call get_rot_matrix(rot2,vk7,e_perp_inc,prop) ! rotate about the facet normal, for diffraction into far-field
+                call get_rot_matrix(rot2,vk7,e_perp,prop)
+                
+                ! rotate the amplitude matrix into the new scattering plane
+                ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
                 
                 ! apply distance phase factor
                 ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*rbi_int*dist)
@@ -628,40 +626,30 @@ module beam_loop_mod
                 ampl(1,2)*conjg(ampl(1,2)) + &
                 ampl(2,1)*conjg(ampl(2,1)) + &
                 ampl(2,2)*conjg(ampl(2,2))))
-
-                ! rotate the amplitude matrix into the new scattering plane
-                ampl_ap(:,:) = matmul(rot1(:,:),ampl(:,:)) ! rotate at aperture, for new propagating beams
-                ampl(:,:) = matmul(rot2(:,:),ampl(:,:)) ! rotate at facet, for diffracted beams
                 
                 ! compute fresnel matrices
                 fr(:,:) = 0d0 ! init fresnel reflection matrix
                 ft(:,:) = 0d0 ! init fresnel transmission matrix
                 theta_i = acos(-ran(3)) ! using incident angle as that of the aperture
-
-                if(is_shad(i)) then ! if facet is in shadow (care)
-                    theta_i_facet = theta_i ! use incident angle of the aperture
-                else ! else, if facet is not in shadow
-                    theta_i_facet = acos(-rot_geometry%n(rot_geometry%f(i)%ni,3)) ! use angle of incident made with the facet
-                end if
-
-                if(beam%is_int .and. theta_i >= asin(1/rbi_int)) then ! if tir (based on aperture normal)
+                theta_i_facet = acos(-(rot_geometry%n(rot_geometry%f(i)%ni,3)))
+                if(beam%is_int .and. theta_i >= asin(1/rbi_int)) then ! if tir
                     is_tir = .true. 
                     fr(2,2) = -1d0
                     ft(2,2) = 0d0
                     fr(1,1) = -1d0
                     ft(1,1) = 0d0
-                else ! if not tir
+                else ! if not tir, do fresnel at aperture, because doing at the facet gives bad results, currently
                     is_tir = .false.
-                    call get_theta_t_complex(theta_i_facet,m_int,m_ext,theta_t_facet) ! get angle of transmission from facet
-                    fr(2,2) = (m_int*cos(theta_i_facet) - cos(theta_t_facet))/(m_int*cos(theta_i_facet) + cos(theta_t_facet))
-                    ft(2,2) = (2*m_int*cos(theta_i_facet))/(m_int*cos(theta_i_facet) + cos(theta_t_facet))
-                    fr(1,1) = (cos(theta_i_facet) - m_int*cos(theta_t_facet))/(m_int*cos(theta_t_facet) + cos(theta_i_facet))
-                    ft(1,1) = (2*m_int*cos(theta_i_facet)) / (m_int*cos(theta_t_facet) + cos(theta_i_facet))
+                    call get_theta_t_complex(theta_i,m_int,m_ext,theta_t)
+                    fr(2,2) = (m_int*cos(theta_i) - cos(theta_t))/(m_int*cos(theta_i) + cos(theta_t))
+                    ft(2,2) = (2*m_int*cos(theta_i))/(m_int*cos(theta_i) + cos(theta_t))
+                    fr(1,1) = (cos(theta_i) - m_int*cos(theta_t))/(m_int*cos(theta_t) + cos(theta_i))
+                    ft(1,1) = (2*m_int*cos(theta_i)) / (m_int*cos(theta_t) + cos(theta_i))                
                 end if
                 
                 ! apply fresnel matrices to amplitude matrix
-                refl_ampl(:,:) = matmul(fr(:,:),ampl_ap(:,:)) ! use reflected field at aperture for new propagating beams
-                trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:)) ! use transmitted field at fiacet for diffracted beams (change this later for re-entry)
+                refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
+                trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
                 
                 ! compute internal intensity
                 int_intensity = real(0.5*(  refl_ampl(1,1)*conjg(refl_ampl(1,1)) + &
@@ -678,23 +666,15 @@ module beam_loop_mod
                 ! possibly remove transmission from shadow facets here
                 if(is_shad(i)) trans_ampl(:,:) = 0d0
                 
-                ! get projected facet area
-                proj_area = geometry%f(i)%area * cos(theta_i_facet)
-                
                 ! add to the beam absorption cross section
-                beam%abs = beam%abs + (abs_intensity * proj_area * rbi_int) ! sum the absorbed energy
+                beam%abs = beam%abs + (abs_intensity * geometry%f(i)%area * cos(theta_i_facet) * rbi_int) ! sum the absorbed energy
                                 
-                ! compute the transmitted propagation vector (at the facet, for diffracted beams)
+                ! compute the transmitted propagation vector
                 if(.not. is_tir) then ! if no internal reflection
                     norm(:) = geometry%n(geometry%f(i)%ni,:)
                     call get_trans_prop(theta_i,theta_t,prop,norm,prop_ext) ! get the transmitted propagation vector
                 end if
                 
-                ! get the angle of transmission made with the facet normal based on geometry
-                theta_t_facet = acos(dot_product(geometry%n(geometry%f(i)%ni,:),prop_ext(:)))
-
-                print*,'theta t (ap) (facet)',theta_t,'|',theta_t_facet
-
                 ! save stuff to the beam structure
                 beam%field_out(n)%ampl_ext(:,:) = trans_ampl(:,:) ! save the transmitted amplitude matrix
                 beam%field_out(n)%ampl_int(:,:) = refl_ampl(:,:) ! save the reflected amplitude matrix
@@ -704,8 +684,8 @@ module beam_loop_mod
                 beam%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
                 beam%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
                 beam%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
-                beam%field_out(n)%pr = int_intensity * proj_area * rbi_int ! save reflected power contribution
-                beam%field_out(n)%pi = proj_area * rbi_int ! save incident power
+                beam%field_out(n)%pr = int_intensity * geometry%f(i)%area * cos(theta_i_facet) * rbi_int ! save reflected power contribution
+                beam%field_out(n)%pi = geometry%f(i)%area * cos(theta_i_facet) * rbi_int ! save incident power
                 if(is_tir) then
                     beam%field_out(n)%pt = 0d0
                 else
@@ -713,8 +693,8 @@ module beam_loop_mod
                 end if
                 beam%pr = beam%pr + beam%field_out(n)%pr ! sum reflected power  
                 beam%pt = beam%pt + beam%field_out(n)%pt ! sum transmitted power  
-                beam%field_out(n)%proj_area = proj_area ! save the geometric cross section
-                beam%proj_area_out = beam%proj_area_out + proj_area ! sum the total projected area for this beam
+                beam%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
+                beam%proj_area_out = beam%proj_area_out + geometry%f(i)%area * cos(theta_i_facet) ! sum the total projected area for this beam
             end if
         end do
     end subroutine
@@ -1490,6 +1470,11 @@ module beam_loop_mod
                 is_vis(i) = .false.
             end if
         end do
+
+        ! set facets which face the wrong way to be shadow facets
+        do i = 1, rot_geometry%nf
+            if(rot_geometry%n(rot_geometry%f(i)%ni,3) >= 0) is_shad(i) = .true.
+        end do
         
         do m = 1, rot_geometry%nf ! for each facet m
             if(is_vis(m) .eqv. .false.) then ! if facet isnt visible
@@ -1547,11 +1532,11 @@ module beam_loop_mod
                                                 end if
                                             else ! else, if facet j blocked facet m, but was not part of the beam surface
                                                 if(rot_geometry%f(m)%ap .eq. rot_geometry%f(j)%ap) then ! if facet j and facet m belong to the same aperture
-                                                    is_shad(m) = .true. ! set m as a shadow facet and continue to search for blockers
+                                                    ! do nothing
                                                 else ! if facet j and facet m dont belong to the same aperture
                                                     if(in_beam(m)) then ! if a blocking beam facet had already been found
                                                         if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(id_beam(m))%mid(3)) then ! if facet j was behind than the blocking beam
-                                                            ! do nothing (dont quite understand this if statement logic but it appears to be working as intended)
+                                                            is_shad(m) = .true. ! (dont quite understand this if statement logic but it appears to be working as intended)
                                                         else
                                                             is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                             in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
@@ -1657,6 +1642,11 @@ module beam_loop_mod
             mapping(beam%field_in(i)%fi) = i ! map each illuminating facet to its position in the beam data structure
         end do
         
+        ! set facets which face the wrong way to be shadow facets
+        do i = 1, geometry%nf
+            if(geometry%n(geometry%f(i)%ni,3) <= 0) is_shad(i) = .true.
+        end do
+
         do m = 1, geometry%nf ! for each facet m
             if(geometry%ap(geometry%f(m)%ap)%n(3) .lt. 0.01) then ! if aperture is downfacing (flip for external)
                 is_vis(m) = .false. ! set not visible
@@ -1692,7 +1682,7 @@ module beam_loop_mod
                                         !do nothing
                                     else
                                         if(geometry%f(m)%ap .eq. geometry%f(j)%ap) then ! if facet j and facet m belong to the same aperture
-                                            is_shad(m) = .true. ! set m as a shadow facet and continue to search for blockers
+                                            is_shad(m) = .true.
                                         else ! if facet j and facet m dont belong to the same aperture
                                             is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                             in_beam(m) = .false. ! not in beam
