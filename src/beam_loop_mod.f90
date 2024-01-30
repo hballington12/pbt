@@ -58,19 +58,46 @@ module beam_loop_mod
 
     end subroutine
     
-    subroutine open_beam_json(filename, beam_tree, beam_id)
+    subroutine open_beam_json(beam_tree, job_params)
 
-        character(len=*), intent(in) :: filename
         type(beam_type), dimension(:), intent(in) :: beam_tree
-        integer(4), intent(in), optional :: beam_id
+        type(job_parameters_type), intent(in) :: job_params
 
         integer(8) num_beams
         integer(8) unit
         integer(8) i
         integer(8) ierr
+        integer(8) start, end
+        real(8) progressReal
+        real work_done
+        integer progressInt
+        character(255) filename
 
         unit = 10
         num_beams = size(beam_tree,1)
+        progressInt = 0
+        work_done = 0
+        filename = trim(job_params%output_dir)//'/'//'beam.json'
+
+        ! set the beam index limits
+        if(job_params%export_beam_rec) then
+            do i = 1, num_beams
+                if(beam_tree(i)%rec == job_params%export_beam_lims(1)) then ! if reached first beam of the starting recursion number
+                    start = i
+                    exit ! break out the loop
+                end if
+            end do
+            do i = 1, num_beams
+                if(beam_tree(i)%rec == job_params%export_beam_lims(2)) then ! if reached beam of the starting recursion number
+                    end = i ! set end index, and keep looking until we reach last beam for this recursion
+                end if
+            end do
+            if(job_params%debug >= 2) print*,'exporting by recursion, limits:',start,end
+        else
+            start = job_params%export_beam_lims(1)
+            end = job_params%export_beam_lims(2)
+            if(job_params%debug >= 2) print*,'exporting by beam number, limits:',start,end
+        end if
 
         ! Open the file for writing
         open(unit, file=filename, status='unknown', action='write', iostat=ierr)
@@ -79,25 +106,34 @@ module beam_loop_mod
             return
         end if
 
+        ! header
         write(unit, *) '{'
         write(unit, *) '"beam tree":['
 
-        if(present(beam_id)) then
-            write(unit, *) '    {'
-            call write_beam_json(filename,beam_tree(beam_id),unit)
-            write(unit, *) '    }'
-        else
-            do i = 1, num_beams
-                write(unit, *) '    {'
-                call write_beam_json(filename,beam_tree(i),unit)
-                if(i /= num_beams) then
-                    write(unit, *) '    },'
-                else
-                    write(unit, *) '    }'
-                end if
-            end do
-        end if
+        ! loop through entries
+        do i = start, end
 
+            ! print export progress
+            if(job_params%timing .and. job_params%debug >=2) then
+                work_done = work_done + 1
+                progressReal = work_done*100/dble(end-start) ! percent completion
+                if(int(floor(progressReal/dble(10))) .gt. progressInt) then  ! if at sufficient progress has been made
+                    progressInt = int(floor(progressReal/dble(10))) ! update progress counter
+                    call progress_bar(progressInt*10, 100)
+                end if
+            end if
+            
+            ! export beam
+            write(unit, *) '    {'
+            call write_beam_json(filename,beam_tree(i),unit)
+            if(i /= end) then
+                write(unit, *) '    },'
+            else
+                write(unit, *) '    }'
+            end if
+        end do
+
+        ! footer
         write(unit, *) '    ]'
         write(unit, *) '}'
 
@@ -1322,7 +1358,10 @@ module beam_loop_mod
             print'(a)',' =========='
         end if
         
-        ! call open_beam_json("beam.json", beam_tree(1:num_beams)) ! optional, write beam tree or individual beam to json file
+        if(job_params%export_beam) then ! if beam exporting enabled
+            if(job_params%debug >= 2) print*,'exporting beam tree...'
+            call open_beam_json(beam_tree(1:num_beams), job_params) ! write beam tree or individual beam to json file
+        end if
         
     end subroutine
     

@@ -29,7 +29,6 @@ integer(8) i, j, k, i_loop
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
-character(len=255) :: output_dir ! output directory
 character(len=255) :: my_rank_str ! string of my rank
 character(len=255) :: my_log_dir ! log file location for each mpi process
 integer result ! true if subdirectory was made, false if subdirectory was not made
@@ -114,21 +113,21 @@ end if
 ! setting up job directory
 ! rank 0 process broadcasts job directory to other processes
 if (my_rank .eq. 0) then
-    call make_dir(job_params%job_name,output_dir)
-    print*,'output directory is "',trim(output_dir),'"'
-    ! result = makedirqq(trim(output_dir)//"/logs") ! make directory for logs
-    call system("mkdir "//trim(output_dir)//"/logs")
-    print*,'log files directory is "',trim(output_dir)//"/logs/",'"'
-    call system("mkdir "//trim(output_dir)//"/tmp") ! make directory for temp files
-    print*,'temporary files directory is "',trim(output_dir)//"/tmp/",'"'
+    call make_dir(job_params%job_name,job_params%output_dir)
+    print*,'output directory is "',trim(job_params%output_dir),'"'
+    ! result = makedirqq(trim(job_params%output_dir)//"/logs") ! make directory for logs
+    call system("mkdir "//trim(job_params%output_dir)//"/logs")
+    print*,'log files directory is "',trim(job_params%output_dir)//"/logs/",'"'
+    call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for temp files
+    print*,'temporary files directory is "',trim(job_params%output_dir)//"/tmp/",'"'
     print*,'sending...'
-    print*,'output_dir: ',output_dir
+    print*,'job_params%output_dir: ',job_params%output_dir
     do dest = 1, p-1
-        CALL MPI_SEND(output_dir, 255, MPI_CHARACTER, dest, tag, MPI_COMM_WORLD, ierr)
+        CALL MPI_SEND(job_params%output_dir, 255, MPI_CHARACTER, dest, tag, MPI_COMM_WORLD, ierr)
     end do
     ! print*,'sending complete.'
 else
-    call MPI_RECV(output_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
+    call MPI_RECV(job_params%output_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
 end if
 
 ! write job parameters to log file
@@ -137,7 +136,7 @@ call write_job_params(job_params)
 write(my_rank_str,*) my_rank
 call StripSpaces(my_rank_str)
 print*,'my_rank_str: ',my_rank_str
-write(my_log_dir,*) trim(output_dir)//"/logs/log",trim(my_rank_str)
+write(my_log_dir,*) trim(job_params%output_dir)//"/logs/log",trim(my_rank_str)
 my_log_dir = adjustl(my_log_dir)
 ! print*,'my rank is : ,',my_rank,' , my output directory is "',trim(my_log_dir),'"'
 
@@ -157,7 +156,7 @@ if (job_params%tri) then
                         '-Q -q', &
                         job_params%tri_roughness, &
                         my_rank, &
-                        output_dir, &
+                        job_params%output_dir, &
                         geometry) ! triangulate the particle
     ! call merge_vertices(vert_in, face_ids, num_vert, 1D-1) ! merge vertices that are close enough
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
@@ -166,7 +165,7 @@ end if
 
 if (my_rank .eq. 0) then
     ! write unrotated particle to file (optional)            
-    call PDAS(  output_dir,     & ! <-  output directory
+    call PDAS(  job_params%output_dir,     & ! <-  output directory
                 "unrotated",    & ! <-  filename
                 geometry)
 end if
@@ -178,7 +177,7 @@ if (my_rank .eq. 0) then
                     gamma_vals, &
                     job_params)
     if(job_params%output_eulers) then
-        call output_eulers(alpha_vals,beta_vals,gamma_vals,output_dir,job_params)
+        call output_eulers(alpha_vals,beta_vals,gamma_vals,job_params%output_dir,job_params)
     end if
     do dest = 1, p-1
         call MPI_SEND(alpha_vals,size(alpha_vals,1),MPI_REAL8,dest,tag,MPI_COMM_WORLD,ierr)
@@ -408,11 +407,11 @@ else ! else, if the job is not to be cached
         output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
 
         ! writing to file
-        call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
-        call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
+        call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)
+        call writeup(mueller_total, mueller_1d_total, job_params%output_dir, output_parameters_total, job_params) ! write to file
 
         ! clean up temporary files
-        call system("rm -r "//trim(output_dir)//"/tmp") ! remove directory for temp files
+        call system("rm -r "//trim(job_params%output_dir)//"/tmp") ! remove directory for temp files
 
         finish = omp_get_wtime()
         print*,'=========='

@@ -28,7 +28,6 @@ integer(8) i_loop, loop_start, i
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
-character(len=255) :: output_dir ! output directory
 type(job_parameters_type) job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
 
 ! sr PDAL2
@@ -80,11 +79,11 @@ if(job_params%resume) then
     ! stop
 end if
 
-call make_dir(job_params%job_name,output_dir)
-print*,'output directory is "',trim(output_dir),'"'
-call system("mkdir "//trim(output_dir)//"/tmp") ! make directory for temp files
-print*,'temporary files directory is "',trim(output_dir)//"/tmp/",'"'
-open(101,file=trim(output_dir)//"/"//"log") ! open global non-standard log file for important records
+call make_dir(job_params%job_name,job_params%output_dir)
+print*,'output directory is "',trim(job_params%output_dir),'"'
+call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for temp files
+print*,'temporary files directory is "',trim(job_params%output_dir)//"/tmp/",'"'
+open(101,file=trim(job_params%output_dir)//"/"//"log") ! open global non-standard log file for important records
 
 ! write job parameters to log file
 call write_job_params(job_params)
@@ -101,7 +100,7 @@ if (job_params%tri) then
                         '-Q -q', &
                         job_params%tri_roughness, &
                         my_rank, &
-                        output_dir, &
+                        job_params%output_dir, &
                         geometry) ! triangulate the particle
     ! call merge_vertices(vert_in, face_ids, 1D-1, geometry) ! merge vertices that are close enough
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
@@ -113,7 +112,7 @@ if (job_params%tri) then
 end if
 
 ! write unrotated particle to file (optional)            
-call PDAS(  output_dir,     & ! <-  output directory
+call PDAS(  job_params%output_dir,     & ! <-  output directory
             "unrotated",    & ! <-  filename
             geometry)
 
@@ -124,7 +123,7 @@ call init_loop( alpha_vals, &
                 job_params)
 
 if(job_params%output_eulers) then
-    call output_eulers(alpha_vals,beta_vals,gamma_vals,output_dir,job_params)
+    call output_eulers(alpha_vals,beta_vals,gamma_vals,job_params%output_dir,job_params)
 end if
 ! stop
 ! some stuff
@@ -153,7 +152,7 @@ do i = 1, num_remaining_orients
 
     ! write rotated particle to file (optional)
     if (job_params%num_orients .eq. 1) then
-        call PDAS(  output_dir,     & ! <-  output directory
+        call PDAS(  job_params%output_dir,     & ! <-  output directory
                     "rotated",    & ! <-  filename
                     rotated_geometry)
     end if
@@ -246,11 +245,11 @@ output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / 
 output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
 
 ! writing to file
-call write_outbins(output_dir,job_params%theta_vals,job_params%phi_vals)
-call writeup(mueller_total, mueller_1d_total, output_dir, output_parameters_total, job_params) ! write to file
+call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)
+call writeup(mueller_total, mueller_1d_total, job_params%output_dir, output_parameters_total, job_params) ! write to file
 
 ! clean up temporary files
-call system("rm -r "//trim(output_dir)//"/tmp") ! remove directory for temp files
+call system("rm -r "//trim(job_params%output_dir)//"/tmp") ! remove directory for temp files
 
 finish = omp_get_wtime()
 print*,'=========='

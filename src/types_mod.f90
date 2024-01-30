@@ -77,6 +77,10 @@ type job_parameters_type
     logical timing ! code timing output
     real(8) thresh_area ! area threshold for new beams
     real(8) thresh_energy ! energy threshold for new beams
+    logical export_beam ! whether or not to export beam in json format
+    logical export_beam_rec ! whether or not to export beams by recursion number, else export by beam number
+    integer(8) export_beam_lims(1:2) ! the start at end indices of beam number (or recursion) to be exported
+    character(len=255) output_dir ! output directory
 end type job_parameters_type
 
 type field_in_type

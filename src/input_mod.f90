@@ -300,6 +300,7 @@ job_params%debug = 1 ! default value is some debugging output
 job_params%timing = .false. ! default is no timing
 job_params%thresh_area = 1d0 ! default area threshold is 0
 job_params%thresh_energy = 1d-4 ! default energy threshold 1d-4
+job_params%export_beam = .false. ! default is do not export the beam
 
 
 ! print*,'command_argument_count(): ',command_argument_count()
@@ -781,7 +782,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 print*,'error: no option found for "mt"'
                 stop
             else
-                print*,'arg: "',trim(arg),'"'
+                ! print*,'arg: "',trim(arg),'"'
                 if(trim(arg) == "0") then
                     is_multithreaded = .false.
                     ! print*,'multithreading: disabled'
@@ -925,6 +926,79 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             print*,'timing: enabled'
             ! do something
 
+        case ('-export_beam')
+            print*,'found command line specifier "export_beam"'
+            job_params%export_beam = .true.
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "mt"'
+            else
+                print*,'arg: "',trim(arg),'"'
+                if(trim(arg(1:1)) == "-") then ! if found next flag, skip
+                    print*,'found next flag, recycling'
+                    i = i - 1
+                else if(trim(arg(1:len(trim(arg)))) == "rec") then
+                    print*,'found export_beam option "rec"'
+                    job_params%export_beam_rec = .true. ! set to export by recursion number
+                    i = i + 1 ! go to next command line argument
+                    call get_command_argument(i,arg,status=my_status) ! get next arg
+                    if (my_status .eq. 1 .or. trim(arg(1:1)) == "-") then ! if no argument (or next flag) found
+                        print*,'error: no value found for "-export_beam rec <value> [<value>]"'
+                        stop
+                    else ! else, if found first number
+                        read(arg,*) job_params%export_beam_lims(2) ! set it as the end recursion
+                        print*,'read first value for -export_beam rec <value> [<value>]:',job_params%export_beam_lims(2)
+                        ! attempt to read second number
+                        i = i + 1 ! go to next command line argument
+                        call get_command_argument(i,arg,status=my_status) ! get next arg
+                        if (my_status .eq. 1) then ! if no argument (or next flag) found
+                            print*,'error: no option found for "-export_beam"'
+                            stop
+                        else if (trim(arg(1:1)) == "-") then
+                            print*,'didnt find second value for -export_beam rec <value> [<value>]'
+                            job_params%export_beam_lims(1) = 1 ! set the start index to 1
+                            print*,'found next flag, recycling'
+                            i = i - 1
+                        else ! if found argument
+                            job_params%export_beam_lims(1) = job_params%export_beam_lims(2) ! set the first value we read as the start
+                            read(arg,*) job_params%export_beam_lims(2) ! and read the second value as the end
+                            print*,'found 2 values:',job_params%export_beam_lims(1:2)
+                        end if
+                    end if
+                else if(trim(arg(1:len(trim(arg)))) == "num") then
+                    print*,'found export_beam option "num"'
+                    job_params%export_beam_rec = .false. ! set to export by beam number
+                    i = i + 1 ! go to next command line argument
+                    call get_command_argument(i,arg,status=my_status) ! get next arg
+                    if (my_status .eq. 1 .or. trim(arg(1:1)) == "-") then ! if no argument (or next flag) found
+                        print*,'error: no value found for "-export_beam num <value> [<value>]"'
+                        stop
+                    else ! else, if found first number
+                        read(arg,*) job_params%export_beam_lims(2) ! set it as the end recursion
+                        print*,'read first value for -export_beam num <value> [<value>]:',job_params%export_beam_lims(2)
+                        ! attempt to read second number
+                        i = i + 1 ! go to next command line argument
+                        call get_command_argument(i,arg,status=my_status) ! get next arg
+                        if (my_status .eq. 1) then ! if no argument (or next flag) found
+                            print*,'error: no option found for "-export_beam"'
+                            stop
+                        else if (trim(arg(1:1)) == "-") then
+                            print*,'didnt find second value for -export_beam num <value> [<value>]'
+                            job_params%export_beam_lims(1) = 1 ! set the start index to 1
+                            print*,'found next flag, recycling'
+                            i = i - 1
+                        else ! if found argument
+                            job_params%export_beam_lims(1) = job_params%export_beam_lims(2) ! set the first value we read as the start
+                            read(arg,*) job_params%export_beam_lims(2) ! and read the second value as the end
+                            print*,'found 2 values:',job_params%export_beam_lims(1:2)
+                        end if
+                    end if
+                else
+                    error stop "invalid argument for flag -export_beam"
+                end if
+            end if
+
         case default ! if argument was unrecognised
             print '(2a, /)', 'unrecognised command-line option: ', arg
             stop
@@ -1025,6 +1099,17 @@ job_params%eulers = eulers
 job_params%cc_hex_params = cc_hex_params
 job_params%theta_vals = theta_vals
 job_params%phi_vals = phi_vals
+
+if(job_params%export_beam) then ! if beam exporting enabled, check values
+    print*,'beam exporting enabled'
+    if(job_params%export_beam_lims(1) > job_params%export_beam_lims(2)) error stop "beam export limits must be equal or increasing values"
+    if(job_params%export_beam_rec) then
+        print*,'exporting by recursion number:',job_params%export_beam_lims(1:2)
+        if(job_params%export_beam_lims(2) > job_params%rec) error stop "upper beam export limit must be equal to or less than the maximum number of recursions if the export method is 'rec'"
+    else
+        print*,'exporting by beam number:',job_params%export_beam_lims(1:2)
+    end if
+end if
 
 print*,'job settings:'
 

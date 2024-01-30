@@ -67,7 +67,7 @@ Main source file. It contains the program entry point. The ABT reads input param
 
         - example: `-rot multi 1000`
 
-- `-mt` - Defines whether the code should attempt to use multithreading, where appropriate. Is optional. If omitted, multithreading is disabled by default. If enabled, the user should ensure that the relevant omp environment variables are set up for their system. ie. OMP_STACKSIZE, OMP_NUM_THREADS, etc. If the code throws a segmentation fault at the diffraction subroutine, the user will likely need to increase their OMP_STACKSIZE.
+- `-mt <value>` - Defines whether the code should attempt to use multithreading, where appropriate. The value may be `0` for no multithreading, or `1` for multithreading. If omitted, multithreading is enabled by default. If enabled, the user should ensure that the relevant omp environment variables are set up for their system. ie. `OMP_STACKSIZE`, `OMP_NUM_THREADS`, etc. If the code throws a segmentation fault at the diffraction subroutine, the user will likely need to increase the `OMP_STACKSIZE`.
 
 - `-jobname` `<string>` - Specifies the name of the directory within which the output files should be place. Is optional. If omitted, "my_job#" is used, where # is an integer. If the directory already exists, an integer is appended to the directory name so that no files are overwritten.
 
@@ -103,6 +103,12 @@ Main source file. It contains the program entry point. The ABT reads input param
     - `2` - large output
 
     - `3` - extreme output
+
+- `-export_beam <args>` - exports information about the beams to a file
+
+    - `num <value> [<value>]` - exports by beam number. If 1 value is given, the beam tree is exported from the first beam index to the index specified by the value. If 2 values are given, the beam tree is exported from the beam index specified by the first value to the beam index specified by the second value.
+
+    - `rec <value> [<value>]` - exports by recursion number. If 1 value is given, the beam tree is exported from the first recursion to the recursion specified by the value. If 2 values are given, the beam tree is exported from the recursion specified by the first value to the recursion specified by the second value.
 
  ## Examples
 
