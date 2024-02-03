@@ -441,11 +441,9 @@ module beam_loop_mod
                 prop_ext(3) = -1 + 2*geometry%ap(ai)%n(3)*geometry%ap(ai)%n(3) ! reflected propagation vector (in rotated system)
                 
                 ! get vk7, the new e-perp vector (normal x reflected prop vector)
-                call cross(an,prop,vk7a,.true.) ! get reflected e-perp vector (aperture)
                 call cross(geometry%n(geometry%f(i)%ni,:),prop,vk7,.true.) ! get reflected e-perp vector (facet)
                 
                 ! get the rotation matrix to rotate about prop. vector into new scattering plane
-                call get_rot_matrix(rot1,vk7a,e_perp_inc,prop) ! (rotate about the aperture normal, for new beam propagation)
                 call get_rot_matrix(rot2,vk7,e_perp_inc,prop) ! (rotate about the facet normal, for diffraction into far-field)
                 
                 ! apply distance phase factor
@@ -479,7 +477,7 @@ module beam_loop_mod
                 
                 ! apply fresnel matrices to amplitude matrix
                 refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:)) ! use reflected field at facet for diffracted beams (change this later for re-entry)
-                trans_ampl(:,:) = matmul(ft(:,:),ampl_ap(:,:)) ! use transmitted field at aperture for new propagating beams
+                trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:)) ! use transmitted field at aperture for new propagating beams
                 
                 ! compute internal intensity
                 int_intensity = real(0.5*(  trans_ampl(1,1)*conjg(trans_ampl(1,1)) + &
@@ -634,7 +632,7 @@ module beam_loop_mod
                 prop_int(:) = matmul(transpose(rot),prop_int(:)) ! rotate reflected/refracted propagation vector back to original coordinate system
                 
                 ! get vk7, the new e-perp vector (normal x reflected prop vector)
-                call cross(-an,prop,vk7,.true.)
+                call cross(-(geometry%n(geometry%f(i)%ni,:)),prop,vk7,.true.)
                 
                 ! get the rotation matrix to rotate about prop. vector into new scattering plane
                 call get_rot_matrix(rot2,vk7,e_perp,prop)
