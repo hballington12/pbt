@@ -1555,7 +1555,7 @@ module beam_loop_mod
                                             if(is_beam(j)) then ! if facet j was part of the illuminating surface
                                                 if(in_beam(m)) then ! if a blocking beam facet had already been found
                                                     ! check to see which is the closest
-                                                    if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(id_beam(m))%mid(3)) then ! if facet j was closer than the previous blocker
+                                                    if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j was closer than the previous blocker
                                                         in_beam(m) = .true. ! set to be within beam
                                                         id_beam(m) = mapping(j) ! record the blocking facet
                                                         dist_beam(m) = rot_geometry%f(j)%mid(3) - rot_geometry%f(m)%mid(3) ! record the distance from centroid of blocker to centroid of facet m
@@ -1572,12 +1572,16 @@ module beam_loop_mod
                                                     ! do nothing
                                                 else ! if facet j and facet m dont belong to the same aperture
                                                     if(in_beam(m)) then ! if a blocking beam facet had already been found
-                                                        if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(id_beam(m))%mid(3)) then ! if facet j was behind than the blocking beam
-                                                            is_shad(m) = .true. ! (dont quite understand this if statement logic but it appears to be working as intended)
+                                                        ! previous blocker had position in beam tree: id_beam(m) -> facet id is therefore beam%field_in(id_beam(m))%fi
+                                                        if(rot_geometry%f(j)%mid(3).gt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j above the beam-emitting surface
+                                                            ! do nothing
                                                         else
                                                             is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                             in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                         end if
+                                                    else ! else, if a blocking had not yet been found
+                                                        is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                        in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet 
                                                     end if
                                                 end if
                                             end if
