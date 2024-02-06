@@ -1527,9 +1527,9 @@ module beam_loop_mod
                         if(f5(j,bb)) then ! 
                             ! if(any(f4(j,1:3)) .eq. bb) then ! if blocker was in fuzzy bounding box
                             if(j .ne. m) then ! ignore self-block
-                                if(rot_geometry%n(rot_geometry%f(j)%ni,3) .lt. 0.01) then ! if down-facing, sign flip here for internal
-                                    ! do nothing
-                                else ! if up-facing
+                                ! if(rot_geometry%n(rot_geometry%f(j)%ni,3) .lt. 0.01) then ! if down-facing, sign flip here for internal
+                                !     ! do nothing
+                                ! else ! if up-facing
                                     if (rot_geometry%f(m)%mid(3) .gt. rot_geometry%f(j)%mid(3)) then ! if potential blocker was behind facet m
                                         ! do nothing
                                     else ! if potential blocker was in front of facet m
@@ -1587,7 +1587,7 @@ module beam_loop_mod
                                             end if
                                         end if
                                     end if
-                                end if
+                                ! end if
                             end if
                         end if
                     end do
@@ -1816,8 +1816,8 @@ module beam_loop_mod
         type(geometry_type), intent(out) :: bb_geometry
         
         real(8) min_x, min_y, max_x, max_y, min_z, max_z
-        integer(8), parameter :: bounding_box_x_dim = 4 ! bounding box x dimension
-        integer(8), parameter :: bounding_box_y_dim = 4 ! bounding box y dimension
+        integer(8), parameter :: bounding_box_x_dim = 2 ! bounding box x dimension
+        integer(8), parameter :: bounding_box_y_dim = 2 ! bounding box y dimension
         real(8), parameter :: fac = 1.1
         real(8), dimension(1:bounding_box_x_dim+1, 1:bounding_box_y_dim+1) :: xvals, yvals ! bounding box x and y vertices
         integer(8) i,j, vert_counter, face_counter

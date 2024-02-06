@@ -952,13 +952,9 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         ! attempt to read second number
                         i = i + 1 ! go to next command line argument
                         call get_command_argument(i,arg,status=my_status) ! get next arg
-                        if (my_status .eq. 1) then ! if no argument (or next flag) found
-                            print*,'error: no option found for "-export_beam"'
-                            stop
-                        else if (trim(arg(1:1)) == "-") then
+                        if (my_status .eq. 1 .or. len(trim(arg)) .eq. 0 .or. trim(arg(1:1)) == "-") then ! if found next flag, or didnt find a number
                             print*,'didnt find second value for -export_beam rec <value> [<value>]'
                             job_params%export_beam_lims(1) = 1 ! set the start index to 1
-                            print*,'found next flag, recycling'
                             i = i - 1
                         else ! if found argument
                             job_params%export_beam_lims(1) = job_params%export_beam_lims(2) ! set the first value we read as the start
@@ -980,10 +976,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         ! attempt to read second number
                         i = i + 1 ! go to next command line argument
                         call get_command_argument(i,arg,status=my_status) ! get next arg
-                        if (my_status .eq. 1) then ! if no argument (or next flag) found
-                            print*,'error: no option found for "-export_beam"'
-                            stop
-                        else if (trim(arg(1:1)) == "-") then
+                        if (my_status .eq. 1 .or. len(trim(arg)) .eq. 0 .or. trim(arg(1:1)) == "-") then ! if found next flag, or didnt find a number
                             print*,'didnt find second value for -export_beam num <value> [<value>]'
                             job_params%export_beam_lims(1) = 1 ! set the start index to 1
                             print*,'found next flag, recycling'
