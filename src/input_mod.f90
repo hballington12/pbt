@@ -2643,7 +2643,7 @@ subroutine PDAL2(   job_params,     &
                 print*,'the user should ensure that the vertex ids in each face should be in an anti-clockwise order as viewed externally.'
                 print*,'poor energy conservation in the beam loop my result if this is not taken care of.'
             else ! else, if some normals read, perform checks to see if vertices need reordering
-                if(job_params%debug >= 1) print*,'validating vertex ordering...'
+                ! if(job_params%debug >= 1) print*,'validating vertex ordering...'
                 ! call validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
             end if
 
