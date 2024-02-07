@@ -1918,7 +1918,6 @@ subroutine recursion_ext(beam,geometry,job_params)
         do i = 1, beam%nf_in
             is_beam(beam%field_in(i)%fi) = .true.
             mapping(beam%field_in(i)%fi) = i ! map each illuminating facet to its position in the beam data structure
-            print*,'fi',beam%field_in(i)%fi,'is beam?',is_beam(beam%field_in(i)%fi) 
         end do
         
         ! need to add a check to ignore facets outside beam max/min here
@@ -1956,7 +1955,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 is_vis(i) = .false.
             end if
         end do
-
+ 
         ! set facets which face the wrong way to be shadow facets
         do i = 1, rot_geometry%nf
             if(rot_geometry%n(rot_geometry%f(i)%ni,3) <= 0) is_shad(i) = .true.
@@ -1966,6 +1965,7 @@ subroutine recursion_ext(beam,geometry,job_params)
             if(is_vis(m) .eqv. .false.) then ! if facet isnt visible
                 ! do nothing
             else
+                ! print*,'looking for blockers of facet m=',m
                 if(rot_geometry%ap(rot_geometry%f(m)%ap)%n(3) .lt. 0.01) then ! if aperture is downfacing (flip for external)
                     is_vis(m) = .false. ! set not visible
                 else ! if aperture was facing towards incidence
@@ -1989,15 +1989,13 @@ subroutine recursion_ext(beam,geometry,job_params)
                                         end if
                                         vecb1 = rot_geometry%f(m)%mid(1) - rot_geometry%v(rot_geometry%f(j)%vi(k),1) ! vector from vertex k of potential blocker j to centroid of facet m
                                         vecb2 = rot_geometry%f(m)%mid(2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
-                                        edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor b
+                                        edge_check = -vecb1*edge_norm1 -vecb2*edge_norm2 ! dot product of edge vector with vetor b (flip for external)
                                         if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
                                     end do
                                     if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
                                         !do nothing
                                     else
-                                        print*,'passed edge check: m',m,'j',j
                                         if(is_beam(j)) then ! if facet j was part of the illuminating surface
-                                            print*,'j was in the beam'
                                             if(in_beam(m)) then ! if a blocking beam facet had already been found
                                                 ! check to see which is the closest
                                                 if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j was closer than the previous blocker
