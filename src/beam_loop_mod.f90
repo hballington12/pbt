@@ -801,16 +801,14 @@ subroutine recursion_ext(beam,geometry,job_params)
         
         ! get the total number of facets illuminated by this beam
         num_ill_facets = 0
-        do i = 1, rot_geometry%na
+        do i = 1, rot_geometry%na ! remove this later, aperture loop not needed
             do j = 1, rot_geometry%nf
                 if(in_beam(j) .and. rot_geometry%f(j)%ap == i) then
-                    num_ill_facets = num_ill_facets + 1
+                    num_ill_facets = num_ill_facets + 1 ! update counter
+                    beam%field_in(id_beam(j))%is_outgoing = .false. ! set the illuminating facet to be not outgoing to the far-field
                 end if
             end do
         end do
-        
-        print*,'beam_id',beam%id,'num_ill_facets',num_ill_facets
-        print*,'beam_id',beam%id,'prop',beam%prop(:)
 
         ! allocate space in the beam structure to hold the illuminated field
         beam%nf_out = num_ill_facets
@@ -830,110 +828,89 @@ subroutine recursion_ext(beam,geometry,job_params)
                 dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
                 prop(:) = beam%prop(:) ! incoming propagation direction in unrotated system
                 
-                ! ! get the reflected propagation vector in unrotated system
-                ! prop_int(1) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(1) ! reflected propagation vector (in rotated system)
-                ! prop_int(2) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(2) ! reflected propagation vector (in rotated system)
-                ! prop_int(3) = -1 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(3) ! reflected propagation vector (in rotated system)
-                ! prop_int(:) = matmul(transpose(rot),prop_int(:)) ! rotate reflected/refracted propagation vector back to original coordinate system
+                ! get the reflected propagation vector in unrotated system
+                prop_ext(1) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(1) ! reflected propagation vector (in rotated system)
+                prop_ext(2) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(2) ! reflected propagation vector (in rotated system)
+                prop_ext(3) = -1 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(3) ! reflected propagation vector (in rotated system)
+                prop_ext(:) = matmul(transpose(rot),prop_ext(:)) ! rotate reflected/refracted propagation vector back to original coordinate system
                 
-                ! ! get vk7, the new e-perp vector (normal x reflected prop vector)
-                ! call cross(-(geometry%n(geometry%f(i)%ni,:)),prop,vk7,.true.)
+                ! get vk7, the new e-perp vector (normal x reflected prop vector)
+                call cross(geometry%n(geometry%f(i)%ni,:),prop,vk7,.true.)
                 
-                ! ! get the rotation matrix to rotate about prop. vector into new scattering plane
-                ! call get_rot_matrix(rot2,vk7,e_perp,prop)
+                ! get the rotation matrix to rotate about prop. vector into new scattering plane
+                call get_rot_matrix(rot2,vk7,e_perp,prop)
                 
-                ! ! rotate the amplitude matrix into the new scattering plane
-                ! ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
+                ! rotate the amplitude matrix into the new scattering plane
+                ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
                 
-                ! ! apply distance phase factor
-                ! ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*rbi_int*dist)
+                ! apply distance phase factor
+                ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*dist)
                 
-                ! ! compute incident intensity (before applying the absorption factor)
-                ! in_intensity = real(0.5*(  ampl(1,1)*conjg(ampl(1,1)) + &
-                ! ampl(1,2)*conjg(ampl(1,2)) + &
-                ! ampl(2,1)*conjg(ampl(2,1)) + &
-                ! ampl(2,2)*conjg(ampl(2,2))))
+                ! compute incident intensity (before applying the absorption factor)
+                in_intensity = real(0.5*(  ampl(1,1)*conjg(ampl(1,1)) + &
+                ampl(1,2)*conjg(ampl(1,2)) + &
+                ampl(2,1)*conjg(ampl(2,1)) + &
+                ampl(2,2)*conjg(ampl(2,2))))
+
+                ! compute fresnel matrices
+                fr(:,:) = 0d0 ! init fresnel reflection matrix
+                ft(:,:) = 0d0 ! init fresnel transmission matrix
+                theta_i = acos(ran(3)) ! using incident angle as that of the aperture
+                theta_i_facet = acos(rot_geometry%n(rot_geometry%f(i)%ni,3))
+
+                is_tir = .false. ! no tir because this is external incidence
+        
+                ! compute fresnel based angle of incidence and refraction at the facet
+                call get_theta_t_complex(theta_i_facet,m_ext,m_int,theta_t_facet) ! get angle of refraction at facet based on complex Snell's law
+                fr(2,2) = (cos(theta_i_facet) - m_int*cos(theta_t_facet))/(cos(theta_i_facet) + m_int*cos(theta_t_facet))
+                ft(2,2) = (2*cos(theta_i_facet))/(cos(theta_i_facet) + m_int*cos(theta_t_facet))
+                fr(1,1) = (m_int*cos(theta_i_facet) - cos(theta_t_facet))/(cos(theta_t_facet) + m_int*cos(theta_i_facet))
+                ft(1,1) = (2*cos(theta_i_facet))/(cos(theta_t_facet) + m_int*cos(theta_i_facet))
                 
-                ! ! compute absorbed intensity (before applying the absorption factor)
-                ! abs_intensity = in_intensity * (1d0-exp(-2*waveno*ibi_int*sqrt(dist))**2)
+                ! apply fresnel matrices to amplitude matrix
+                refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:)) ! use reflected field at facet for diffracted beams (change this later for re-entry)
+                trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:)) ! use transmitted field at aperture for new propagating beams
                 
-                ! ! apply absorption factor
-                ! ampl(:,:) = ampl(:,:) * exp(-2*waveno*ibi_int*sqrt(dist))
+                ! compute internal intensity
+                int_intensity = real(0.5*(  trans_ampl(1,1)*conjg(trans_ampl(1,1)) + &
+                trans_ampl(1,2)*conjg(trans_ampl(1,2)) + &
+                trans_ampl(2,1)*conjg(trans_ampl(2,1)) + &
+                trans_ampl(2,2)*conjg(trans_ampl(2,2))))
                 
-                ! ! compute remaining intensity after absorption
-                ! out_intensity = real(0.5*(  ampl(1,1)*conjg(ampl(1,1)) + &
-                ! ampl(1,2)*conjg(ampl(1,2)) + &
-                ! ampl(2,1)*conjg(ampl(2,1)) + &
-                ! ampl(2,2)*conjg(ampl(2,2))))
-                
-                ! ! compute fresnel matrices
-                ! fr(:,:) = 0d0 ! init fresnel reflection matrix
-                ! ft(:,:) = 0d0 ! init fresnel transmission matrix
-                ! theta_i = acos(-ran(3)) ! using incident angle as that of the aperture
-                ! theta_i_facet = acos(-(rot_geometry%n(rot_geometry%f(i)%ni,3)))
-                ! if(beam%is_int .and. theta_i >= asin(1/rbi_int)) then ! if tir
-                !     is_tir = .true. 
-                !     fr(2,2) = -1d0
-                !     ft(2,2) = 0d0
-                !     fr(1,1) = -1d0
-                !     ft(1,1) = 0d0
-                ! else ! if not tir, do fresnel at aperture, because doing at the facet gives bad results, currently
-                !     is_tir = .false.
-                !     call get_theta_t_complex(theta_i,m_int,m_ext,theta_t)
-                !     fr(2,2) = (m_int*cos(theta_i) - cos(theta_t))/(m_int*cos(theta_i) + cos(theta_t))
-                !     ft(2,2) = (2*m_int*cos(theta_i))/(m_int*cos(theta_i) + cos(theta_t))
-                !     fr(1,1) = (cos(theta_i) - m_int*cos(theta_t))/(m_int*cos(theta_t) + cos(theta_i))
-                !     ft(1,1) = (2*m_int*cos(theta_i)) / (m_int*cos(theta_t) + cos(theta_i))                
-                ! end if
-                
-                ! ! apply fresnel matrices to amplitude matrix
-                ! refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
-                ! trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
-                
-                ! ! compute internal intensity
-                ! int_intensity = real(0.5*(  refl_ampl(1,1)*conjg(refl_ampl(1,1)) + &
-                ! refl_ampl(1,2)*conjg(refl_ampl(1,2)) + &
-                ! refl_ampl(2,1)*conjg(refl_ampl(2,1)) + &
-                ! refl_ampl(2,2)*conjg(refl_ampl(2,2))))
-                
-                ! ! compute external intensity
-                ! ext_intensity = real(0.5*(  trans_ampl(1,1)*conjg(trans_ampl(1,1)) + &
-                ! trans_ampl(1,2)*conjg(trans_ampl(1,2)) + &
-                ! trans_ampl(2,1)*conjg(trans_ampl(2,1)) + &
-                ! trans_ampl(2,2)*conjg(trans_ampl(2,2))))
+                ! compute external intensity
+                ext_intensity = real(0.5*(  refl_ampl(1,1)*conjg(refl_ampl(1,1)) + &
+                refl_ampl(1,2)*conjg(refl_ampl(1,2)) + &
+                refl_ampl(2,1)*conjg(refl_ampl(2,1)) + &
+                refl_ampl(2,2)*conjg(refl_ampl(2,2))))
                 
                 ! ! possibly remove transmission from shadow facets here
                 ! if(is_shad(i)) trans_ampl(:,:) = 0d0
                 
-                ! ! add to the beam absorption cross section
-                ! beam%abs = beam%abs + (abs_intensity * geometry%f(i)%area * cos(theta_i_facet) * rbi_int) ! sum the absorbed energy
-                                
-                ! ! compute the transmitted propagation vector
-                ! if(.not. is_tir) then ! if no internal reflection
-                !     norm(:) = geometry%n(geometry%f(i)%ni,:)
-                !     call get_trans_prop(theta_i,theta_t,prop,norm,prop_ext) ! get the transmitted propagation vector
-                ! end if
+                ! compute the transmitted propagation vector using angle refracted from aperture
+                call get_theta_t_complex(theta_i,m_ext,m_int,theta_t) ! get angle of transmission made with the aperture normal
+                norm(:) = -an(:) ! get aperture normal
+                call get_trans_prop(theta_i,theta_t,prop,norm,prop_int) ! get the transmitted propagation vector
+                
+                ! get the angle of transmission made with the facet normal based on geometry
+                theta_t_facet = acos(dot_product(-geometry%n(geometry%f(i)%ni,:),prop_int(:)))
                 
                 ! save stuff to the beam structure
-                ! beam%field_out(n)%ampl_ext(:,:) = trans_ampl(:,:) ! save the transmitted amplitude matrix
-                ! beam%field_out(n)%ampl_int(:,:) = refl_ampl(:,:) ! save the reflected amplitude matrix
-                ! beam%field_out(n)%e_perp(:) = vk7(:) ! save the perpendicular field vector
+                beam%field_out(n)%ampl_ext(:,:) = refl_ampl(:,:) ! save the transmitted amplitude matrix
+                beam%field_out(n)%ampl_int(:,:) = trans_ampl(:,:) ! save the reflected amplitude matrix
+                beam%field_out(n)%e_perp(:) = vk7(:) ! save the perpendicular field vector
                 beam%field_out(n)%fi = i ! save the face id
                 beam%field_out(n)%ap = ai ! save the aperture
-                ! beam%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
-                ! beam%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
-                ! beam%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
-                ! beam%field_out(n)%pr = int_intensity * geometry%f(i)%area * cos(theta_i_facet) * rbi_int ! save reflected power contribution
-                ! beam%field_out(n)%pi = geometry%f(i)%area * cos(theta_i_facet) * rbi_int ! save incident power
-                ! if(is_tir) then
-                !     beam%field_out(n)%pt = 0d0
-                ! else
-                !     beam%field_out(n)%pt = ext_intensity * geometry%f(i)%area * cos(theta_t) ! save transmitted power contribution
-                ! end if
-                ! beam%pr = beam%pr + beam%field_out(n)%pr ! sum reflected power  
-                ! beam%pt = beam%pt + beam%field_out(n)%pt ! sum transmitted power  
-                ! beam%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
-                ! beam%proj_area_out = beam%proj_area_out + geometry%f(i)%area * cos(theta_i_facet) ! sum the total projected area for this beam
+                beam%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
+                beam%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
+                beam%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
+                beam%field_out(n)%pi = geometry%f(i)%area * cos(theta_i_facet) ! save incident power
+                beam%field_out(n)%pr = ext_intensity * geometry%f(i)%area * cos(theta_i_facet) ! save reflected power (angle made with facet)
+                beam%field_out(n)%pt = int_intensity * geometry%f(i)%area * rbi_int * cos(theta_t_facet) ! save transmitted power (angle made with aperture, because the new propagation direction is along this direction)
+                beam%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
+                beam%pi = beam%pi + beam%field_out(n)%pi ! sum total incident power (bit different to other parts of the code because we do not care about conservation of energy for the initial wavefront)
+                beam%pr = beam%pr + beam%field_out(n)%pr ! sum total reflected power
+                beam%pt = beam%pt + beam%field_out(n)%pt ! sum total transmitted power
+
             end if
         end do
     end subroutine
@@ -1156,6 +1133,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally refracted propagation vector (overwrites each time but they are all the same)            
                 beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pt ! incident power for new beam is the sum of transmitted power of all facets in the new beam
                 beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
+                beam_tree(index)%field_in(nf)%is_outgoing = .false. ! internal beams cannot be outgoing
 
                 ! add information about the externally reflected beam to the beam tree
                 index = mapping(ai) + 1 ! get the position of new beam in the beam tree
@@ -1168,7 +1146,8 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
                 beam_tree(index)%prop(:) = beam%field_out(i)%prop_ext(:) ! save externally reflected propagation vector (overwrites each time but they are all the same)            
                 beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of reflected power of all facets in the new beam
-                beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction                
+                beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction      
+                beam_tree(index)%field_in(nf)%is_outgoing = .true. ! external beams can be changed to not outgoing if they are found to illuminate part of the particle - this is done in recursion_ext       
             end if
         end do
         
@@ -1538,17 +1517,24 @@ subroutine recursion_ext(beam,geometry,job_params)
                 ! propagate this beam
                 if(beam%is_int) then ! if the beam is internally propagating
                     call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
+                    !$omp critical
+                    if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
+
+                    !$omp end critical
                 else ! if the beam is externally propagating
                     call recursion_ext(beam,geometry,job_params) ! propagate the beam and populate the beam structure
+                    !$omp critical
+                    call add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree
+                    call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params)
+                    !$omp end critical
                 end if ! end: if the beam is internally propagating
                 !$omp critical     
                 beam_tree(beam%id) = beam ! update the information about the propagated beam in the beam tree
                 if(job_params%debug >= 2) call print_beam_info(beam,job_params) ! print some info about the beam
-                if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
                 ! add the new beams to the beam tree (need to also add the new information about the current beam)
-                call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
+                ! call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
                 ! add the outgoing surface field to the diffraction structure
-                call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params)
+                ! call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params)
                 !$omp end critical
             end do ! end: for each entry in the beam tree that belongs to this recursion
             !$omp end parallel
@@ -2337,19 +2323,21 @@ subroutine recursion_ext(beam,geometry,job_params)
         integer(8) i, counter
         
         counter = 0 ! counts the number of beams added to the tree
-        
-        do i = 1, beam%nf_out ! for each illuminated facet in this beam structure
-            if(.not. beam%field_out(i)%is_tir) then ! if it wasnt total internal reflection, add to outbeams
+        print*,'adding to outbeam tree: beam number',beam%id
+        do i = 1, beam%nf_in ! for each illuminated facet in this beam structure
+            if(beam%field_in(i)%is_outgoing) then ! if beam is outgoing to far-field, add to diffraction outbeam tree
+                print*,'outgoing facet:',beam%field_in(i)%fi
                 beam_outbeam_tree_counter = beam_outbeam_tree_counter + 1 ! update outbeam tree counter
                 counter = counter + 1
                 if(beam_outbeam_tree_counter .gt. size(beam_outbeam_tree,1)) then
                     print*,'error: need more space in outbeam_tree. please increase in sr init'
                 end if
-                beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(:,:) = beam%field_out(i)%ampl_ext(:,:) ! external amplitude matrix
-                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(:) = beam%field_out(i)%prop_int(:) ! incident propagation direction
-                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(:) = beam%field_out(i)%prop_ext(:) ! outgoing propagation direction
-                beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(:) = beam%field_out(i)%e_perp(:) ! perpendicular field vector
-                beam_outbeam_tree(beam_outbeam_tree_counter)%fout = beam%field_out(i)%fi ! facet id
+                
+                beam_outbeam_tree(beam_outbeam_tree_counter)%ampl(:,:) = beam%field_in(i)%ampl(:,:) ! external amplitude matrix
+                ! beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(:) = beam%field_in(i)%prop_int(:) ! incident propagation direction ! probably unused
+                beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(:) = beam%prop(:) ! outgoing propagation direction
+                beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(:) = beam%field_in(i)%e_perp(:) ! perpendicular field vector
+                beam_outbeam_tree(beam_outbeam_tree_counter)%fout = beam%field_in(i)%fi ! facet id
             end if
         end do
         

@@ -89,6 +89,7 @@ type field_in_type
     integer(8) fi ! the facet id
     complex(8) ampl(1:2,1:2) ! the amplitude matrix
     real(8) e_perp(1:3) ! electric field perpendicular vector (previously known as vk7)
+    logical is_outgoing ! whether or not this part of the beam reached the far-field (can only be true for externally propagating beams)
 end type field_in_type
 
 type field_out_type
