@@ -404,7 +404,7 @@ module beam_loop_mod
         ! no need to rotate as propagation is already along the -z direction
         
         ! find the facets illuminated by the beam
-        call find_vis_incidence(in_beam, is_vis, dist_beam, id_beam, is_shad, beam_inc, geometry, beam_geometry)
+        call find_vis_inc(in_beam, is_vis, dist_beam, id_beam, is_shad, beam_inc, geometry, beam_geometry)
         
         ! get the total number of facets illuminated by this beam
         num_ill_facets = 0
@@ -733,6 +733,211 @@ module beam_loop_mod
         end do
     end subroutine
     
+subroutine recursion_ext(beam,geometry,job_params)
+        
+        ! recursion_ext
+        ! propagates an external beam
+        ! finds the visible facets as viewed along the initial propagation direction (-z)
+        ! propagates the field from the incident beam to the visible facets      
+        
+        type(geometry_type), intent(in) :: geometry ! geometry data structure
+        type(job_parameters_type), intent(in) :: job_params ! job parameters
+        type(beam_type), intent(inout) :: beam ! current beam to be traced
+        
+        type(geometry_type) :: rot_geometry ! the geometry structure after rotating
+        integer(8) i, j ! some counters
+        integer(8) ai ! an aperture id
+        real(8) rot(1:3,1:3) ! a 3x3 rotation matrix
+        real(8) rot2(1:2,1:2) ! a 2x2 rotation matrix
+        logical, dimension(:), allocatable :: is_shad ! whether each facet was in the shadow of another
+        logical, dimension(:), allocatable :: in_beam ! whether each facet was within the beam
+        integer(8), dimension(:), allocatable :: id_beam ! the facet id of the beam face which illuminated each facet
+        real(8), dimension(:), allocatable :: dist_beam ! the distance from the beam to each facet
+        real(8) prop(1:3) ! incoming propagation direction in unrotated system
+        real(8) prop_int(1:3) ! reflected/refracted propagation vector
+        real(8) prop_ext(1:3) ! reflected/refracted propagation vector
+        integer(8) num_ill_facets    
+        integer(8) n ! a counter
+        real(8) an(1:3) ! an aperture normal
+        real(8) ran(1:3) ! a rotated aperture normal
+        real(8) vk7(1:3) ! a reflected/refracted e-perp vector
+        real(8) e_perp(1:3) ! an incident e-perp vector
+        integer(8) bfi ! an beam face id
+        complex(8) ampl(1:2,1:2) ! an amplitude matrix
+        complex(8) refl_ampl(1:2,1:2) ! a reflected amplitude matrix
+        complex(8) trans_ampl(1:2,1:2) ! a transmitted amplitude matrix
+        real(8) waveno ! wave number
+        real(8) rbi_int ! internal real part refractive index
+        real(8) ibi_int ! internal imaginary part refractive index
+        complex(8) m_int ! internal complex refractive index
+        complex(8) m_ext ! external complex refractive index
+        real(8) dist ! distance travelled
+        logical is_tir ! whether or not there is total internal reflection
+        real(8) theta_i ! incident angle
+        real(8) theta_i_facet ! incident angle with the facet
+        real(8) theta_t ! transmitted angle
+        real(8) theta_t_facet ! transmitted angle
+        complex(8) fr(1:2,1:2) ! fresnel reflection matrix
+        complex(8) ft(1:2,1:2) ! fresnel reflection matrix
+        real(8) abs_intensity ! absorbed intensity
+        real(8) in_intensity ! absorbed intensity
+        real(8) out_intensity ! intensity after absorption
+        real(8) int_intensity ! internal intensitiy
+        real(8) ext_intensity ! external intensitiy        
+        real(8) norm(1:3) ! a facet normal
+        real(8) proj_area ! a projected area
+        
+        waveno = 2*pi/job_params%la ! wavenumber
+        rbi_int = job_params%rbi ! real part refractive index
+        ibi_int = job_params%ibi ! imaginary part refractive index
+        m_int = cmplx(rbi_int,ibi_int,kind=8) ! refractive index
+        m_ext = cmplx(1d0,0d0,kind=8) ! external refractive index
+        
+        ! rotate geometry so that the propagation is along the z-axis, save the rotation matrix
+        call rotate(beam,geometry,rot_geometry,rot)
+        
+        ! find the facets illuminated by the beam
+        call find_vis_ext(in_beam, dist_beam, id_beam, is_shad, beam, rot_geometry)
+        
+        ! get the total number of facets illuminated by this beam
+        num_ill_facets = 0
+        do i = 1, rot_geometry%na
+            do j = 1, rot_geometry%nf
+                if(in_beam(j) .and. rot_geometry%f(j)%ap == i) then
+                    num_ill_facets = num_ill_facets + 1
+                end if
+            end do
+        end do
+        
+        print*,'beam_id',beam%id,'num_ill_facets',num_ill_facets
+        print*,'beam_id',beam%id,'prop',beam%prop(:)
+
+        ! allocate space in the beam structure to hold the illuminated field
+        beam%nf_out = num_ill_facets
+        allocate(beam%field_out(1:beam%nf_out))
+        
+        ! add info about the illuminated field to the beam structure
+        n = 0 ! init a counter to count the number of faces added to the beam struct
+        do i = 1, rot_geometry%nf ! for each face
+            if(in_beam(i)) then ! if this face was illuminated by the beam
+                n = n + 1 ! update counter
+                ai = geometry%f(i)%ap ! get the aperture id (in unrotated system)
+                an(:) = geometry%ap(ai)%n(:) ! get the aperture normal (in unrotated systen)
+                ran(:) = rot_geometry%ap(ai)%n(:) ! get the aperture normal (in rotated system)
+                bfi = id_beam(i) ! get the beam facet id which illuminated this one
+                ampl(:,:) = beam%field_in(bfi)%ampl(:,:) ! get the amplitude matrix of the illuminating facet
+                e_perp(:) = beam%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
+                dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
+                prop(:) = beam%prop(:) ! incoming propagation direction in unrotated system
+                
+                ! ! get the reflected propagation vector in unrotated system
+                ! prop_int(1) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(1) ! reflected propagation vector (in rotated system)
+                ! prop_int(2) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(2) ! reflected propagation vector (in rotated system)
+                ! prop_int(3) = -1 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(3) ! reflected propagation vector (in rotated system)
+                ! prop_int(:) = matmul(transpose(rot),prop_int(:)) ! rotate reflected/refracted propagation vector back to original coordinate system
+                
+                ! ! get vk7, the new e-perp vector (normal x reflected prop vector)
+                ! call cross(-(geometry%n(geometry%f(i)%ni,:)),prop,vk7,.true.)
+                
+                ! ! get the rotation matrix to rotate about prop. vector into new scattering plane
+                ! call get_rot_matrix(rot2,vk7,e_perp,prop)
+                
+                ! ! rotate the amplitude matrix into the new scattering plane
+                ! ampl(:,:) = matmul(rot2(:,:),ampl(:,:))
+                
+                ! ! apply distance phase factor
+                ! ampl(:,:) = ampl(:,:) * exp2cmplx(waveno*rbi_int*dist)
+                
+                ! ! compute incident intensity (before applying the absorption factor)
+                ! in_intensity = real(0.5*(  ampl(1,1)*conjg(ampl(1,1)) + &
+                ! ampl(1,2)*conjg(ampl(1,2)) + &
+                ! ampl(2,1)*conjg(ampl(2,1)) + &
+                ! ampl(2,2)*conjg(ampl(2,2))))
+                
+                ! ! compute absorbed intensity (before applying the absorption factor)
+                ! abs_intensity = in_intensity * (1d0-exp(-2*waveno*ibi_int*sqrt(dist))**2)
+                
+                ! ! apply absorption factor
+                ! ampl(:,:) = ampl(:,:) * exp(-2*waveno*ibi_int*sqrt(dist))
+                
+                ! ! compute remaining intensity after absorption
+                ! out_intensity = real(0.5*(  ampl(1,1)*conjg(ampl(1,1)) + &
+                ! ampl(1,2)*conjg(ampl(1,2)) + &
+                ! ampl(2,1)*conjg(ampl(2,1)) + &
+                ! ampl(2,2)*conjg(ampl(2,2))))
+                
+                ! ! compute fresnel matrices
+                ! fr(:,:) = 0d0 ! init fresnel reflection matrix
+                ! ft(:,:) = 0d0 ! init fresnel transmission matrix
+                ! theta_i = acos(-ran(3)) ! using incident angle as that of the aperture
+                ! theta_i_facet = acos(-(rot_geometry%n(rot_geometry%f(i)%ni,3)))
+                ! if(beam%is_int .and. theta_i >= asin(1/rbi_int)) then ! if tir
+                !     is_tir = .true. 
+                !     fr(2,2) = -1d0
+                !     ft(2,2) = 0d0
+                !     fr(1,1) = -1d0
+                !     ft(1,1) = 0d0
+                ! else ! if not tir, do fresnel at aperture, because doing at the facet gives bad results, currently
+                !     is_tir = .false.
+                !     call get_theta_t_complex(theta_i,m_int,m_ext,theta_t)
+                !     fr(2,2) = (m_int*cos(theta_i) - cos(theta_t))/(m_int*cos(theta_i) + cos(theta_t))
+                !     ft(2,2) = (2*m_int*cos(theta_i))/(m_int*cos(theta_i) + cos(theta_t))
+                !     fr(1,1) = (cos(theta_i) - m_int*cos(theta_t))/(m_int*cos(theta_t) + cos(theta_i))
+                !     ft(1,1) = (2*m_int*cos(theta_i)) / (m_int*cos(theta_t) + cos(theta_i))                
+                ! end if
+                
+                ! ! apply fresnel matrices to amplitude matrix
+                ! refl_ampl(:,:) = matmul(fr(:,:),ampl(:,:))
+                ! trans_ampl(:,:) = matmul(ft(:,:),ampl(:,:))
+                
+                ! ! compute internal intensity
+                ! int_intensity = real(0.5*(  refl_ampl(1,1)*conjg(refl_ampl(1,1)) + &
+                ! refl_ampl(1,2)*conjg(refl_ampl(1,2)) + &
+                ! refl_ampl(2,1)*conjg(refl_ampl(2,1)) + &
+                ! refl_ampl(2,2)*conjg(refl_ampl(2,2))))
+                
+                ! ! compute external intensity
+                ! ext_intensity = real(0.5*(  trans_ampl(1,1)*conjg(trans_ampl(1,1)) + &
+                ! trans_ampl(1,2)*conjg(trans_ampl(1,2)) + &
+                ! trans_ampl(2,1)*conjg(trans_ampl(2,1)) + &
+                ! trans_ampl(2,2)*conjg(trans_ampl(2,2))))
+                
+                ! ! possibly remove transmission from shadow facets here
+                ! if(is_shad(i)) trans_ampl(:,:) = 0d0
+                
+                ! ! add to the beam absorption cross section
+                ! beam%abs = beam%abs + (abs_intensity * geometry%f(i)%area * cos(theta_i_facet) * rbi_int) ! sum the absorbed energy
+                                
+                ! ! compute the transmitted propagation vector
+                ! if(.not. is_tir) then ! if no internal reflection
+                !     norm(:) = geometry%n(geometry%f(i)%ni,:)
+                !     call get_trans_prop(theta_i,theta_t,prop,norm,prop_ext) ! get the transmitted propagation vector
+                ! end if
+                
+                ! save stuff to the beam structure
+                ! beam%field_out(n)%ampl_ext(:,:) = trans_ampl(:,:) ! save the transmitted amplitude matrix
+                ! beam%field_out(n)%ampl_int(:,:) = refl_ampl(:,:) ! save the reflected amplitude matrix
+                ! beam%field_out(n)%e_perp(:) = vk7(:) ! save the perpendicular field vector
+                beam%field_out(n)%fi = i ! save the face id
+                beam%field_out(n)%ap = ai ! save the aperture
+                ! beam%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
+                ! beam%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
+                ! beam%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
+                ! beam%field_out(n)%pr = int_intensity * geometry%f(i)%area * cos(theta_i_facet) * rbi_int ! save reflected power contribution
+                ! beam%field_out(n)%pi = geometry%f(i)%area * cos(theta_i_facet) * rbi_int ! save incident power
+                ! if(is_tir) then
+                !     beam%field_out(n)%pt = 0d0
+                ! else
+                !     beam%field_out(n)%pt = ext_intensity * geometry%f(i)%area * cos(theta_t) ! save transmitted power contribution
+                ! end if
+                ! beam%pr = beam%pr + beam%field_out(n)%pr ! sum reflected power  
+                ! beam%pt = beam%pt + beam%field_out(n)%pt ! sum transmitted power  
+                ! beam%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
+                ! beam%proj_area_out = beam%proj_area_out + geometry%f(i)%area * cos(theta_i_facet) ! sum the total projected area for this beam
+            end if
+        end do
+    end subroutine
+
     subroutine get_trans_prop(theta_i,theta_t,prop_in,norm,prop_out)
         
         ! get_trans_prop
@@ -894,18 +1099,37 @@ module beam_loop_mod
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(create_new_beam(i)) then ! if it was part of an aperture sufficiently illuminated by this beam
-                num_new_beams = num_new_beams + 1 ! update counter
-                num_beams = num_beams + 1 ! add an internally reflected beam to the beam tree
+                num_new_beams = num_new_beams + 2 ! update total counter twice, one for internal and one for external
+
+                ! adding the internally transmitted beam to the tree
+                num_beams = num_beams + 1 ! update local counter once, for internally transmitted beam
                 if(num_beams > size(beam_tree,1)) then
                     print*,'not enough space in beam tree'
                     stop
                 end if
-                mapping(i) = num_beams ! save the position of this beam in the beam tree
+                mapping(i) = num_beams ! save the position of this beam in the beam tree (the external reflection will be mapping(i)+1)
                 allocate(beam_tree(num_beams)%field_in(1:num_ill(i))) ! allocate space
                 ! add stuff to the beam tree
                 beam_tree(num_beams)%ap = i ! aperture id
                 beam_tree(num_beams)%nf_in = 0 ! init
                 beam_tree(num_beams)%is_int = .true. ! is internally propagating
+                beam_tree(num_beams)%pi = 0 ! init
+                beam_tree(num_beams)%pr = 0 ! init
+                beam_tree(num_beams)%pt = 0 ! init
+                beam_tree(num_beams)%id = num_beams ! save position in beam tree
+                beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
+
+                ! adding the externally reflected beam to the tree
+                num_beams = num_beams + 1 ! update local counter once, for externally reflected beam
+                if(num_beams > size(beam_tree,1)) then
+                    print*,'not enough space in beam tree'
+                    stop
+                end if
+                allocate(beam_tree(num_beams)%field_in(1:num_ill(i))) ! allocate space
+                ! add stuff to the beam tree
+                beam_tree(num_beams)%ap = i ! aperture id
+                beam_tree(num_beams)%nf_in = 0 ! init
+                beam_tree(num_beams)%is_int = .false. ! is externally propagating
                 beam_tree(num_beams)%pi = 0 ! init
                 beam_tree(num_beams)%pr = 0 ! init
                 beam_tree(num_beams)%pt = 0 ! init
@@ -919,18 +1143,32 @@ module beam_loop_mod
             ai = beam%field_out(i)%ap ! get the aperture id
             if(create_new_beam(ai)) then ! if it was sufficiently illuminated by this beam
                 fi = beam%field_out(i)%fi ! get the facet id
+
+                ! add information about the internally transmitted beam to the beam tree
                 index = mapping(ai) ! get the position of new beam in the beam tree
                 nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
                 nf = nf + 1 ! update the number of facets
                 proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
-                
                 beam_tree(index)%nf_in = nf ! save updated number of facets
-                beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
+                beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally refracted field becomes the new beam field
                 beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
                 beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
-                beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time but they are all the same)            
+                beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally refracted propagation vector (overwrites each time but they are all the same)            
                 beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pt ! incident power for new beam is the sum of transmitted power of all facets in the new beam
                 beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
+
+                ! add information about the externally reflected beam to the beam tree
+                index = mapping(ai) + 1 ! get the position of new beam in the beam tree
+                nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
+                nf = nf + 1 ! update the number of facets
+                proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),beam%field_out(i)%prop_ext(:))
+                beam_tree(index)%nf_in = nf ! save updated number of facets
+                beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_ext(:,:) ! the externally reflected field becomes the new beam field
+                beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
+                beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
+                beam_tree(index)%prop(:) = beam%field_out(i)%prop_ext(:) ! save externally reflected propagation vector (overwrites each time but they are all the same)            
+                beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of reflected power of all facets in the new beam
+                beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction                
             end if
         end do
         
@@ -1258,7 +1496,8 @@ module beam_loop_mod
 
         call add_to_beam_tree_external(beam_tree,beam_inc,num_beams,geometry,job_params) ! add beams to be propagated to the tree
         
-        call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam_inc,job_params) ! add externally reflected beams to diffraction tree
+        ! removed for re-entry branch
+        ! call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam_inc,job_params) ! add externally reflected beams to diffraction tree
         
         call get_geo_cross_section(geometry,beam_inc,output_parameters) ! for the first recursion, get the illuminated geometric cross section
         
@@ -1300,8 +1539,7 @@ module beam_loop_mod
                 if(beam%is_int) then ! if the beam is internally propagating
                     call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                 else ! if the beam is externally propagating
-                    print*,'external propagation not supported yet'
-                    cycle
+                    call recursion_ext(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                 end if ! end: if the beam is internally propagating
                 !$omp critical     
                 beam_tree(beam%id) = beam ! update the information about the propagated beam in the beam tree
@@ -1522,72 +1760,66 @@ module beam_loop_mod
                 else ! if aperture was facing towards incidence
                     bb = f3(m) ! get bounding box id
                     do j = 1, rot_geometry%nf ! for each potentially blocking facet j
-                        ! if(rotatednorm(face2(j),3) .lt. 0.01) then ! sign flip here for internal
-                        ! if(f4(j,1) .eq. bb .or. f4(j,2) .eq. bb .or. f4(j,3) .eq. bb) then ! 
                         if(f5(j,bb)) then ! 
                             ! if(any(f4(j,1:3)) .eq. bb) then ! if blocker was in fuzzy bounding box
                             if(j .ne. m) then ! ignore self-block
-                                ! if(rot_geometry%n(rot_geometry%f(j)%ni,3) .lt. 0.01) then ! if down-facing, sign flip here for internal
-                                !     ! do nothing
-                                ! else ! if up-facing
-                                    if (rot_geometry%f(m)%mid(3) .gt. rot_geometry%f(j)%mid(3)) then ! if potential blocker was behind facet m
-                                        ! do nothing
-                                    else ! if potential blocker was in front of facet m
-                                        ! do bounded surface edge check
-                                        within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
-                                        do k = 1, rot_geometry%f(j)%nv ! looping over vertices of potentially blocking facet j
-                                            ! compute edge normal
-                                            if(k .eq. rot_geometry%f(j)%nv) then
-                                                edge_norm2 = -rot_geometry%v(rot_geometry%f(j)%vi(1),1) + rot_geometry%v(rot_geometry%f(j)%vi(rot_geometry%f(j)%nv),1) ! cross product of edge vector with reverse beam direction
-                                                edge_norm1 = rot_geometry%v(rot_geometry%f(j)%vi(1),2) - rot_geometry%v(rot_geometry%f(j)%vi(rot_geometry%f(j)%nv),2)
-                                            else
-                                                edge_norm2 = -rot_geometry%v(rot_geometry%f(j)%vi(k+1),1) + rot_geometry%v(rot_geometry%f(j)%vi(k),1)
-                                                edge_norm1 = rot_geometry%v(rot_geometry%f(j)%vi(k+1),2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
-                                            end if
-                                            vecb1 = rot_geometry%f(m)%mid(1) - rot_geometry%v(rot_geometry%f(j)%vi(k),1) ! vector from vertex k of potential blocker j to centroid of facet m
-                                            vecb2 = rot_geometry%f(m)%mid(2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
-                                            edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor b
-                                            if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
-                                        end do
-                                        if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
-                                            !do nothing
+                                if (rot_geometry%f(m)%mid(3) .gt. rot_geometry%f(j)%mid(3)) then ! if potential blocker was behind facet m
+                                    ! do nothing
+                                else ! if potential blocker was in front of facet m
+                                    ! do bounded surface edge check
+                                    within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
+                                    do k = 1, rot_geometry%f(j)%nv ! looping over vertices of potentially blocking facet j
+                                        ! compute edge normal
+                                        if(k .eq. rot_geometry%f(j)%nv) then
+                                            edge_norm2 = -rot_geometry%v(rot_geometry%f(j)%vi(1),1) + rot_geometry%v(rot_geometry%f(j)%vi(rot_geometry%f(j)%nv),1) ! cross product of edge vector with reverse beam direction
+                                            edge_norm1 = rot_geometry%v(rot_geometry%f(j)%vi(1),2) - rot_geometry%v(rot_geometry%f(j)%vi(rot_geometry%f(j)%nv),2)
                                         else
-                                            if(is_beam(j)) then ! if facet j was part of the illuminating surface
-                                                if(in_beam(m)) then ! if a blocking beam facet had already been found
-                                                    ! check to see which is the closest
-                                                    if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j was closer than the previous blocker
-                                                        in_beam(m) = .true. ! set to be within beam
-                                                        id_beam(m) = mapping(j) ! record the blocking facet
-                                                        dist_beam(m) = rot_geometry%f(j)%mid(3) - rot_geometry%f(m)%mid(3) ! record the distance from centroid of blocker to centroid of facet m
-                                                    else
-                                                        ! do nothing                                     
-                                                    end if
-                                                else ! if this is the first time finding a blocking beam facet
+                                            edge_norm2 = -rot_geometry%v(rot_geometry%f(j)%vi(k+1),1) + rot_geometry%v(rot_geometry%f(j)%vi(k),1)
+                                            edge_norm1 = rot_geometry%v(rot_geometry%f(j)%vi(k+1),2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
+                                        end if
+                                        vecb1 = rot_geometry%f(m)%mid(1) - rot_geometry%v(rot_geometry%f(j)%vi(k),1) ! vector from vertex k of potential blocker j to centroid of facet m
+                                        vecb2 = rot_geometry%f(m)%mid(2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
+                                        edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor b
+                                        if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
+                                    end do
+                                    if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
+                                        !do nothing
+                                    else
+                                        if(is_beam(j)) then ! if facet j was part of the illuminating surface
+                                            if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                ! check to see which is the closest
+                                                if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j was closer than the previous blocker
                                                     in_beam(m) = .true. ! set to be within beam
-                                                    id_beam(m) = mapping(j) ! record the position of the blocking facet in the beam data struct
+                                                    id_beam(m) = mapping(j) ! record the blocking facet
                                                     dist_beam(m) = rot_geometry%f(j)%mid(3) - rot_geometry%f(m)%mid(3) ! record the distance from centroid of blocker to centroid of facet m
+                                                else
+                                                    ! do nothing                                     
                                                 end if
-                                            else ! else, if facet j blocked facet m, but was not part of the beam surface
-                                                if(rot_geometry%f(m)%ap .eq. rot_geometry%f(j)%ap) then ! if facet j and facet m belong to the same aperture
-                                                    ! do nothing
-                                                else ! if facet j and facet m dont belong to the same aperture
-                                                    if(in_beam(m)) then ! if a blocking beam facet had already been found
-                                                        ! previous blocker had position in beam tree: id_beam(m) -> facet id is therefore beam%field_in(id_beam(m))%fi
-                                                        if(rot_geometry%f(j)%mid(3).gt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j above the beam-emitting surface
-                                                            ! do nothing
-                                                        else
-                                                            is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
-                                                            in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
-                                                        end if
-                                                    else ! else, if a blocking had not yet been found
+                                            else ! if this is the first time finding a blocking beam facet
+                                                in_beam(m) = .true. ! set to be within beam
+                                                id_beam(m) = mapping(j) ! record the position of the blocking facet in the beam data struct
+                                                dist_beam(m) = rot_geometry%f(j)%mid(3) - rot_geometry%f(m)%mid(3) ! record the distance from centroid of blocker to centroid of facet m
+                                            end if
+                                        else ! else, if facet j blocked facet m, but was not part of the beam surface
+                                            if(rot_geometry%f(m)%ap .eq. rot_geometry%f(j)%ap) then ! if facet j and facet m belong to the same aperture
+                                                ! do nothing
+                                            else ! if facet j and facet m dont belong to the same aperture
+                                                if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                    ! previous blocker had position in beam tree: id_beam(m) -> facet id is therefore beam%field_in(id_beam(m))%fi
+                                                    if(rot_geometry%f(j)%mid(3) .gt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j above the beam-emitting surface
+                                                        ! do nothing
+                                                    else
                                                         is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
-                                                        in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet 
+                                                        in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                     end if
+                                                else ! else, if a blocking had not yet been found
+                                                    is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                    in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet 
                                                 end if
                                             end if
                                         end if
                                     end if
-                                ! end if
+                                end if
                             end if
                         end if
                     end do
@@ -1598,7 +1830,219 @@ module beam_loop_mod
         
     end subroutine
     
-    subroutine find_vis_incidence(in_beam, is_vis, dist_beam, id_beam, is_shad, beam, geometry, beam_geometry)
+    subroutine find_vis_ext(in_beam, dist_beam, id_beam, is_shad, beam, rot_geometry)
+        
+        ! find_vis_ext
+        ! finds the facets illuminated by a an externally propagating beam
+        ! for a given particle orientation with assumed propagation along the -z axis,
+        ! computes the externally illuminated facets for a given illuminating aperture
+        ! uses a z-buffer technique to increase speed, among a few other tricks
+        
+        logical, dimension(:), allocatable, intent(out) :: in_beam
+        real(8), dimension(:), allocatable, intent(out) :: dist_beam
+        integer(8), dimension(:), allocatable, intent(out) :: id_beam
+        logical, dimension(:), allocatable, intent(out) :: is_shad
+        type(beam_type), intent(in) :: beam
+        type(geometry_type), intent(in) :: rot_geometry
+        
+        integer(8) i, k, m, fi, vi
+        integer(8) j
+        logical, dimension(:), allocatable :: is_beam
+        logical, dimension(:), allocatable :: is_vis
+        integer(8), dimension(:), allocatable :: f3 ! bounding box ids
+        integer(8), dimension(:,:), allocatable :: f4 ! fuzzy bounding box ids
+        real(8), dimension(:), allocatable :: dist_to_bb, dist_to_fbb
+        integer(8) bb
+        logical within_bounds
+        real(8) vecb1, vecb2
+        real(8) edge_norm1, edge_norm2
+        real(8) edge_check
+        real(8) beamxmax0, beamxmin0, beamymax0, beamymin0
+        real(8) beamxmax, beamxmin, beamymax, beamymin
+        logical, dimension(:,:), allocatable :: f5
+        real(8) start, finish
+        integer(8), dimension(:), allocatable :: mapping
+        type(geometry_type) bb_geometry ! bounding box geometry
+        
+        ! ################################
+        ! start new ray tracing algorithm
+        
+        call cpu_time(start)
+        
+        ! use the current crystal vertices to create some bounding boxes in x-y plane
+        call beam_aligned_bounding_boxes(rot_geometry,bb_geometry)
+        call compute_geometry_midpoints(bb_geometry)
+        call compute_geometry_areas(bb_geometry)
+        
+        allocate(f3(1:rot_geometry%nf)) ! array to hold index of bounding box that each face belongs to
+        allocate(f4(1:rot_geometry%nf,1:3)) ! array to hold index of fuzzy bounding box that each face belongs to
+        allocate(dist_to_bb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
+        allocate(dist_to_fbb(1:bb_geometry%nf)) ! array to hold the distance of a given vertex to each bounding box
+        
+        do i = 1, rot_geometry%nf ! for each face
+            dist_to_bb(:) = sqrt((bb_geometry%f(:)%mid(1) - rot_geometry%f(i)%mid(1))**2 + (bb_geometry%f(:)%mid(2) - rot_geometry%f(i)%mid(2))**2) ! distance to each bb
+            f3(i) = minloc(dist_to_bb,1) ! record which bounding box midpoint this facet was closest to
+            do j = 1, 3 ! for each vertex
+                dist_to_fbb(:) = sqrt((bb_geometry%f(:)%mid(1) - rot_geometry%v(rot_geometry%f(i)%vi(j),1))**2 + (bb_geometry%f(:)%mid(2) - rot_geometry%v(rot_geometry%f(i)%vi(j),2))**2) ! distance to each fuzzy bb
+                f4(i,j) = minloc(dist_to_fbb,1) ! record which bounding box midpoint this facet vertex was closest to
+            end do 
+        end do
+        
+        ! more optimisation
+        allocate(f5(1:rot_geometry%nf,1:bb_geometry%nf))
+        f5 = .false. ! init
+        do i = 1, rot_geometry%nf
+            do j = 1, bb_geometry%nf
+                if(f4(i,1) .eq. j .or. f4(i,2) .eq. j .or. f4(i,3) .eq. j) f5(i,j) = .true.
+            end do
+        end do
+        
+        ! allocate and init
+        allocate(is_vis(1:rot_geometry%nf))
+        allocate(is_shad(1:rot_geometry%nf))
+        allocate(in_beam(1:rot_geometry%nf))
+        allocate(is_beam(1:rot_geometry%nf))
+        allocate(id_beam(1:rot_geometry%nf))
+        allocate(dist_beam(1:rot_geometry%nf))
+        allocate(mapping(1:rot_geometry%nf))
+        
+        is_vis = .true.
+        is_shad = .false.
+        in_beam = .false.
+        is_beam = .false.
+        id_beam = 0
+        dist_beam = 0
+        mapping = 0
+        
+        ! record which facets are part of the illuminating beam
+        do i = 1, beam%nf_in
+            is_beam(beam%field_in(i)%fi) = .true.
+            mapping(beam%field_in(i)%fi) = i ! map each illuminating facet to its position in the beam data structure
+            print*,'fi',beam%field_in(i)%fi,'is beam?',is_beam(beam%field_in(i)%fi) 
+        end do
+        
+        ! need to add a check to ignore facets outside beam max/min here
+        ! init some stuff
+        fi = beam%field_in(1)%fi ! get the first facet in the beam
+        vi = rot_geometry%f(fi)%vi(1) ! get the vertex id of the first vertex in this facet
+        beamxmax = rot_geometry%v(vi,1) ! save the x coordinate
+        beamxmin = rot_geometry%v(vi,1) ! save the x coordinate
+        beamymax = rot_geometry%v(vi,2) ! save the y coordinate
+        beamymin = rot_geometry%v(vi,2) ! save the y coordinate
+        
+        do i = 1, beam%nf_in ! for each face in the incident beam
+            fi = beam%field_in(i)%fi ! get the facet id
+            do j = 1, rot_geometry%f(fi)%nv ! for each vertex in this face
+                vi = rot_geometry%f(fi)%vi(j) ! get the vertex id
+                beamxmax0 = rot_geometry%v(vi,1) ! get the x coordinate
+                beamxmin0 = rot_geometry%v(vi,1) ! get the x coordinate
+                beamymax0 = rot_geometry%v(vi,2) ! get the y coordinate
+                beamymin0 = rot_geometry%v(vi,2) ! get the y coordinate
+                if(beamxmax0 .gt. beamxmax) beamxmax = beamxmax0
+                if(beamxmin0 .lt. beamxmin) beamxmin = beamxmin0
+                if(beamymax0 .gt. beamymax) beamymax = beamymax0
+                if(beamymin0 .lt. beamymin) beamymin = beamymin0 
+            end do
+        end do
+        
+        do i = 1, rot_geometry%nf
+            if(rot_geometry%f(i)%mid(1) .lt. beamxmin) then
+                is_vis(i) = .false.
+            else if(rot_geometry%f(i)%mid(1) .gt. beamxmax) then
+                is_vis(i) = .false.
+            else if(rot_geometry%f(i)%mid(2) .lt. beamymin) then
+                is_vis(i) = .false.
+            else if(rot_geometry%f(i)%mid(2) .gt. beamymax) then
+                is_vis(i) = .false.
+            end if
+        end do
+
+        ! set facets which face the wrong way to be shadow facets
+        do i = 1, rot_geometry%nf
+            if(rot_geometry%n(rot_geometry%f(i)%ni,3) <= 0) is_shad(i) = .true.
+        end do
+        
+        do m = 1, rot_geometry%nf ! for each facet m
+            if(is_vis(m) .eqv. .false.) then ! if facet isnt visible
+                ! do nothing
+            else
+                if(rot_geometry%ap(rot_geometry%f(m)%ap)%n(3) .lt. 0.01) then ! if aperture is downfacing (flip for external)
+                    is_vis(m) = .false. ! set not visible
+                else ! if aperture was facing towards incidence
+                    bb = f3(m) ! get bounding box id
+                    do j = 1, rot_geometry%nf ! for each potentially blocking facet j
+                        if(f5(j,bb)) then ! 
+                            if(j .ne. m) then ! ignore self-block
+                                if (rot_geometry%f(m)%mid(3) .gt. rot_geometry%f(j)%mid(3)) then ! if potential blocker was behind facet m
+                                    ! do nothing
+                                else ! if potential blocker was in front of facet m
+                                    ! do bounded surface edge check
+                                    within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
+                                    do k = 1, rot_geometry%f(j)%nv ! looping over vertices of potentially blocking facet j
+                                        ! compute edge normal
+                                        if(k .eq. rot_geometry%f(j)%nv) then
+                                            edge_norm2 = -rot_geometry%v(rot_geometry%f(j)%vi(1),1) + rot_geometry%v(rot_geometry%f(j)%vi(rot_geometry%f(j)%nv),1) ! cross product of edge vector with reverse beam direction
+                                            edge_norm1 = +rot_geometry%v(rot_geometry%f(j)%vi(1),2) - rot_geometry%v(rot_geometry%f(j)%vi(rot_geometry%f(j)%nv),2)
+                                        else
+                                            edge_norm2 = -rot_geometry%v(rot_geometry%f(j)%vi(k+1),1) + rot_geometry%v(rot_geometry%f(j)%vi(k),1)
+                                            edge_norm1 = +rot_geometry%v(rot_geometry%f(j)%vi(k+1),2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
+                                        end if
+                                        vecb1 = rot_geometry%f(m)%mid(1) - rot_geometry%v(rot_geometry%f(j)%vi(k),1) ! vector from vertex k of potential blocker j to centroid of facet m
+                                        vecb2 = rot_geometry%f(m)%mid(2) - rot_geometry%v(rot_geometry%f(j)%vi(k),2)
+                                        edge_check = vecb1*edge_norm1 + vecb2*edge_norm2 ! dot product of edge vector with vetor b
+                                        if(edge_check .gt. 0) within_bounds = .false. ! if edge check fails, centroid of facet m is not within the bounded surface of facet j
+                                    end do
+                                    if(within_bounds .eqv. .false.) then ! if facet m is not within bounded surface of facet j
+                                        !do nothing
+                                    else
+                                        print*,'passed edge check: m',m,'j',j
+                                        if(is_beam(j)) then ! if facet j was part of the illuminating surface
+                                            print*,'j was in the beam'
+                                            if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                ! check to see which is the closest
+                                                if(rot_geometry%f(j)%mid(3) .lt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j was closer than the previous blocker
+                                                    in_beam(m) = .true. ! set to be within beam
+                                                    id_beam(m) = mapping(j) ! record the blocking facet
+                                                    dist_beam(m) = rot_geometry%f(j)%mid(3) - rot_geometry%f(m)%mid(3) ! record the distance from centroid of blocker to centroid of facet m
+                                                else
+                                                    ! do nothing                                     
+                                                end if
+                                            else ! if this is the first time finding a blocking beam facet
+                                                in_beam(m) = .true. ! set to be within beam
+                                                id_beam(m) = mapping(j) ! record the position of the blocking facet in the beam data struct
+                                                dist_beam(m) = rot_geometry%f(j)%mid(3) - rot_geometry%f(m)%mid(3) ! record the distance from centroid of blocker to centroid of facet m
+                                            end if
+                                        else ! else, if facet j blocked facet m, but was not part of the beam surface
+                                            if(rot_geometry%f(m)%ap .eq. rot_geometry%f(j)%ap) then ! if facet j and facet m belong to the same aperture
+                                                ! do nothing
+                                            else ! if facet j and facet m dont belong to the same aperture
+                                                if(in_beam(m)) then ! if a blocking beam facet had already been found
+                                                    ! previous blocker had position in beam tree: id_beam(m) -> facet id is therefore beam%field_in(id_beam(m))%fi
+                                                    if(rot_geometry%f(j)%mid(3) .gt. rot_geometry%f(beam%field_in(id_beam(m))%fi)%mid(3)) then ! if facet j above the beam-emitting surface
+                                                        ! do nothing
+                                                    else
+                                                        is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                        in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                    end if
+                                                else ! else, if a blocking had not yet been found
+                                                    is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                    in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet 
+                                                end if
+                                            end if
+                                        end if
+                                    end if
+                                end if
+                            end if
+                        end if
+                    end do
+                end if
+            end if
+        end do
+        call cpu_time(finish)
+        
+    end subroutine
+
+    subroutine find_vis_inc(in_beam, is_vis, dist_beam, id_beam, is_shad, beam, geometry, beam_geometry)
         
         
         
