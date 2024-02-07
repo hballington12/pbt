@@ -1,4 +1,4 @@
-# Fortran Console Application : ABT Project Overview
+# Fortran Console Application : PBT Project Overview
 
 This file contains a summary of the aperture beam tracer (ABT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse.
 
