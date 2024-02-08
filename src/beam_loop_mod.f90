@@ -24,6 +24,7 @@ module beam_loop_mod
         real(8) p_i ! total power in
         real(8) pr ! total power reflected
         real(8) pt ! total power transmitted
+        real(8) po ! total power outgoing
         real(8) abs ! total power absorbed
         real(8) proj_area_in ! projected area in
         real(8) proj_area_out ! projected area out
@@ -34,6 +35,7 @@ module beam_loop_mod
         p_i = 0d0
         pr = 0d0
         pt = 0d0
+        po = 0d0
         abs = 0d0
         proj_area_in = 0d0
         proj_area_out = 0d0
@@ -42,6 +44,7 @@ module beam_loop_mod
             p_i = p_i + beam_tree_part(i)%pi
             pr = pr + beam_tree_part(i)%pr
             pt = pt + beam_tree_part(i)%pt
+            po = po + beam_tree_part(i)%po
             abs = abs + beam_tree_part(i)%abs
             proj_area_in = proj_area_in + beam_tree_part(i)%proj_area_in
             proj_area_out = proj_area_out + beam_tree_part(i)%proj_area_out
@@ -50,10 +53,11 @@ module beam_loop_mod
         print'(a,f14.8)','power in: ',p_i
         print'(a,f14.8)','power reflected: ',pr
         print'(a,f14.8)','power transmitted: ',pt
+        print'(a,f14.8)','power outgoing: ',po
         print'(a,f14.8)','power absorbed: ',abs
         print'(a,f14.8)','geo cross section in: ',proj_area_in
         print'(a,f14.8)','geo cross section out: ',proj_area_out
-        print'(a,f14.8,a)','energy conservation: ',(abs+pt+pr)/p_i*100d0,' %'
+        print'(a,f14.8,a)','energy conservation: ',(abs+pt+pr+po)/p_i*100d0,' %'
 
 
     end subroutine
@@ -332,7 +336,8 @@ module beam_loop_mod
             print'(a,i6,a,f14.8)','beam ',beam%id,': power reflected: ',beam%pr
             print'(a,i6,a,f14.8)','beam ',beam%id,': power transmitted: ',beam%pt
             print'(a,i6,a,f14.8)','beam ',beam%id,': power absorbed: ',beam%abs
-            print'(a,i6,a,f14.8,a)','beam ',beam%id,': energy conservation: ',(beam%abs+beam%pt+beam%pr)/beam%pi*100d0,' %'
+            print'(a,i6,a,f14.8)','beam ',beam%id,': power outgoing: ',beam%po
+            print'(a,i6,a,f14.8,a)','beam ',beam%id,': energy conservation: ',(beam%abs+beam%pt+beam%pr+beam%po)/beam%pi*100d0,' %'
 
         end if
         
@@ -903,16 +908,33 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam%field_out(n)%prop_int(:) = prop_int(:) ! save the internally reflected propagation vector
                 beam%field_out(n)%prop_ext(:) = prop_ext(:) ! save the externally transmitited propagation vector
                 beam%field_out(n)%is_tir = is_tir ! save whether or not this field was total internal reflection
-                beam%field_out(n)%pi = geometry%f(i)%area * cos(theta_i_facet) ! save incident power
+                ! beam%field_out(n)%pi = in_intensity * geometry%f(i)%area * cos(theta_i_facet) ! save incident power
                 beam%field_out(n)%pr = ext_intensity * geometry%f(i)%area * cos(theta_i_facet) ! save reflected power (angle made with facet)
                 beam%field_out(n)%pt = int_intensity * geometry%f(i)%area * rbi_int * cos(theta_t_facet) ! save transmitted power (angle made with aperture, because the new propagation direction is along this direction)
                 beam%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
-                beam%pi = beam%pi + beam%field_out(n)%pi ! sum total incident power (bit different to other parts of the code because we do not care about conservation of energy for the initial wavefront)
+                ! beam%pi = beam%pi + beam%field_out(n)%pi ! sum total incident power (needs testing)
                 beam%pr = beam%pr + beam%field_out(n)%pr ! sum total reflected power
                 beam%pt = beam%pt + beam%field_out(n)%pt ! sum total transmitted power
 
             end if
         end do
+
+        ! update the outgoing power by summation of beam facets that did not illuminate anything
+        do i = 1, beam%nf_in ! for each facet in the incoming beamfront
+            if(beam%field_in(i)%is_outgoing) then ! if the field was outgoing
+                bfi = beam%field_in(i)%fi ! get the facet id
+                ampl(:,:) = beam%field_in(i)%ampl(:,:) ! get the amplitude matrix of the illuminating facet
+                in_intensity = real(0.5*(  ampl(1,1)*conjg(ampl(1,1)) + & ! get intensity emitted from this facet
+                ampl(1,2)*conjg(ampl(1,2)) + &
+                ampl(2,1)*conjg(ampl(2,1)) + &
+                ampl(2,2)*conjg(ampl(2,2))))
+                theta_t_facet = acos(-(rot_geometry%n(rot_geometry%f(bfi)%ni,3))) ! get angle of transmission from beam facet
+                proj_area = geometry%f(bfi)%area * cos(theta_t_facet) ! proj. area of incoming beam facet
+                beam%po = beam%po + proj_area * in_intensity ! sum outgoing power
+            end if
+        end do
+
+        
     end subroutine
 
     subroutine get_trans_prop(theta_i,theta_t,prop_in,norm,prop_out)
@@ -987,7 +1009,9 @@ subroutine recursion_ext(beam,geometry,job_params)
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(create_new_beam(i)) then ! if it was sufficiently illuminated by this beam
-                num_new_beams = num_new_beams + 1 ! update counter
+                num_new_beams = num_new_beams + 2 ! update total counter twice, one for internal and one for external
+
+                ! adding the internally reflected beam to the tree
                 num_beams = num_beams + 1 ! add an internally reflected beam to the beam tree
                 if(num_beams > size(beam_tree,1)) then
                     print*,'not enough space in beam tree'
@@ -1003,6 +1027,23 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%proj_area_in = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
+
+                ! adding the externally transmitted beam to the tree
+                num_beams = num_beams + 1 ! update local counter once, for externally reflected beam
+                if(num_beams > size(beam_tree,1)) then
+                    print*,'not enough space in beam tree'
+                    stop
+                end if
+                allocate(beam_tree(num_beams)%field_in(1:num_ill(i))) ! allocate space
+                ! add stuff to the beam tree
+                beam_tree(num_beams)%ap = i ! aperture id
+                beam_tree(num_beams)%nf_in = 0 ! init
+                beam_tree(num_beams)%is_int = .false. ! is externally propagating
+                beam_tree(num_beams)%pi = 0 ! init
+                beam_tree(num_beams)%pr = 0 ! init
+                beam_tree(num_beams)%pt = 0 ! init
+                beam_tree(num_beams)%id = num_beams ! save position in beam tree
+                beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
             end if
         end do
         
@@ -1011,11 +1052,12 @@ subroutine recursion_ext(beam,geometry,job_params)
             ai = beam%field_out(i)%ap ! get the aperture id
             if(create_new_beam(ai)) then ! if it was part of an aperture sufficiently illuminated by this beam
                 fi = beam%field_out(i)%fi ! get the facet id
+
+                ! add information about the internally reflected beam to the beam tree
                 index = mapping(ai) ! get the position of new beam in the beam tree
                 nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
                 nf = nf + 1 ! update the number of facets
                 proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),-beam%field_out(i)%prop_int(:))
-                
                 beam_tree(index)%nf_in = nf ! save updated number of facets
                 beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_int(:,:) ! the internally reflected field becomes the new beam field
                 beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
@@ -1023,6 +1065,20 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time)
                 beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of reflected power of all facets in the new beam
                 beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
+
+                ! add information about the externally transmitted beam to the beam tree
+                index = mapping(ai) + 1 ! get the position of new beam in the beam tree
+                nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
+                nf = nf + 1 ! update the number of facets
+                proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),beam%field_out(i)%prop_ext(:))
+                beam_tree(index)%nf_in = nf ! save updated number of facets
+                beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_ext(:,:) ! the externally transmitted field becomes the new beam field
+                beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
+                beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
+                beam_tree(index)%prop(:) = beam%field_out(i)%prop_ext(:) ! save externally transmitted propagation vector (overwrites each time but they are all the same)            
+                beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of transmitted power of all facets in the new beam
+                beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction      
+                beam_tree(index)%field_in(nf)%is_outgoing = .true. ! external beams can be changed to not outgoing if they are found to illuminate part of the particle - this is done in recursion_ext   
             end if
         end do
         
@@ -1093,6 +1149,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%pi = 0 ! init
                 beam_tree(num_beams)%pr = 0 ! init
                 beam_tree(num_beams)%pt = 0 ! init
+                beam_tree(num_beams)%po = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
 
@@ -1110,6 +1167,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%pi = 0 ! init
                 beam_tree(num_beams)%pr = 0 ! init
                 beam_tree(num_beams)%pt = 0 ! init
+                beam_tree(num_beams)%po = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
             end if
@@ -1519,7 +1577,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                     call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                     !$omp critical
                     if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
-
+                    call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree
                     !$omp end critical
                 else ! if the beam is externally propagating
                     call recursion_ext(beam,geometry,job_params) ! propagate the beam and populate the beam structure
@@ -2323,10 +2381,8 @@ subroutine recursion_ext(beam,geometry,job_params)
         integer(8) i, counter
         
         counter = 0 ! counts the number of beams added to the tree
-        print*,'adding to outbeam tree: beam number',beam%id
         do i = 1, beam%nf_in ! for each illuminated facet in this beam structure
             if(beam%field_in(i)%is_outgoing) then ! if beam is outgoing to far-field, add to diffraction outbeam tree
-                print*,'outgoing facet:',beam%field_in(i)%fi
                 beam_outbeam_tree_counter = beam_outbeam_tree_counter + 1 ! update outbeam tree counter
                 counter = counter + 1
                 if(beam_outbeam_tree_counter .gt. size(beam_outbeam_tree,1)) then

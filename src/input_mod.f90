@@ -2175,14 +2175,15 @@ end do
 ! stop
 
 ! initialise the incident beam structure
-beam_inc%prop(:) = (/0D0,0D0,-1D0/)
-beam_inc%nf_in = beam_geometry%nf
-beam_inc%is_int = .false.
-beam_inc%id = 0D0
+beam_inc%prop(:) = (/0D0,0D0,-1D0/) ! propagation direction
+beam_inc%nf_in = beam_geometry%nf ! number of facets
+beam_inc%is_int = .false. ! incidence is, by default, external
+beam_inc%id = 0
 beam_inc%scatt_in = 0D0
 beam_inc%scatt_out = 0D0
 beam_inc%proj_area_in = 0D0
-beam_inc%rec = 0
+beam_inc%rec = 0 ! incidence is the 0th recursion
+beam_inc%po = 0 ! by default, no outgoing power for the first beam
 allocate(beam_inc%field_in(1:beam_inc%nf_in))
 do i = 1, beam_inc%nf_in ! for each facet in the incident beam
     beam_inc%field_in(i)%ampl(:,:) = 0D0 ! init amplitude matrix

@@ -133,6 +133,7 @@ type beam_type
     real(8) pi ! incident power
     real(8) pr ! reflected power
     real(8) pt ! transmitted power
+    real(8) po ! outgoing power
 end type beam_type
 
 type facet_type
