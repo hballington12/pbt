@@ -164,6 +164,8 @@ type geometry_type
     integer(8) nn ! number of unique normals
     integer(8) na ! number of apertures
     type(aperture_type), dimension(:), allocatable :: ap ! data structure with information about each aperture in the geometry
+    real(8) area ! the total surface area
+    real(8) com(1:3) ! centre of mass
 end type geometry_type
 
 ! format specifiers

@@ -2804,19 +2804,19 @@ subroutine PDAL2(   job_params,     &
     geometry%na = maxval(geometry%f(:)%ap) ! total number of apertures
     allocate(geometry%ap(1:geometry%na)) ! allocate
 
-    call compute_geometry_normals(geometry)
     call compute_geometry_midpoints(geometry)
     call compute_geometry_areas(geometry)
+
+    call compute_geometry_com(geometry)
+    if(job_params%debug >= 2) print*,'centre of mass: ',geometry%com(:)
+    if(job_params%debug >= 2) print*,'translating centre of mass to origin...'
+    call move_geometry_to_origin(geometry)
+
+    call compute_geometry_midpoints(geometry) ! recompute after translating to origin
+    call compute_geometry_normals(geometry)
     call compute_geometry_apertures(geometry)
 
-
-    ! print*,'faceareas(123)',faceAreas(123)
-    ! print*,'guess:',geometry%f(123)%area
-
-    ! allocate(geometry%n(1:num_norm,1:3))
-
     print*,'========== end sr PDAL2'
-    ! stop
 
 end subroutine
 

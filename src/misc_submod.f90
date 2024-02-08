@@ -13,6 +13,49 @@
         
         contains
 
+        subroutine move_geometry_to_origin(geometry)
+
+        ! sr move_geometry_to_origin
+        ! translates the geometry centre of mass to the origin
+
+        type(geometry_type), intent(inout) :: geometry
+
+        integer(8) i
+
+        do i = 1, geometry%nv
+            geometry%v(i,:) = geometry%v(i,:) - geometry%com(:) ! translate vertices
+        end do
+
+        geometry%com(:) = 0D0 ! set centre of mass to origin
+
+        end subroutine
+
+        subroutine compute_geometry_com(geometry)
+
+        ! sr compute_geometry_com
+        ! computes the total surface area and the centre of mass of a geometry
+
+        type(geometry_type), intent(inout) :: geometry
+
+        integer(8) i
+        real(8) com(1:3) ! centre of mass
+        real(8) area ! total surface area
+
+        com = 0 ! init
+        area = 0 ! init
+
+        do i = 1, geometry%nf ! for each face
+            com(:) = com(:) + geometry%f(i)%mid(:)*geometry%f(i)%area ! sum com
+            area = area + geometry%f(i)%area ! sum area
+        end do
+
+        com(:) = com(:) / area ! divide by total "mass"
+
+        geometry%area = area ! save the total area
+        geometry%com(:) = com(:) ! save the com
+
+        end subroutine
+
         subroutine compute_geometry_apertures(geometry)
 
         type(geometry_type), intent(inout) :: geometry
