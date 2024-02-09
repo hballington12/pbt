@@ -27,7 +27,8 @@ module beam_loop_mod
         real(8) po ! total power outgoing
         real(8) abs ! total power absorbed
         real(8) proj_area_in ! projected area in
-        real(8) proj_area_out ! projected area out
+        real(8) proj_area_ill ! projected area illuminated
+        real(8) proj_area_outgoing ! projected area out
 
         num_beams = size(beam_tree_part,1) ! get the number of beams for this recursion
 
@@ -38,7 +39,8 @@ module beam_loop_mod
         po = 0d0
         abs = 0d0
         proj_area_in = 0d0
-        proj_area_out = 0d0
+        proj_area_ill = 0d0
+        proj_area_outgoing = 0d0
 
         do i = 1, num_beams ! for each beam in this recursion
             p_i = p_i + beam_tree_part(i)%pi
@@ -47,16 +49,19 @@ module beam_loop_mod
             po = po + beam_tree_part(i)%po
             abs = abs + beam_tree_part(i)%abs
             proj_area_in = proj_area_in + beam_tree_part(i)%proj_area_in
-            proj_area_out = proj_area_out + beam_tree_part(i)%proj_area_out
+            proj_area_ill = proj_area_ill + beam_tree_part(i)%proj_area_ill
+            proj_area_outgoing = proj_area_outgoing + beam_tree_part(i)%proj_area_outgoing
         end do
 
+        print'(a,f14.8)','geo cross section in: ',proj_area_in
+        print'(a,f14.8)','geo cross section illuminated: ',proj_area_ill
+        print'(a,f14.8)','geo cross section outgoing: ',proj_area_outgoing
+        print'(a,f14.8,a)','geo cross section conservation: ',(proj_area_ill+proj_area_outgoing)/proj_area_in*100d0,' %'
         print'(a,f14.8)','power in: ',p_i
         print'(a,f14.8)','power reflected: ',pr
         print'(a,f14.8)','power transmitted: ',pt
         print'(a,f14.8)','power outgoing: ',po
         print'(a,f14.8)','power absorbed: ',abs
-        print'(a,f14.8)','geo cross section in: ',proj_area_in
-        print'(a,f14.8)','geo cross section out: ',proj_area_out
         print'(a,f14.8,a)','energy conservation: ',(abs+pt+pr+po)/p_i*100d0,' %'
 
 
@@ -180,7 +185,7 @@ module beam_loop_mod
             write(unit, *) '    "is_int": ', 'false', ','
         end if
         write(unit, *) '    "proj_area_in": ', beam%proj_area_in, ','
-        write(unit, *) '    "proj_area_out": ', beam%proj_area_out, ','
+        write(unit, *) '    "proj_area_ill": ', beam%proj_area_ill, ','
         write(unit, *) '    "rec": ', beam%rec, ','
         write(unit, *) '    "field_in": ['
         do i = 1, size(beam%field_in)
@@ -320,26 +325,26 @@ module beam_loop_mod
         type(beam_type), intent(in) :: beam
         type(job_parameters_type), intent(in) :: job_params
         
-        if(job_params%debug >= 3) then
-            print*,'-----------------------------------------------'
-            if(beam%is_int) then
-                print'(a,i6,a)','beam ',beam%id,': is internally propagating'
-            else
-                print'(a,i6,a)','beam ',beam%id,': is externally propagating'
-            end if
-            print'(a,i6,a,i8)','beam ',beam%id,': originates from aperture: ',beam%ap
-            print'(a,i6,a,i8)','beam ',beam%id,': number of facets in this beam: ',beam%nf_in
-            print'(a,i6,a,i8)','beam ',beam%id,': number of facets illuminated: ',beam%nf_out
-            print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section in: ',beam%proj_area_in
-            print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section out: ',beam%proj_area_out            
-            print'(a,i6,a,f14.8)','beam ',beam%id,': power in: ',beam%pi
-            print'(a,i6,a,f14.8)','beam ',beam%id,': power reflected: ',beam%pr
-            print'(a,i6,a,f14.8)','beam ',beam%id,': power transmitted: ',beam%pt
-            print'(a,i6,a,f14.8)','beam ',beam%id,': power absorbed: ',beam%abs
-            print'(a,i6,a,f14.8)','beam ',beam%id,': power outgoing: ',beam%po
-            print'(a,i6,a,f14.8,a)','beam ',beam%id,': energy conservation: ',(beam%abs+beam%pt+beam%pr+beam%po)/beam%pi*100d0,' %'
-
+        print*,'-----------------------------------------------'
+        if(beam%is_int) then
+            print'(a,i6,a)','beam ',beam%id,': is internally propagating'
+        else
+            print'(a,i6,a)','beam ',beam%id,': is externally propagating'
         end if
+        print'(a,i6,a,i8)','beam ',beam%id,': originates from aperture: ',beam%ap
+        print'(a,i6,a,i8)','beam ',beam%id,': number of facets in this beam: ',beam%nf_in
+        print'(a,i6,a,i8)','beam ',beam%id,': number of facets illuminated: ',beam%nf_out
+        print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section in: ',beam%proj_area_in
+        print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section illuminated: ',beam%proj_area_ill            
+        print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section outgoing: ',beam%proj_area_outgoing            
+        print'(a,i6,a,f14.8,a)','beam ',beam%id,': geo cross section conservation: ',(beam%proj_area_ill+beam%proj_area_outgoing)/beam%proj_area_in*100d0,' %'
+        print'(a,i6,a,f14.8)','beam ',beam%id,': power in: ',beam%pi
+        print'(a,i6,a,f14.8)','beam ',beam%id,': power reflected: ',beam%pr
+        print'(a,i6,a,f14.8)','beam ',beam%id,': power transmitted: ',beam%pt
+        print'(a,i6,a,f14.8)','beam ',beam%id,': power absorbed: ',beam%abs
+        print'(a,i6,a,f14.8)','beam ',beam%id,': power outgoing: ',beam%po
+        print'(a,i6,a,f14.8,a)','beam ',beam%id,': energy conservation: ',(beam%abs+beam%pt+beam%pr+beam%po)/beam%pi*100d0,' %'
+
         
         
     end subroutine
@@ -730,10 +735,10 @@ module beam_loop_mod
                 else
                     beam%field_out(n)%pt = ext_intensity * geometry%f(i)%area * cos(theta_t) ! save transmitted power contribution
                 end if
+                beam%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
                 beam%pr = beam%pr + beam%field_out(n)%pr ! sum reflected power  
                 beam%pt = beam%pt + beam%field_out(n)%pt ! sum transmitted power  
-                beam%field_out(n)%proj_area = geometry%f(i)%area * cos(theta_i_facet) ! save the geometric cross section
-                beam%proj_area_out = beam%proj_area_out + geometry%f(i)%area * cos(theta_i_facet) ! sum the total projected area for this beam
+                beam%proj_area_ill = beam%proj_area_ill + geometry%f(i)%area * cos(theta_i_facet) ! sum the total projected area for this beam
             end if
         end do
     end subroutine
@@ -832,7 +837,6 @@ subroutine recursion_ext(beam,geometry,job_params)
                 e_perp(:) = beam%field_in(bfi)%e_perp(:) ! get the incident e-perp vector
                 dist = dist_beam(i) ! distance travelled from illuminating to illuminated facet
                 prop(:) = beam%prop(:) ! incoming propagation direction in unrotated system
-                
                 ! get the reflected propagation vector in unrotated system
                 prop_ext(1) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(1) ! reflected propagation vector (in rotated system)
                 prop_ext(2) =  0 + 2*rot_geometry%ap(ai)%n(3)*rot_geometry%ap(ai)%n(2) ! reflected propagation vector (in rotated system)
@@ -915,7 +919,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 ! beam%pi = beam%pi + beam%field_out(n)%pi ! sum total incident power (needs testing)
                 beam%pr = beam%pr + beam%field_out(n)%pr ! sum total reflected power
                 beam%pt = beam%pt + beam%field_out(n)%pt ! sum total transmitted power
-
+                beam%proj_area_ill = beam%proj_area_ill + geometry%f(i)%area * cos(theta_i_facet) ! sum the total projected area for this beam
             end if
         end do
 
@@ -930,14 +934,10 @@ subroutine recursion_ext(beam,geometry,job_params)
                 ampl(2,2)*conjg(ampl(2,2))))
                 theta_t_facet = acos(-(rot_geometry%n(rot_geometry%f(bfi)%ni,3))) ! get angle of transmission from beam facet
                 proj_area = geometry%f(bfi)%area * cos(theta_t_facet) ! proj. area of incoming beam facet
+                beam%proj_area_outgoing = beam%proj_area_outgoing + proj_area ! sum outgoing projected area
                 beam%po = beam%po + proj_area * in_intensity ! sum outgoing power
             end if
         end do
-
-        if(beam%id == 70) then
-            print*,'beam%po',beam%po
-            print*,'beam%nf_in',beam%nf_in
-        end if
         
     end subroutine
 
@@ -1032,8 +1032,14 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%ap = i ! aperture id
                 beam_tree(num_beams)%nf_in = 0 ! init
                 beam_tree(num_beams)%is_int = .true. ! is internally propagating
+                beam_tree(num_beams)%pi = 0 ! init
+                beam_tree(num_beams)%pr = 0 ! init
+                beam_tree(num_beams)%pt = 0 ! init
+                beam_tree(num_beams)%po = 0 ! init                
                 beam_tree(num_beams)%abs = 0 ! init
                 beam_tree(num_beams)%proj_area_in = 0 ! init
+                beam_tree(num_beams)%proj_area_ill = 0 ! init
+                beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
                 
@@ -1054,6 +1060,10 @@ subroutine recursion_ext(beam,geometry,job_params)
                     beam_tree(num_beams)%pr = 0 ! init
                     beam_tree(num_beams)%pt = 0 ! init
                     beam_tree(num_beams)%po = 0 ! init
+                    beam_tree(num_beams)%abs = 0 ! init
+                    beam_tree(num_beams)%proj_area_in = 0 ! init
+                    beam_tree(num_beams)%proj_area_ill = 0 ! init
+                    beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                     beam_tree(num_beams)%id = num_beams ! save position in beam tree
                     beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
                 end if ! end: if it was not total internal reflection
@@ -1090,7 +1100,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                     beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
                     beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
                     beam_tree(index)%prop(:) = beam%field_out(i)%prop_ext(:) ! save externally transmitted propagation vector (overwrites each time but they are all the same)            
-                    beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of transmitted power of all facets in the new beam
+                    beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pt ! incident power for new beam is the sum of transmitted power of all facets in the new beam
                     beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction      
                     beam_tree(index)%field_in(nf)%is_outgoing = .true. ! external beams can be changed to not outgoing if they are found to illuminate part of the particle - this is done in recursion_ext   
                 end if ! end: if there was no total internal reflection from this facet
@@ -1165,6 +1175,9 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%pr = 0 ! init
                 beam_tree(num_beams)%pt = 0 ! init
                 beam_tree(num_beams)%po = 0 ! init
+                beam_tree(num_beams)%proj_area_in = 0 ! init
+                beam_tree(num_beams)%proj_area_ill = 0 ! init
+                beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
 
@@ -1184,6 +1197,9 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%pr = 0 ! init
                 beam_tree(num_beams)%pt = 0 ! init
                 beam_tree(num_beams)%po = 0 ! init
+                beam_tree(num_beams)%proj_area_in = 0 ! init
+                beam_tree(num_beams)%proj_area_ill = 0 ! init
+                beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
             end if
@@ -1632,7 +1648,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 end if ! end: if the beam is internally propagating
                 !$omp critical     
                 beam_tree(beam%id) = beam ! update the information about the propagated beam in the beam tree
-                if(job_params%debug >= 2) call print_beam_info(beam,job_params) ! print some info about the beam
+                if(job_params%debug >= 3) call print_beam_info(beam,job_params) ! print some info about the beam
                 ! add the new beams to the beam tree (need to also add the new information about the current beam)
                 ! call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
                 ! add the outgoing surface field to the diffraction structure

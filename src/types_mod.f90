@@ -128,7 +128,8 @@ type beam_type
     logical is_int ! whether or not the beam is propagating inside the particle
     integer(8) id ! a label for the position of a beam in a beam tree
     real(8) proj_area_in ! the total area of all facets in this beam when projected along the beam propagation direction
-    real(8) proj_area_out ! the total area of all illuminated facets when projected along the beam propagation direction
+    real(8) proj_area_ill ! the total area of all illuminated facets when projected along the beam propagation direction
+    real(8) proj_area_outgoing ! the total area of facets in this beam which were outgoing
     integer(8) rec ! the recursion that this beam belongs to
     real(8) pi ! incident power
     real(8) pr ! reflected power
