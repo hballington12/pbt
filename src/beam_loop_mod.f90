@@ -934,6 +934,10 @@ subroutine recursion_ext(beam,geometry,job_params)
             end if
         end do
 
+        if(beam%id == 70) then
+            print*,'beam%po',beam%po
+            print*,'beam%nf_in',beam%nf_in
+        end if
         
     end subroutine
 
@@ -981,6 +985,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         logical, dimension(:), allocatable :: suff_area ! whether each aperture was sufficiently illuminated
         logical, dimension(:), allocatable :: suff_energy ! whether each aperture had a sufficient amount of energy remaining
         logical, dimension(:), allocatable :: create_new_beam ! whether a new beam should be created for each aperture
+        logical, dimension(:), allocatable :: is_tir ! whether or not total internal reflection occurred
         integer(8), dimension(:), allocatable :: num_ill ! number of illuminated facets in each aperture
         integer(8), dimension(:), allocatable :: mapping ! a mapping
         integer(8) ai ! aperture id
@@ -998,6 +1003,9 @@ subroutine recursion_ext(beam,geometry,job_params)
         ! determine which apertures were sufficiently illuminated to create new internal beams based on area of illumination
         call is_sufficient_energy(geometry,beam,job_params,suff_energy,.true.)
 
+        ! determine which apertures, if any, were total internal reflection events
+        call is_beam_tir(geometry,beam,job_params,is_tir)
+
         do i = 1, geometry%na ! for each aperture
             if(suff_area(i) .and. suff_energy(i)) create_new_beam(i) = .true. ! decide if a new beam should be created
         end do
@@ -1006,12 +1014,13 @@ subroutine recursion_ext(beam,geometry,job_params)
         mapping = 0
         num_new_beams = 0 ! init
         
+
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(create_new_beam(i)) then ! if it was sufficiently illuminated by this beam
-                num_new_beams = num_new_beams + 2 ! update total counter twice, one for internal and one for external
 
                 ! adding the internally reflected beam to the tree
+                num_new_beams = num_new_beams + 1 ! update total counter twice for internal
                 num_beams = num_beams + 1 ! add an internally reflected beam to the beam tree
                 if(num_beams > size(beam_tree,1)) then
                     print*,'not enough space in beam tree'
@@ -1027,23 +1036,27 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%proj_area_in = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
-
-                ! adding the externally transmitted beam to the tree
-                num_beams = num_beams + 1 ! update local counter once, for externally reflected beam
-                if(num_beams > size(beam_tree,1)) then
-                    print*,'not enough space in beam tree'
-                    stop
-                end if
-                allocate(beam_tree(num_beams)%field_in(1:num_ill(i))) ! allocate space
-                ! add stuff to the beam tree
-                beam_tree(num_beams)%ap = i ! aperture id
-                beam_tree(num_beams)%nf_in = 0 ! init
-                beam_tree(num_beams)%is_int = .false. ! is externally propagating
-                beam_tree(num_beams)%pi = 0 ! init
-                beam_tree(num_beams)%pr = 0 ! init
-                beam_tree(num_beams)%pt = 0 ! init
-                beam_tree(num_beams)%id = num_beams ! save position in beam tree
-                beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
+                
+                if(.not. is_tir(i)) then ! if it was not total internal reflection
+                    ! adding the externally transmitted beam to the tree
+                    num_new_beams = num_new_beams + 1 ! update total counter for external
+                    num_beams = num_beams + 1 ! update local counter once, for externally reflected beam
+                    if(num_beams > size(beam_tree,1)) then
+                        print*,'not enough space in beam tree'
+                        stop
+                    end if
+                    allocate(beam_tree(num_beams)%field_in(1:num_ill(i))) ! allocate space
+                    ! add stuff to the beam tree
+                    beam_tree(num_beams)%ap = i ! aperture id
+                    beam_tree(num_beams)%nf_in = 0 ! init
+                    beam_tree(num_beams)%is_int = .false. ! is externally propagating
+                    beam_tree(num_beams)%pi = 0 ! init
+                    beam_tree(num_beams)%pr = 0 ! init
+                    beam_tree(num_beams)%pt = 0 ! init
+                    beam_tree(num_beams)%po = 0 ! init
+                    beam_tree(num_beams)%id = num_beams ! save position in beam tree
+                    beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
+                end if ! end: if it was not total internal reflection
             end if
         end do
         
@@ -1066,19 +1079,21 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of reflected power of all facets in the new beam
                 beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
 
-                ! add information about the externally transmitted beam to the beam tree
-                index = mapping(ai) + 1 ! get the position of new beam in the beam tree
-                nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
-                nf = nf + 1 ! update the number of facets
-                proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),beam%field_out(i)%prop_ext(:))
-                beam_tree(index)%nf_in = nf ! save updated number of facets
-                beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_ext(:,:) ! the externally transmitted field becomes the new beam field
-                beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
-                beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
-                beam_tree(index)%prop(:) = beam%field_out(i)%prop_ext(:) ! save externally transmitted propagation vector (overwrites each time but they are all the same)            
-                beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of transmitted power of all facets in the new beam
-                beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction      
-                beam_tree(index)%field_in(nf)%is_outgoing = .true. ! external beams can be changed to not outgoing if they are found to illuminate part of the particle - this is done in recursion_ext   
+                if(.not. beam%field_out(i)%is_tir) then ! if there was no total internal reflection from this facet
+                    ! add information about the externally transmitted beam to the beam tree
+                    index = mapping(ai) + 1 ! get the position of new beam in the beam tree
+                    nf = beam_tree(index)%nf_in ! get (current) number of facets in this beam
+                    nf = nf + 1 ! update the number of facets
+                    proj_area = geometry%f(fi)%area * dot_product(geometry%n(geometry%f(fi)%ni,:),beam%field_out(i)%prop_ext(:))
+                    beam_tree(index)%nf_in = nf ! save updated number of facets
+                    beam_tree(index)%field_in(nf)%ampl(:,:) = beam%field_out(i)%ampl_ext(:,:) ! the externally transmitted field becomes the new beam field
+                    beam_tree(index)%field_in(nf)%e_perp(:) = beam%field_out(i)%e_perp(:)
+                    beam_tree(index)%field_in(nf)%fi = fi ! save the facet id
+                    beam_tree(index)%prop(:) = beam%field_out(i)%prop_ext(:) ! save externally transmitted propagation vector (overwrites each time but they are all the same)            
+                    beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of transmitted power of all facets in the new beam
+                    beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction      
+                    beam_tree(index)%field_in(nf)%is_outgoing = .true. ! external beams can be changed to not outgoing if they are found to illuminate part of the particle - this is done in recursion_ext   
+                end if ! end: if there was no total internal reflection from this facet
             end if
         end do
         
@@ -1132,9 +1147,9 @@ subroutine recursion_ext(beam,geometry,job_params)
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(create_new_beam(i)) then ! if it was part of an aperture sufficiently illuminated by this beam
-                num_new_beams = num_new_beams + 2 ! update total counter twice, one for internal and one for external
 
                 ! adding the internally transmitted beam to the tree
+                num_new_beams = num_new_beams + 1 ! update total counter for internal
                 num_beams = num_beams + 1 ! update local counter once, for internally transmitted beam
                 if(num_beams > size(beam_tree,1)) then
                     print*,'not enough space in beam tree'
@@ -1154,6 +1169,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
 
                 ! adding the externally reflected beam to the tree
+                num_new_beams = num_new_beams + 1 ! update total counter for external
                 num_beams = num_beams + 1 ! update local counter once, for externally reflected beam
                 if(num_beams > size(beam_tree,1)) then
                     print*,'not enough space in beam tree'
@@ -1309,6 +1325,34 @@ subroutine recursion_ext(beam,geometry,job_params)
         
     end subroutine
     
+    subroutine is_beam_tir(geometry,beam,job_params,is_tir)
+        
+        ! is_beam_tir
+        ! this subroutine examines the facets illuminated by a beam
+        ! if total internal reflection found, sets the total internal reflection as true, so that no external beam is added to the beam tree
+        
+        type(geometry_type), intent(in) :: geometry
+        type(beam_type), intent(in) :: beam
+        type(job_parameters_type), intent(in) :: job_params
+        
+        integer(8) i
+        logical, dimension(:), allocatable, intent(out) :: is_tir ! whether each aperture was sufficiently illuminated
+        integer(8) ai ! aperture id
+        integer(8) fi ! face id
+        
+        allocate(is_tir(1:geometry%na)) ! allocate
+        is_tir = .false. ! init
+
+        do i = 1, beam%nf_out ! for each illuminated facet
+            if(beam%field_out(i)%is_tir) then ! if total internal reflection
+                fi = beam%field_out(i)%fi ! get the facet id
+                ai = geometry%f(fi)%ap ! get the aperture id
+                is_tir(ai) = .true. ! set total internal reflection for this aperture to true
+            end if
+        end do
+        
+    end subroutine
+
     subroutine rotate(beam,geometry,rot_geometry,rot)
         
         ! rotate
