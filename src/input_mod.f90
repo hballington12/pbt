@@ -302,6 +302,7 @@ job_params%thresh_area = 1d-1 ! default area threshold is 0
 job_params%thresh_energy = 1d-4 ! default energy threshold 1d-4
 job_params%export_beam = .false. ! default is do not export the beam
 
+call print_command() ! print the command used to execute the program
 
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'

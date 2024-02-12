@@ -2077,6 +2077,24 @@
         
     end subroutine
     
+    subroutine print_command()
+    character(len=256) :: command_line
+    integer :: i, num_args
+
+    ! Get the command line
+    num_args = command_argument_count()
+    command_line = ""
+
+    do i = 0, num_args
+        call get_command_argument(i, command_line)
+        write(*, '(a)', advance='no') trim(command_line)//" "
+    end do
+
+    ! Print a newline after the command line
+    write(*, *)
+
+    end subroutine print_command
+
     subroutine cross(a,b,c,normalise)
         
         ! calculates a cross b and returns c
