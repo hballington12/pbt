@@ -1600,7 +1600,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         allocate(beam_outbeam_tree(1:1000000)) ! set to 1000000 as guess for max outbeams
         
         num_beams = 0 ! total number of beams in the beam tree
-        allocate(beam_tree(1:5000)) ! allocate some space to hold beams to be traced (might need to add more space later)
+        allocate(beam_tree(1:50000)) ! allocate some space to hold beams to be traced (might need to add more space later)
         
         if(job_params%debug >= 2) then
             print*,'incidence:'
