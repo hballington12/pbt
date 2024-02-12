@@ -2654,7 +2654,7 @@ subroutine PDAL2(   job_params,     &
                 print*,'the user should ensure that the vertex ids in each face should be in an anti-clockwise order as viewed externally.'
                 print*,'poor energy conservation in the beam loop my result if this is not taken care of.'
             else ! else, if some normals read, perform checks to see if vertices need reordering
-                if(job_params%debug >= 1) print*,'validating vertex ordering...'
+                ! if(job_params%debug >= 1) print*,'validating vertex ordering...'
                 ! call validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
             end if
 
@@ -2815,19 +2815,19 @@ subroutine PDAL2(   job_params,     &
     geometry%na = maxval(geometry%f(:)%ap) ! total number of apertures
     allocate(geometry%ap(1:geometry%na)) ! allocate
 
-    call compute_geometry_normals(geometry)
     call compute_geometry_midpoints(geometry)
     call compute_geometry_areas(geometry)
+
+    call compute_geometry_com(geometry)
+    if(job_params%debug >= 2) print*,'centre of mass: ',geometry%com(:)
+    if(job_params%debug >= 2) print*,'translating centre of mass to origin...'
+    call move_geometry_to_origin(geometry)
+
+    call compute_geometry_midpoints(geometry) ! recompute after translating to origin
+    call compute_geometry_normals(geometry)
     call compute_geometry_apertures(geometry)
 
-
-    ! print*,'faceareas(123)',faceAreas(123)
-    ! print*,'guess:',geometry%f(123)%area
-
-    ! allocate(geometry%n(1:num_norm,1:3))
-
     print*,'========== end sr PDAL2'
-    ! stop
 
 end subroutine
 

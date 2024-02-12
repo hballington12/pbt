@@ -188,6 +188,8 @@ module diff_mod
     k(1) = x3/bin_vec_size ! propagation vector components for each bin vector in aperture system
     k(2) = y3/bin_vec_size
     k(3) = z3/bin_vec_size
+
+    if(abs(k(2)) > 0.999999) k(2) = sign(dble(0.999999),k(2))
     
     big_kx = prop2(1) ! propagation direction in aperture system
     big_ky = prop2(2)
@@ -213,7 +215,7 @@ module diff_mod
     b1em = 0.5*b1m 
     b2em = 0.5*(b2m+b2e)
 
-    ! ##### e-m theory #####
+    ! ##### e-m theokry #####
     diff_ampl(1,1) = a1em
     diff_ampl(1,2) = b1em
     diff_ampl(2,1) = a2em
