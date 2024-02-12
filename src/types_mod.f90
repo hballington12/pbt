@@ -176,8 +176,8 @@ end type geometry_type
 
 ! format specifiers
 
-character(len=111), parameter :: fmt_mueller_2d = '(f12.4,f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)'
-character(len=105), parameter :: fmt_mueller_1d = '(f12.4,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8,f22.8)'
+character(len=111), parameter :: fmt_mueller_2d = '(f12.4,f12.4,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8)'
+character(len=105), parameter :: fmt_mueller_1d = '(f12.4,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8)'
 
 
 contains
