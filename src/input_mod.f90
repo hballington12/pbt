@@ -298,10 +298,12 @@ job_params%gamma_lims = (/0D0,360D0/)
 job_params%output_eulers = .false.
 job_params%debug = 1 ! default value is some debugging output
 job_params%timing = .false. ! default is no timing
-job_params%thresh_area = 1d0 ! default area threshold is 0
+job_params%thresh_area = 1d-1 ! default area threshold is 0
 job_params%thresh_energy = 1d-4 ! default energy threshold 1d-4
 job_params%export_beam = .false. ! default is do not export the beam
+job_params%refl = 10 ! default is max 10 total internal reflections
 
+call print_command() ! print the command used to execute the program
 
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'
@@ -662,6 +664,19 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 found_rec = .true.
             end if
 
+        case ('-refl')
+            ! print*,'found command line specifier "rec"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "refl"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) job_params%refl
+                ! print*,'rec: ', rec
+                found_rec = .true.
+            end if
+
         case ('-jobname')
             ! print*,'found command line specifier "jobname"'
             i = i + 1 ! update counter to read the rotation method
@@ -952,13 +967,9 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         ! attempt to read second number
                         i = i + 1 ! go to next command line argument
                         call get_command_argument(i,arg,status=my_status) ! get next arg
-                        if (my_status .eq. 1) then ! if no argument (or next flag) found
-                            print*,'error: no option found for "-export_beam"'
-                            stop
-                        else if (trim(arg(1:1)) == "-") then
+                        if (my_status .eq. 1 .or. len(trim(arg)) .eq. 0 .or. trim(arg(1:1)) == "-") then ! if found next flag, or didnt find a number
                             print*,'didnt find second value for -export_beam rec <value> [<value>]'
                             job_params%export_beam_lims(1) = 1 ! set the start index to 1
-                            print*,'found next flag, recycling'
                             i = i - 1
                         else ! if found argument
                             job_params%export_beam_lims(1) = job_params%export_beam_lims(2) ! set the first value we read as the start
@@ -980,10 +991,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         ! attempt to read second number
                         i = i + 1 ! go to next command line argument
                         call get_command_argument(i,arg,status=my_status) ! get next arg
-                        if (my_status .eq. 1) then ! if no argument (or next flag) found
-                            print*,'error: no option found for "-export_beam"'
-                            stop
-                        else if (trim(arg(1:1)) == "-") then
+                        if (my_status .eq. 1 .or. len(trim(arg)) .eq. 0 .or. trim(arg(1:1)) == "-") then ! if found next flag, or didnt find a number
                             print*,'didnt find second value for -export_beam num <value> [<value>]'
                             job_params%export_beam_lims(1) = 1 ! set the start index to 1
                             print*,'found next flag, recycling'
@@ -1117,6 +1125,7 @@ print*,'wavelength: ',job_params%la
 print*,'refractive index (real): ',job_params%rbi
 print*,'refractive index (imag): ',job_params%ibi
 print*,'beam recursions: ',job_params%rec
+print*,'total internal reflections: ',job_params%refl
 print*,'particle rotation method: ',job_params%rot_method
 print*,'number of orientations: ',job_params%num_orients
 print*,'intelligent orientations: ',job_params%intellirot
@@ -2182,14 +2191,16 @@ end do
 ! stop
 
 ! initialise the incident beam structure
-beam_inc%prop(:) = (/0D0,0D0,-1D0/)
-beam_inc%nf_in = beam_geometry%nf
-beam_inc%is_int = .false.
-beam_inc%id = 0D0
+beam_inc%prop(:) = (/0D0,0D0,-1D0/) ! propagation direction
+beam_inc%nf_in = beam_geometry%nf ! number of facets
+beam_inc%is_int = .false. ! incidence is, by default, external
+beam_inc%id = 0
 beam_inc%scatt_in = 0D0
 beam_inc%scatt_out = 0D0
 beam_inc%proj_area_in = 0D0
-beam_inc%rec = 0
+beam_inc%rec = 0 ! incidence is the 0th recursion
+beam_inc%po = 0 ! by default, no outgoing power for the first beam
+beam_inc%refl = 0 ! no total internal reflections
 allocate(beam_inc%field_in(1:beam_inc%nf_in))
 do i = 1, beam_inc%nf_in ! for each facet in the incident beam
     beam_inc%field_in(i)%ampl(:,:) = 0D0 ! init amplitude matrix

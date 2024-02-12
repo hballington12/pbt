@@ -51,9 +51,9 @@ type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing
 integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
 
 ! sr diff_main
-complex(8), dimension(:,:), allocatable:: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! total
+complex(8), dimension(:,:,:,:), allocatable:: ampl_far_beam ! total
 real(8), dimension(:), allocatable :: theta_vals, phi_vals
-complex(8), dimension(:,:), allocatable :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! total
+complex(8), dimension(:,:,:,:), allocatable :: ampl_far_ext_diff ! total
 
 ! sr make_mueller
 real(8), dimension(:,:,:), allocatable :: mueller, mueller_total, mueller_recv ! mueller matrices
@@ -253,32 +253,19 @@ do i = my_start, my_end
     !     end if
     ! end if
     
-
     ! diffraction
-    call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing
-                    beam_outbeam_tree_counter, & ! <-  counts the current number of beam outbeams
-                    ampl_far_beam11,           & !  -> amplitude matrix (1,1) due to beam diffraction
-                    ampl_far_beam12,           & !  -> amplitude matrix (1,2) due to beam diffraction
-                    ampl_far_beam21,           & !  -> amplitude matrix (2,1) due to beam diffraction
-                    ampl_far_beam22,           & !  -> amplitude matrix (2,2) due to beam diffraction
-                    ext_diff_outbeam_tree,     & ! <-  outgoing beams from external diffraction
-                    ampl_far_ext_diff11,       & !  -> amplitude matrix (1,1) due to external diffraction
-                    ampl_far_ext_diff12,       & !  -> amplitude matrix (1,2) due to external diffraction
-                    ampl_far_ext_diff21,       & !  -> amplitude matrix (2,1) due to external diffraction
-                    ampl_far_ext_diff22,       & !  -> amplitude matrix (2,2) due to external diffraction
+    call diff_main( beam_outbeam_tree,          & ! <-  outgoing beams from the beam tracing
+                    beam_outbeam_tree_counter,  & ! <-  counts the current number of beam outbeams
+                    ampl_far_beam,              & !  -> amplitude matrix due to beam diffraction
+                    ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
+                    ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
                     job_params)
 
-    call finalise(  ampl_far_beam11,     & ! <-  amplitude matrix (1,1) due to beam diffraction
-                    ampl_far_beam12,     & ! <-  amplitude matrix (1,2) due to beam diffraction
-                    ampl_far_beam21,     & ! <-  amplitude matrix (2,1) due to beam diffraction
-                    ampl_far_beam22,     & ! <-  amplitude matrix (2,2) due to beam diffraction
-                    ampl_far_ext_diff11, & ! <-  amplitude matrix (1,1) due to external diffraction
-                    ampl_far_ext_diff12, & ! <-  amplitude matrix (1,2) due to external diffraction
-                    ampl_far_ext_diff21, & ! <-  amplitude matrix (2,1) due to external diffraction
-                    ampl_far_ext_diff22, & ! <-  amplitude matrix (2,2) due to external diffraction
-                    mueller,             & !  -> 2d mueller matrix
-                    mueller_1d,          & !  -> 1d mueller matrix
-                    output_parameters,   & !  -> some output parameters
+    call finalise(  ampl_far_beam,              & ! <-  amplitude matrix due to beam diffraction
+                    ampl_far_ext_diff,          & ! <-  amplitude matrix due to external diffraction
+                    mueller,                    & !  -> 2d mueller matrix
+                    mueller_1d,                 & !  -> 1d mueller matrix
+                    output_parameters,          & !  -> some output parameters
                     job_params)
 
     ! call writeup(mueller, mueller_1d, theta_vals, phi_vals) ! write current mueller to file

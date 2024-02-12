@@ -553,12 +553,14 @@
             
             ! saves the apertures to a file
             
-            character(len=255), intent(in) :: output_dir ! cached files directory (if job stops early)
+            character(len=*), intent(in) :: output_dir ! cached files directory (if job stops early)
             ! integer(8), dimension(:), allocatable, intent(in) :: apertures ! apertures asignments for each facet
             type(geometry_type), intent(in) :: geometry
 
             integer(8) i
             
+            print*,'apertures file output is: "',trim(output_dir)//"/apertures.dat",'"'
+
             open(10,file=trim(output_dir)//"/apertures.dat") ! open pertures file
             
             do i = 1, geometry%nf
@@ -1450,6 +1452,7 @@
             num_faces = geometry%nf
             
             print*,'writing rotated particle to file...'
+            print*,'file output is: "',trim(output_dir)//"/"//trim(filename),'"'
     
             ! write to wavefront file
             open(10,file=trim(output_dir)//"/"//trim(filename)//".obj") ! wavefront format
@@ -2117,6 +2120,24 @@
         
     end subroutine
     
+    subroutine print_command()
+    character(len=256) :: command_line
+    integer :: i, num_args
+
+    ! Get the command line
+    num_args = command_argument_count()
+    command_line = ""
+
+    do i = 0, num_args
+        call get_command_argument(i, command_line)
+        write(*, '(a)', advance='no') trim(command_line)//" "
+    end do
+
+    ! Print a newline after the command line
+    write(*, *)
+
+    end subroutine print_command
+
     subroutine cross(a,b,c,normalise)
         
         ! calculates a cross b and returns c
