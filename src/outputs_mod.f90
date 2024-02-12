@@ -28,14 +28,8 @@
 
    end subroutine
    
-   subroutine finalise( ampl_far_beam11,     & ! amplitude matrix (1,1) due to beam diffraction
-                        ampl_far_beam12,     & ! amplitude matrix (1,2) due to beam diffraction
-                        ampl_far_beam21,     & ! amplitude matrix (2,1) due to beam diffraction
-                        ampl_far_beam22,     & ! amplitude matrix (2,2) due to beam diffraction
-                        ampl_far_ext_diff11, & ! amplitude matrix (1,1) due to external diffraction
-                        ampl_far_ext_diff12, & ! amplitude matrix (1,2) due to external diffraction
-                        ampl_far_ext_diff21, & ! amplitude matrix (2,1) due to external diffraction
-                        ampl_far_ext_diff22, & ! amplitude matrix (2,2) due to external diffraction
+   subroutine finalise( ampl_far_beam,     & ! amplitude matrix due to beam diffraction
+                        ampl_far_ext_diff, & ! amplitude matrix due to external diffraction
                         mueller,             & ! 2d mueller matrix
                         mueller_1d,          & ! 1d mueller matrix
                         output_parameters,   & ! output parameters
@@ -48,8 +42,8 @@
       !  simpne interpolates a 3-point Lagrangian polynomial to the data and integrates that exactly
       ! the 1d mueller matrices are integrated to compute various integrated scattering parameters
       
-      complex(8), dimension(:,:), allocatable, intent(inout) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! beam
-      complex(8), dimension(:,:), allocatable, intent(inout)  :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! ext diff
+      complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: ampl_far_beam ! beam
+      complex(8), dimension(:,:,:,:), allocatable, intent(inout)  :: ampl_far_ext_diff ! ext diff
       real(8), dimension(:), allocatable :: theta_vals, phi_vals
       real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
       real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
@@ -57,7 +51,7 @@
       type(output_parameters_type), intent(out) :: output_parameters 
       type(job_parameters_type), intent(in) :: job_params
 
-      complex(8), dimension(:,:), allocatable :: ampl_far11, ampl_far12, ampl_far21, ampl_far22 ! total
+      complex(8), dimension(:,:,:,:), allocatable :: ampl_far ! total
       real(8), dimension(:,:,:), allocatable :: mueller_beam, mueller_ext_diff ! mueller matrices
       real(8), dimension(:,:), allocatable :: mueller_beam_1d, mueller_ext_diff_1d ! phi-integrated mueller matrices
 
@@ -72,34 +66,22 @@
       waveno = 2d0*pi/la
       
       ! allocate total amplitude matrix (beam - ext diff)
-      allocate(ampl_far11(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
-      allocate(ampl_far12(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
-      allocate(ampl_far21(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
-      allocate(ampl_far22(1:size(ampl_far_beam11,1),1:size(ampl_far_beam11,2)))
+      allocate(ampl_far(1:size(ampl_far_beam,1),1:size(ampl_far_beam,2),1:2,1:2))
 
       ! account for 1/waveno factor in Bohren & Huffman eq 3.12
-      ampl_far_beam11 = ampl_far_beam11 * waveno
-      ampl_far_beam12 = ampl_far_beam12 * waveno
-      ampl_far_beam21 = ampl_far_beam21 * waveno
-      ampl_far_beam22 = ampl_far_beam22 * waveno
-      ampl_far_ext_diff11 = ampl_far_ext_diff11 * waveno
-      ampl_far_ext_diff12 = ampl_far_ext_diff12 * waveno
-      ampl_far_ext_diff21 = ampl_far_ext_diff21 * waveno
-      ampl_far_ext_diff22 = ampl_far_ext_diff22 * waveno      
+      ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) * waveno
+      ampl_far_ext_diff(:,:,:,:) = ampl_far_ext_diff(:,:,:,:) * waveno  
 
       ! far field = beam diffraction - external diffraction
-      ampl_far11 = ampl_far_beam11 + ampl_far_ext_diff11
-      ampl_far12 = ampl_far_beam12 + ampl_far_ext_diff12
-      ampl_far21 = ampl_far_beam21 + ampl_far_ext_diff21
-      ampl_far22 = ampl_far_beam22 + ampl_far_ext_diff22
+      ampl_far(:,:,:,:) = ampl_far_beam(:,:,:,:) + ampl_far_ext_diff(:,:,:,:)
 
       if(job_params%debug >= 1) then    
          print*,'making 2d mueller matrices...'
       end if
 
-      call ampl_to_mueller(ampl_far11,ampl_far12,ampl_far21,ampl_far22,mueller)
-      call ampl_to_mueller(ampl_far_beam11,ampl_far_beam12,ampl_far_beam21,ampl_far_beam22,mueller_beam)
-      call ampl_to_mueller(ampl_far_ext_diff11,ampl_far_ext_diff12,ampl_far_ext_diff21,ampl_far_ext_diff22,mueller_ext_diff)
+      call ampl_to_mueller(ampl_far,mueller)
+      call ampl_to_mueller(ampl_far_beam,mueller_beam)
+      call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
 
       if(job_params%debug >= 1) then
          print*,'making 1d mueller matrices...'
@@ -134,29 +116,20 @@
             print'(A40)','applying diffraction energy scaling...'
          end if
          ! scale the beam diffraction energy to match near field
-         ampl_far_beam11 = ampl_far_beam11/sqrt(scatt_beam/output_parameters%beam_energy_out)
-         ampl_far_beam12 = ampl_far_beam12/sqrt(scatt_beam/output_parameters%beam_energy_out)
-         ampl_far_beam21 = ampl_far_beam21/sqrt(scatt_beam/output_parameters%beam_energy_out)
-         ampl_far_beam22 = ampl_far_beam22/sqrt(scatt_beam/output_parameters%beam_energy_out)
+         ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) / sqrt(scatt_beam/output_parameters%beam_energy_out)
 
          ! scale the external diffraction energy to match near field
-         ampl_far_ext_diff11 = ampl_far_ext_diff11/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
-         ampl_far_ext_diff12 = ampl_far_ext_diff12/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
-         ampl_far_ext_diff21 = ampl_far_ext_diff21/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
-         ampl_far_ext_diff22 = ampl_far_ext_diff22/sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
+         ampl_far_ext_diff(:,:,:,:) = ampl_far_ext_diff(:,:,:,:) / sqrt(scatt_ext_diff/output_parameters%ext_energy_out)
 
-         ampl_far11 = ampl_far_beam11 + ampl_far_ext_diff11
-         ampl_far12 = ampl_far_beam12 + ampl_far_ext_diff12
-         ampl_far21 = ampl_far_beam21 + ampl_far_ext_diff21
-         ampl_far22 = ampl_far_beam22 + ampl_far_ext_diff22
+         ampl_far(:,:,:,:) = ampl_far_beam(:,:,:,:) + ampl_far_ext_diff(:,:,:,:)
          
          if(job_params%debug >= 2) then  
             print*,'remaking 2d mueller matrices...'
          end if
 
-         call ampl_to_mueller(ampl_far11,ampl_far12,ampl_far21,ampl_far22,mueller)
-         call ampl_to_mueller(ampl_far_beam11,ampl_far_beam12,ampl_far_beam21,ampl_far_beam22,mueller_beam)
-         call ampl_to_mueller(ampl_far_ext_diff11,ampl_far_ext_diff12,ampl_far_ext_diff21,ampl_far_ext_diff22,mueller_ext_diff)
+         call ampl_to_mueller(ampl_far,mueller)
+         call ampl_to_mueller(ampl_far_beam,mueller_beam)
+         call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
    
          if(job_params%debug >= 2) then  
             print*,'remaking 1d mueller matrices...'
@@ -437,77 +410,77 @@
       
    end subroutine
    
-   subroutine ampl_to_mueller(ampl11,ampl12,ampl21,ampl22,mueller)
+   subroutine ampl_to_mueller(ampl,mueller)
 
       ! returns a mueller matrix from an amplitude matrix
 
-      complex(8), dimension(:,:), allocatable, intent(in) :: ampl11, ampl12, ampl21, ampl22 
+      complex(8), dimension(:,:,:,:), allocatable, intent(in) :: ampl
       real(8), dimension(:,:,:), allocatable, intent(out) :: mueller
 
       integer(8) i, j
 
       ! allocate mueller matrix
-      allocate(mueller(1:size(ampl11,1),1:size(ampl11,2),1:16)) ! 1:16 is for each element
+      allocate(mueller(1:size(ampl,1),1:size(ampl,2),1:16)) ! 1:16 is for each element
 
-      do i = 1, size(ampl11,2) ! loop over theta
-         do j = 1, size(ampl11,1) ! loop over phi
+      do i = 1, size(ampl,2) ! loop over theta
+         do j = 1, size(ampl,1) ! loop over phi
             ! Bohren & Huffman
             ! ##########################--S11--##########################
-            mueller(j,i,1) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) + &
-                                       ampl12(j,i)*conjg(ampl12(j,i)) + &
-                                       ampl21(j,i)*conjg(ampl21(j,i)) + &
-                                       ampl22(j,i)*conjg(ampl22(j,i))))   
+            mueller(j,i,1) = real(0.5*(ampl(j,i,1,1)*conjg(ampl(j,i,1,1)) + &
+                                       ampl(j,i,1,2)*conjg(ampl(j,i,1,2)) + &
+                                       ampl(j,i,2,1)*conjg(ampl(j,i,2,1)) + &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,2))))   
             ! ##########################--S12--##########################                                                
-            mueller(j,i,2) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) - &
-                                       ampl12(j,i)*conjg(ampl12(j,i)) + &
-                                       ampl21(j,i)*conjg(ampl21(j,i)) - &
-                                       ampl22(j,i)*conjg(ampl22(j,i)))) 
+            mueller(j,i,2) = real(0.5*(ampl(j,i,1,1)*conjg(ampl(j,i,1,1)) - &
+                                       ampl(j,i,1,2)*conjg(ampl(j,i,1,2)) + &
+                                       ampl(j,i,2,1)*conjg(ampl(j,i,2,1)) - &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,2)))) 
             ! ##########################--S13--##########################
-            mueller(j,i,3) =      real(ampl11(j,i)*conjg(ampl12(j,i)) + &
-                                       ampl22(j,i)*conjg(ampl21(j,i))) 
+            mueller(j,i,3) =      real(ampl(j,i,1,1)*conjg(ampl(j,i,1,2)) + &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,1))) 
             ! ##########################--S14--##########################
-            mueller(j,i,4) =      imag(ampl11(j,i)*conjg(ampl12(j,i)) - &
-                                       ampl22(j,i)*conjg(ampl21(j,i)))
+            mueller(j,i,4) =      imag(ampl(j,i,1,1)*conjg(ampl(j,i,1,2)) - &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,1)))
             ! ##########################--S21--##########################
-            mueller(j,i,5) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) + &
-                                       ampl12(j,i)*conjg(ampl12(j,i)) - &
-                                       ampl21(j,i)*conjg(ampl21(j,i)) - &
-                                       ampl22(j,i)*conjg(ampl22(j,i))))
+            mueller(j,i,5) = real(0.5*(ampl(j,i,1,1)*conjg(ampl(j,i,1,1)) + &
+                                       ampl(j,i,1,2)*conjg(ampl(j,i,1,2)) - &
+                                       ampl(j,i,2,1)*conjg(ampl(j,i,2,1)) - &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,2))))
             ! ##########################--S22--##########################                                                             
-            mueller(j,i,6) = real(0.5*(ampl11(j,i)*conjg(ampl11(j,i)) - &
-                                       ampl12(j,i)*conjg(ampl12(j,i)) - &
-                                       ampl21(j,i)*conjg(ampl21(j,i)) + &
-                                       ampl22(j,i)*conjg(ampl22(j,i))))
+            mueller(j,i,6) = real(0.5*(ampl(j,i,1,1)*conjg(ampl(j,i,1,1)) - &
+                                       ampl(j,i,1,2)*conjg(ampl(j,i,1,2)) - &
+                                       ampl(j,i,2,1)*conjg(ampl(j,i,2,1)) + &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,2))))
             ! ##########################--S23--##########################   
-            mueller(j,i,7) =      real(ampl11(j,i)*conjg(ampl12(j,i)) - &
-                                       ampl22(j,i)*conjg(ampl21(j,i)))
+            mueller(j,i,7) =      real(ampl(j,i,1,1)*conjg(ampl(j,i,1,2)) - &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,1)))
             ! ##########################--S24--##########################   
-            mueller(j,i,8) =      imag(ampl11(j,i)*conjg(ampl12(j,i)) + &
-                                       ampl22(j,i)*conjg(ampl21(j,i))) 
+            mueller(j,i,8) =      imag(ampl(j,i,1,1)*conjg(ampl(j,i,1,2)) + &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,2,1))) 
             ! ##########################--S31--##########################   
-            mueller(j,i,9) =      real(ampl11(j,i)*conjg(ampl21(j,i)) + &
-                                       ampl22(j,i)*conjg(ampl12(j,i)))
+            mueller(j,i,9) =      real(ampl(j,i,1,1)*conjg(ampl(j,i,2,1)) + &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,1,2)))
             ! ##########################--S32--##########################  
-            mueller(j,i,10) =     real(ampl11(j,i)*conjg(ampl21(j,i)) - &
-                                       ampl22(j,i)*conjg(ampl12(j,i))) 
+            mueller(j,i,10) =     real(ampl(j,i,1,1)*conjg(ampl(j,i,2,1)) - &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,1,2))) 
             ! ##########################--S33--##########################  
-            mueller(j,i,11) =     real(ampl11(j,i)*conjg(ampl22(j,i)) + &
-                                       ampl12(j,i)*conjg(ampl21(j,i)))  
+            mueller(j,i,11) =     real(ampl(j,i,1,1)*conjg(ampl(j,i,2,2)) + &
+                                       ampl(j,i,1,2)*conjg(ampl(j,i,2,1)))  
             ! ##########################--S34--##########################   
-            mueller(j,i,12) =     imag(ampl11(j,i)*conjg(ampl22(j,i)) + &
-                                       ampl21(j,i)*conjg(ampl12(j,i))) 
+            mueller(j,i,12) =     imag(ampl(j,i,1,1)*conjg(ampl(j,i,2,2)) + &
+                                       ampl(j,i,2,1)*conjg(ampl(j,i,1,2))) 
             ! ##########################--S41--########################## 
-            mueller(j,i,13) =     imag(ampl21(j,i)*conjg(ampl11(j,i)) + &
-                                       ampl22(j,i)*conjg(ampl12(j,i)))  
+            mueller(j,i,13) =     imag(ampl(j,i,2,1)*conjg(ampl(j,i,1,1)) + &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,1,2)))  
             ! ##########################--S42--##########################  
-            mueller(j,i,14) =     imag(ampl21(j,i)*conjg(ampl11(j,i)) - &
-                                       ampl22(j,i)*conjg(ampl12(j,i)))  
+            mueller(j,i,14) =     imag(ampl(j,i,2,1)*conjg(ampl(j,i,1,1)) - &
+                                       ampl(j,i,2,2)*conjg(ampl(j,i,1,2)))  
             ! ##########################--S43--##########################  
-            mueller(j,i,15) =     imag(ampl22(j,i)*conjg(ampl11(j,i)) - &
-                                       ampl12(j,i)*conjg(ampl21(j,i)))  
+            mueller(j,i,15) =     imag(ampl(j,i,2,2)*conjg(ampl(j,i,1,1)) - &
+                                       ampl(j,i,1,2)*conjg(ampl(j,i,2,1)))  
             ! ##########################--S44--##########################   
-            mueller(j,i,16) =     real(ampl22(j,i)*conjg(ampl11(j,i)) - &
-                                       ampl12(j,i)*conjg(ampl21(j,i)))     
+            mueller(j,i,16) =     real(ampl(j,i,2,2)*conjg(ampl(j,i,1,1)) - &
+                                       ampl(j,i,1,2)*conjg(ampl(j,i,2,1)))     
             
             
          end do

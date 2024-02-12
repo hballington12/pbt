@@ -51,6 +51,7 @@ type job_parameters_type
     real(8) rbi ! real part of the refractive index
     real(8) ibi ! imaginary part of the refractive index
     integer rec ! max number of internal beam recursions
+    integer refl ! max number of total internal reflections
     character(100) rot_method ! rotation method
     logical is_multithreaded ! whether or not code should use multithreading
     integer num_orients ! number of orientations
@@ -89,6 +90,7 @@ type field_in_type
     integer(8) fi ! the facet id
     complex(8) ampl(1:2,1:2) ! the amplitude matrix
     real(8) e_perp(1:3) ! electric field perpendicular vector (previously known as vk7)
+    logical is_outgoing ! whether or not this part of the beam reached the far-field (can only be true for externally propagating beams)
 end type field_in_type
 
 type field_out_type
@@ -127,11 +129,15 @@ type beam_type
     logical is_int ! whether or not the beam is propagating inside the particle
     integer(8) id ! a label for the position of a beam in a beam tree
     real(8) proj_area_in ! the total area of all facets in this beam when projected along the beam propagation direction
-    real(8) proj_area_out ! the total area of all illuminated facets when projected along the beam propagation direction
+    real(8) proj_area_ill ! the total area of all illuminated facets when projected along the beam propagation direction
+    real(8) proj_area_outgoing ! the total area of facets in this beam which were outgoing
     integer(8) rec ! the recursion that this beam belongs to
     real(8) pi ! incident power
     real(8) pr ! reflected power
     real(8) pt ! transmitted power
+    real(8) po ! outgoing power
+    integer(8) refl ! number of total internal reflections so far
+    logical is_tir ! whether or not the beam originated from a total internal reflection
 end type beam_type
 
 type facet_type
