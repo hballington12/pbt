@@ -13,6 +13,7 @@ type outbeamtype ! type for outbeam trees (used for diffraction)
     real(8) prop_in(1:3) ! incoming propagation vector
     integer(8) FOut ! face ID from which the beam was emitted
     integer interactionOut ! interaction counter
+    real(8) fov ! field of view for this diffraction interaction
 end type outbeamtype
 
 type cc_hex_params_type ! type for holding parameters needed for C. Collier Gaussian Random hexagonal columns/plates

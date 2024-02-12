@@ -1665,7 +1665,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                     call recursion_ext(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                     !$omp critical
                     if(beam%rec < job_params%rec) call add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree (if max recursions hasnt been reached)
-                    call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params) ! add outgoing beams to the diffraction tree
+                    call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params,geometry) ! add outgoing beams to the diffraction tree
                     !$omp end critical
                 end if ! end: if the beam is internally propagating
                 !$omp critical     
@@ -2447,7 +2447,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         
     end subroutine
     
-    subroutine add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params)
+    subroutine add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params,geometry)
         
         ! add_to_outbeam_tree
         ! adds the external field after a beam has propagated to the outbeam tree, ready for diffraction
@@ -2456,8 +2456,19 @@ subroutine recursion_ext(beam,geometry,job_params)
         type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_outbeam_tree ! outgoing beams from the beam tracing
         type(beam_type), intent(in) :: beam ! current beam to be traced
         type(job_parameters_type), intent(in) :: job_params
+        type(geometry_type), intent(in) :: geometry
         
         integer(8) i, counter
+        real(8) interaction_area, d, fov
+
+        interaction_area = 0D0 ! init
+
+        do i = 1, beam%nf_in
+            interaction_area = interaction_area + geometry%f(beam%field_in(i)%fi)%area
+        end do
+
+        d = 2*sqrt(interaction_area/pi) ! get diameter of area-equivalent circle
+        fov = job_params%la/d ! get field of view
         
         counter = 0 ! counts the number of beams added to the tree
         do i = 1, beam%nf_in ! for each illuminated facet in this beam structure
@@ -2473,6 +2484,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(:) = beam%prop(:) ! outgoing propagation direction
                 beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(:) = beam%field_in(i)%e_perp(:) ! perpendicular field vector
                 beam_outbeam_tree(beam_outbeam_tree_counter)%fout = beam%field_in(i)%fi ! facet id
+                beam_outbeam_tree(beam_outbeam_tree_counter)%fov = fov ! save total area of this interaction
             end if
         end do
         
