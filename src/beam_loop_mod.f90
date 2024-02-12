@@ -328,9 +328,16 @@ module beam_loop_mod
         print*,'-----------------------------------------------'
         if(beam%is_int) then
             print'(a,i6,a)','beam ',beam%id,': is internally propagating'
+            if(beam%is_tir) then
+                print'(a,i6,a)','beam ',beam%id,': is total internal reflection'
+            else
+                print'(a,i6,a)','beam ',beam%id,': is not total internal reflection'
+            end if  
         else
             print'(a,i6,a)','beam ',beam%id,': is externally propagating'
-        end if
+        end if      
+        print'(a,i6,a,i8)','beam ',beam%id,': recursion: ',beam%rec
+        print'(a,i6,a,i8)','beam ',beam%id,': number of tir events: ',beam%refl
         print'(a,i6,a,i8)','beam ',beam%id,': originates from aperture: ',beam%ap
         print'(a,i6,a,i8)','beam ',beam%id,': number of facets in this beam: ',beam%nf_in
         print'(a,i6,a,i8)','beam ',beam%id,': number of facets illuminated: ',beam%nf_out
@@ -1014,7 +1021,6 @@ subroutine recursion_ext(beam,geometry,job_params)
         mapping = 0
         num_new_beams = 0 ! init
         
-
         ! initialise the new beams to be added to the beam tree
         do i = 1, geometry%na ! for each aperture in the geometry
             if(create_new_beam(i)) then ! if it was sufficiently illuminated by this beam
@@ -1042,7 +1048,9 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
-                
+                beam_tree(num_beams)%refl = beam%refl ! save number of total internal reflections
+                beam_tree(num_beams)%is_tir = .false. ! initialilse
+
                 if(.not. is_tir(i)) then ! if it was not total internal reflection
                     ! adding the externally transmitted beam to the tree
                     num_new_beams = num_new_beams + 1 ! update total counter for external
@@ -1066,6 +1074,8 @@ subroutine recursion_ext(beam,geometry,job_params)
                     beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                     beam_tree(num_beams)%id = num_beams ! save position in beam tree
                     beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
+                    beam_tree(num_beams)%refl = beam%refl ! save number of total internal reflections
+                    beam_tree(num_beams)%is_tir = .false. ! initialilse
                 end if ! end: if it was not total internal reflection
             end if
         end do
@@ -1088,7 +1098,11 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(index)%prop(:) = beam%field_out(i)%prop_int(:) ! save internally reflected propagation vector (overwrites each time)
                 beam_tree(index)%pi = beam_tree(index)%pi + beam%field_out(i)%pr ! incident power for new beam is the sum of reflected power of all facets in the new beam
                 beam_tree(index)%proj_area_in = beam_tree(index)%proj_area_in + proj_area ! sum the projected area along the new propagation direction
-
+                if(beam%field_out(i)%is_tir) then
+                    beam_tree(index)%refl = beam%refl + 1 ! update number of total internal reflections
+                    beam_tree(index)%is_tir = .true. ! this beam is saved as originating from a total internal reflection
+                end if
+                
                 if(.not. beam%field_out(i)%is_tir) then ! if there was no total internal reflection from this facet
                     ! add information about the externally transmitted beam to the beam tree
                     index = mapping(ai) + 1 ! get the position of new beam in the beam tree
@@ -1107,7 +1121,7 @@ subroutine recursion_ext(beam,geometry,job_params)
             end if
         end do
         
-        if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
+        ! if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
         
     end subroutine
     
@@ -1180,6 +1194,8 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
+                beam_tree(num_beams)%refl = beam%refl ! save number of total internal reflections
+                beam_tree(num_beams)%is_tir = .false. ! initialilse
 
                 ! adding the externally reflected beam to the tree
                 num_new_beams = num_new_beams + 1 ! update total counter for external
@@ -1202,6 +1218,8 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%proj_area_outgoing = 0 ! init
                 beam_tree(num_beams)%id = num_beams ! save position in beam tree
                 beam_tree(num_beams)%rec = beam%rec + 1 ! save recursion number
+                beam_tree(num_beams)%refl = beam%refl ! save number of total internal reflections
+                beam_tree(num_beams)%is_tir = .false. ! initialilse
             end if
         end do
         
@@ -1241,7 +1259,7 @@ subroutine recursion_ext(beam,geometry,job_params)
             end if
         end do
         
-        if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
+        ! if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',num_new_beams,' beams to beam tree -----> ',num_beams,' total beams'
         
     end subroutine
     
@@ -1551,7 +1569,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         type(beam_type), intent(inout) :: beam_inc
         
         real(8) start, finish, start1, finish1 ! cpu timing variables
-        integer(8) i, j
+        integer(8) i, j, rec
         
         ! new beam tree
         type(beam_type), dimension(:), allocatable :: beam_tree
@@ -1559,12 +1577,15 @@ subroutine recursion_ext(beam,geometry,job_params)
         integer(8) i_start, i_end
         type(beam_type) beam ! current beam to be traced
         integer(8) num_threads
+
+        logical done
         
         ! init
         start = 0d0
         start1 = 0d0
         finish = 0d0
         finish1 = 0d0
+        done = .false.
         
         if(job_params%timing) then
             start = omp_get_wtime()
@@ -1592,10 +1613,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         if(job_params%debug >= 2) call print_beam_info(beam_inc,job_params) ! print some info about the beam
 
         call add_to_beam_tree_external(beam_tree,beam_inc,num_beams,geometry,job_params) ! add beams to be propagated to the tree
-        
-        ! removed for re-entry branch
-        ! call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam_inc,job_params) ! add externally reflected beams to diffraction tree
-        
+
         call get_geo_cross_section(geometry,beam_inc,output_parameters) ! for the first recursion, get the illuminated geometric cross section
         
         if(job_params%timing) then
@@ -1610,11 +1628,13 @@ subroutine recursion_ext(beam,geometry,job_params)
         
         ! main loop
         i_start = 1 ! entry in beam tree to start at
-        do i = 1, job_params%rec ! for each recursion
+        rec = 1 ! recursion to start at
+        do while (.not. done)
+            rec = rec + 1 ! update the recursion number
             i_end = num_beams ! entry in beam tree to stop at
             
             if(job_params%debug >= 2) then
-                print*,'internal recursion: ',i
+                print*,'internal recursion: ',rec
                 if(job_params%timing) then
                     start1 = omp_get_wtime()
                 end if
@@ -1637,22 +1657,19 @@ subroutine recursion_ext(beam,geometry,job_params)
                     call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                     !$omp critical
                     if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
-                    call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree
+                    if( beam%rec < job_params%rec .or. &
+                    (beam%is_tir .and. beam%refl < job_params%refl)) call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree (if max recursions hasnt been reached, or if beam was total internal reflection and max total internal reflections hasnt been reached)
                     !$omp end critical
                 else ! if the beam is externally propagating
                     call recursion_ext(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                     !$omp critical
-                    call add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree
-                    call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params)
+                    if(beam%rec < job_params%rec) call add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree (if max recursions hasnt been reached)
+                    call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params) ! add outgoing beams to the diffraction tree
                     !$omp end critical
                 end if ! end: if the beam is internally propagating
                 !$omp critical     
                 beam_tree(beam%id) = beam ! update the information about the propagated beam in the beam tree
                 if(job_params%debug >= 3) call print_beam_info(beam,job_params) ! print some info about the beam
-                ! add the new beams to the beam tree (need to also add the new information about the current beam)
-                ! call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
-                ! add the outgoing surface field to the diffraction structure
-                ! call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params)
                 !$omp end critical
             end do ! end: for each entry in the beam tree that belongs to this recursion
             !$omp end parallel
@@ -1661,13 +1678,14 @@ subroutine recursion_ext(beam,geometry,job_params)
                 if(job_params%debug >= 2) then
                     finish1 = omp_get_wtime()
                     print*,'======================================'
-                    print'(a,i3,a,f16.8,a)',"recursion",i," - time taken: ",finish1-start1," secs"
+                    print'(a,i3,a,f16.8,a)',"recursion",rec," - time taken: ",finish1-start1," secs"
                     call print_recursion_info(beam_tree(i_start:i_end),job_params)
-                    write(101,'(a,i3,a,f16.8,a)')"recursion",i," - time taken: ",finish1-start1," secs"
+                    write(101,'(a,i3,a,f16.8,a)')"recursion",rec," - time taken: ",finish1-start1," secs"
                     print*,'======================================'
                 end if
             end if
-            
+
+            if(i_end == num_beams) done = .true. ! if no beams to be traced are remaining, we are done
             i_start = i_end + 1 ! update the starting index for the next recursion
         end do ! end: for each recursion
         

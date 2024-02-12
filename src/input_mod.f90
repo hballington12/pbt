@@ -301,6 +301,7 @@ job_params%timing = .false. ! default is no timing
 job_params%thresh_area = 1d-1 ! default area threshold is 0
 job_params%thresh_energy = 1d-4 ! default energy threshold 1d-4
 job_params%export_beam = .false. ! default is do not export the beam
+job_params%refl = 10 ! default is max 10 total internal reflections
 
 call print_command() ! print the command used to execute the program
 
@@ -659,6 +660,19 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else ! else, parse the specifier
                 read(arg,*) rec
+                ! print*,'rec: ', rec
+                found_rec = .true.
+            end if
+
+        case ('-refl')
+            ! print*,'found command line specifier "rec"'
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "refl"'
+                stop
+            else ! else, parse the specifier
+                read(arg,*) job_params%refl
                 ! print*,'rec: ', rec
                 found_rec = .true.
             end if
@@ -1111,6 +1125,7 @@ print*,'wavelength: ',job_params%la
 print*,'refractive index (real): ',job_params%rbi
 print*,'refractive index (imag): ',job_params%ibi
 print*,'beam recursions: ',job_params%rec
+print*,'total internal reflections: ',job_params%refl
 print*,'particle rotation method: ',job_params%rot_method
 print*,'number of orientations: ',job_params%num_orients
 print*,'intelligent orientations: ',job_params%intellirot
@@ -2185,6 +2200,7 @@ beam_inc%scatt_out = 0D0
 beam_inc%proj_area_in = 0D0
 beam_inc%rec = 0 ! incidence is the 0th recursion
 beam_inc%po = 0 ! by default, no outgoing power for the first beam
+beam_inc%refl = 0 ! no total internal reflections
 allocate(beam_inc%field_in(1:beam_inc%nf_in))
 do i = 1, beam_inc%nf_in ! for each facet in the incident beam
     beam_inc%field_in(i)%ampl(:,:) = 0D0 ! init amplitude matrix

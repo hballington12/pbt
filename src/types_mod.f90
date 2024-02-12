@@ -51,6 +51,7 @@ type job_parameters_type
     real(8) rbi ! real part of the refractive index
     real(8) ibi ! imaginary part of the refractive index
     integer rec ! max number of internal beam recursions
+    integer refl ! max number of total internal reflections
     character(100) rot_method ! rotation method
     logical is_multithreaded ! whether or not code should use multithreading
     integer num_orients ! number of orientations
@@ -135,6 +136,8 @@ type beam_type
     real(8) pr ! reflected power
     real(8) pt ! transmitted power
     real(8) po ! outgoing power
+    integer(8) refl ! number of total internal reflections so far
+    logical is_tir ! whether or not the beam originated from a total internal reflection
 end type beam_type
 
 type facet_type
