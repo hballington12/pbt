@@ -267,8 +267,8 @@ allocate(cc_hex_params%cls(1:cc_hex_params%nscales))
 allocate(cc_hex_params%sds(1:cc_hex_params%nscales))
 cc_hex_params%cls = 1
 cc_hex_params%sds = 0
-rot_method = "euler"
-eulers = (/20D0,30D0,40D0/)
+rot_method = "none"
+eulers = (/0D0,0D0,0D0/) 
 job_name = 'job'
 afn = "(null)"
 cfn = "(null)"

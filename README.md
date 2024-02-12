@@ -1,6 +1,6 @@
 # Fortran Console Application : PBT Project Overview
 
-This file contains a summary of the aperture beam tracer (ABT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse.
+This file contains a summary of the parent beam tracer (PBT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse.
 
 ## Compilation
 
@@ -13,45 +13,49 @@ Example shell scripts for submitting jobs may be found in `template/`
 
 ## Input Flags
 
-Main source file. It contains the program entry point. The ABT reads input parameters from the command line. There are a few required input arguments, as well as a few optional ones. The code will stop if a mandatory argument is missing from the command line. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of most arguments in the command line is not important and the ABT will search through lines from left to right in an attempt to find each argument. A summary of command line arguments is given below:
+Main source file. It contains the program entry point. The PBT reads input parameters from the command line. There are a few required input arguments, as well as a few optional ones. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of most arguments in the command line is not important and the PBT will search through lines from left to right in an attempt to find each argument. A summary of command line arguments is given below:
 
-- `-lambda` `<value>` - Defines the wavelength of incident light. Is required.
+- `-lambda` `<value>` - Defines the wavelength of incident light. If omitted, the default value is `0.532`.
 
-- `-rbi` `<value>` - Defines the real component of the particle refractive index. Is required.
+- `-rbi` `<value>` - Defines the real component of the particle refractive index. If omitted, the default value is `1.31`.
 
-- `-ibi` `<value>` - Defines the imaginary component of the particle refractive index. Is required.
+- `-ibi` `<value>` - Defines the imaginary component of the particle refractive index. If omitted, the default value is `0`.
 
-- `-cmethod` `<string>` - Defines the method of particle input. Is required. Current supported methods are:
+- `-cmethod` `<string>` - Defines the method of particle input. If omitted, the PBT will use the `cc_hex` method to make a hexagonal prism with radius 5 and prism length 10. Current supported methods are:
 
-    - `read` - attempts to read the particle from the current directory. If "read" is specified, the following arguments must also be specified:
+    - `read` - attempts to read the particle from the current directory. If `read` is specified, the following arguments may also be specified:
     
-        - `cft` `<string>` - Defines the particle input filetype. The supported particle file input types are:
+        - `-cft` `<string>` - Defines the particle input filetype. The supported particle file input types are:
         
             - `obj` - wavefront style geometry file
         
             - `mrt` - Macke ray-tracing style
+
+            If `-cfn` is omitted, the PBT will attempt to guess the particle filetype based on the file extension. Macke ray-tracing style is assumed for file extensions `.cry` and `.crystal`, and wavefront style is assumed for file extension `.obj`.
         
-        - `cfn` `<string>` - Defines the particle filename. Is required. Currently, input file must be a wavefront geometry file. The particle should be triangulated.
+        - `-cfn` `<string>` - Defines the particle filename. If the particle file is not a sufficiently discretised triangular mesh, see information on the `-tri` flag for triangulation. If the mesh consists only of triangles, the PBT will assume it is sufficiently discretised and automatic triangulation will be disabled. If the mesh contains a facet with more than 3 vertices, the PBT will enable triangulation by default because the code does not currently directly support this.
     
-        - `afn` `<string>` - Defines the apertures filename. Is required. The apertures file containes a single column defining which aperture each face belongs to. The number of lines in the apertures file must match the total number of faces in the particle file.
+        - `-afn` `<string>` - Defines the apertures filename. The apertures file contains a single column defining which aperture each face belongs to. The number of lines in the apertures file must match the total number of faces in the particle file.
     
-    - `cc_hex` - Attempts to make gaussian rough hexagonal column/plate. Uses method developed by C. Collier, based on Muinonen & Saarinen 2000. If this flag flag is used, several other flags must also be specified:
-        - `-cc_hex_l` `<value>` - L from Muinonen & Saarinen 2000. Should be large compared to the correlation length (see below).
-        - `-cc_hex_hr` - Hexagonal edge length.
-        - `-cc_hex_nfhr` - Number of subdivisions along each hexagonal edge.
-        - `-cc_hex_pfl` - Prism edge length.
-        - `-cc_hex_nfpl` - Number of subdivisions along each prism edge.
-        - `-cc_hex_pher` - Number of rotations to perform at prism facet-basal facet edges (10% of no. of subfacets along prism edge).
-        - `-cc_hex_pper` - Number of rotations to perform at prism facet-prism facet edges (10% of subfacets along hexagon edge).
-        - `-cc_hex_nscales` - Number of roughness scales.
-        - `-cc_hex_cls` - Correlation lengths for each roughness scale, separated by spaces.
-        - `-cc_hex_sds` - Standard deviations for each roughness scale, separated by spaces.
+    - `cc_hex` - Attempts to make gaussian rough hexagonal column/plate. Uses method developed by C. Collier, based on Muinonen & Saarinen 2000. If this flag flag is used, several other flags may also be specified:
+        - `-cc_hex_l` `<value>` - L from Muinonen & Saarinen 2000. Should be large compared to the correlation length (see below). If omitted, the default value is `20`.
+        - `-cc_hex_hr` - Hexagonal edge length. If omitted, the default value is `5`.
+        - `-cc_hex_nfhr` - Number of subdivisions along each hexagonal edge. If omitted, the default value is `6`.
+        - `-cc_hex_pfl` - Prism edge length. If omitted, the default value is `10`.
+        - `-cc_hex_nfpl` - Number of subdivisions along each prism edge. If omitted, the default value is `12`.
+        - `-cc_hex_pher` - Number of rotations to perform at prism facet-basal facet edges (10% of no. of subfacets along prism edge). If omitted, the default value is `1`.
+        - `-cc_hex_pper` - Number of rotations to perform at prism facet-prism facet edges (10% of subfacets along hexagon edge). If omitted, the default value is `1`.
+        - `-cc_hex_nscales` - Number of roughness scales. If omitted, the default value is `1`.
+        - `-cc_hex_cls` - Correlation lengths for each roughness scale, separated by spaces. If omitted, the default value is `1`.
+        - `-cc_hex_sds` - Standard deviations for each roughness scale, separated by spaces. If omitted, the default value is `0`.
 
-- `-rec` `<value>` - Defines the total number of beam recursions per orientation. Is required.
+- `-rec` `<value>` - Defines the total number of beam recursions per orientation. If omitted, the default value is `8`.
 
-- `-rot` `<args>` - Defines the orientation of the particle. Is optional. If omitted, the ABT will not rotate the input particle. The <args> parameter is used to define the method of rotation, or to define random orientation. Current supported methods are:
+- `-refl` `<value>` - Defines the max number of beam total internal reflection events per orientation. If omitted, the default value is `10`.
 
-    - `euler` <alpha> <beta> <gamma> - Choose to rotate the particle according to the 3 Euler angles, given in degrees. There are several ways to rotate via Euler angles; the ABT follows the method of Mishchenko.
+- `-rot` `<args>` - Defines the orientation of the particle. Is optional. If omitted, the PBT will not rotate the input particle. The `<args>` parameter is used to define the method of rotation, or to define random orientation. Current supported methods are:
+
+    - `euler` `<alpha>` `<beta>` `<gamma>` - Choose to rotate the particle according to the 3 Euler angles, given in degrees. There are several ways to rotate via Euler angles; the PBT follows the method of Mishchenko.
 
         - example: `-rot euler 11 25 32`
 
@@ -59,11 +63,11 @@ Main source file. It contains the program entry point. The ABT reads input param
 
         - example: `-rot off 30 20`
 
-    - `none` - Choose to not rotate the particle. This behaviour is identical to not including the "rot" argument.
+    - `none` - Choose to not rotate the particle.
 
         - example: `rot none`
 
-    - `multi` `<value>` - Choose to randomly orient the particle. <value> defines the number of orientations. For reproducability, the random_seed subroutine can be used to set the random seed to a specified value, which will cause the random orientations to be reproducable.
+    - `multi` `<value>` - Choose to randomly orient the particle. `<value>` defines the number of orientations. For reproducability, the random_seed subroutine can be used to set the random seed to a specified value, which will cause the random orientations to be reproducable. Since the Euler $\alpha$ angle has no effect on the 1-d scattering, it is set to 0 for orientation averaging.
 
         - example: `-rot multi 1000`
 
@@ -72,21 +76,21 @@ Main source file. It contains the program entry point. The ABT reads input param
 - `-jobname` `<string>` - Specifies the name of the directory within which the output files should be place. Is optional. If omitted, "my_job#" is used, where # is an integer. If the directory already exists, an integer is appended to the directory name so that no files are overwritten.
 
 - `-theta` `values` - Specifies the polar angles at which the far-field should be evaluated. See below for example usage:
-    - `-theta 0 1 180` - Evaluate the far-field from 0 in 1 degree steps to 180.
+    - `-theta 0 1 180` - Evaluate the far-field from 0 in 1 degree steps to 180. If omitted, this is the default behaviour.
     - `-theta 6 0.1 25 150 175 0.25 180` - Evaluate the far-field from 6 in 0.1 degree steps to 25, then step to 175, then in 0.25 degree steps to 180.
 
 - `-phi` `values` - Specifies the azimuthal angles at which the far-field should be evaluated. See below for example usage:
-    - `-phi 0 2 360` - Evaluate the far-field from 0 in 2 degree steps to 360.
+    - `-phi 0 1 360` - Evaluate the far-field from 0 in 1 degree steps to 360. If omitted, this is the default behaviour.
 
 - `-no2d` - Suppresses the output of the 2D mueller matrix, which can be a large file if many far-field evaluation points are specified.
 
 - `-tri` - Enables automatic triangulation. Note that use of this flag requires compiling the triangle code in `./src/tri/`.
 
-- `-tri_edge <value>` - Sets the maximum edge length for triangulation.
+- `-tri_edge <value>` - Sets the maximum edge length for triangulation. If omitted, the default value is `1`.
 
-- `-tri_rough <value>` - Sets the standard deviation for roughness derived from the triangulation.
+- `-tri_rough <value>` - Sets the standard deviation for roughness derived from the triangulation. If omitted, the default value is 01`.
 
-- `-time_limit <value>` - Sets a time limit (in hours). The abt will save at an intermediate point if this time is surpassed. Use `-resume <value>` to resume the job (see below).
+- `-time_limit <value>` - Sets a time limit (in hours). The PBT will save at an intermediate point if this time is surpassed. Use `-resume <value>` to resume the job (see below).
 
 - `-resume <value>` - Resumes a previous job that was saved at an intermediate point. `value` must be the number of the cache ID. This option overrides most input parameters with those read from the cached job.
 
