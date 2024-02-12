@@ -1113,7 +1113,10 @@ if(job_params%export_beam) then ! if beam exporting enabled, check values
     if(job_params%export_beam_lims(1) > job_params%export_beam_lims(2)) error stop "beam export limits must be equal or increasing values"
     if(job_params%export_beam_rec) then
         print*,'exporting by recursion number:',job_params%export_beam_lims(1:2)
-        if(job_params%export_beam_lims(2) > job_params%rec) error stop "upper beam export limit must be equal to or less than the maximum number of recursions if the export method is 'rec'"
+        ! if(job_params%export_beam_lims(2) > job_params%rec) then 
+        !     job_params%export_beam_lims(2) = job_params%rec        
+        !     print*,'changed'
+        ! end if
     else
         print*,'exporting by beam number:',job_params%export_beam_lims(1:2)
     end if

@@ -87,6 +87,7 @@ module beam_loop_mod
         progressInt = 0
         work_done = 0
         filename = trim(job_params%output_dir)//'/'//'beam.json'
+        end = num_beams ! init
 
         ! set the beam index limits
         if(job_params%export_beam_rec) then
@@ -1628,7 +1629,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         
         ! main loop
         i_start = 1 ! entry in beam tree to start at
-        rec = 1 ! recursion to start at
+        rec = 0 ! recursion to start at
         do while (.not. done)
             rec = rec + 1 ! update the recursion number
             i_end = num_beams ! entry in beam tree to stop at
