@@ -57,46 +57,6 @@ module diff_mod
         sin_rot = w2/help1
       end subroutine random_rotation
 
-    subroutine trim_outbeam_tree(beam_tree,beam_tree_counter,job_params)
-
-    ! trims the outbeam tree
-    ! outgoing beams are ignored if the amplitude matrix has less than 1e-6 energy
-
-    type(outbeamtype), dimension(:), allocatable, intent(inout) :: beam_tree ! beam_tree to be trimmed
-    integer(8), intent(inout) :: beam_tree_counter ! counts the current number of beam outbeams
-    type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
-    integer i, j
-    type(outbeamtype), dimension(:), allocatable :: beam_tree_temp ! beam_tree temporary copy
-    real(8) energy
-    
-    allocate(beam_tree_temp(1:size(beam_tree,1)))
-
-    j = 0
-    ! do i = 1, size(beam_tree,1) ! loop over beam_tree entries
-    do i = 1, beam_tree_counter ! loop over beam_tree entries
-            energy = real(0.5*( beam_tree(i)%ampl(1,1)*conjg(beam_tree(i)%ampl(1,1)) + &
-                                beam_tree(i)%ampl(1,2)*conjg(beam_tree(i)%ampl(1,2)) + &
-                                beam_tree(i)%ampl(2,1)*conjg(beam_tree(i)%ampl(2,1)) + &
-                                beam_tree(i)%ampl(2,2)*conjg(beam_tree(i)%ampl(2,2)))) ! calc energy out
-        if(energy .gt. 1e-6) then ! if significant energy
-            j = j + 1 ! update total number of outbeams
-            ! print*,'i=',i,'energy=',energy
-            ! print*,'i=',i,'prop=',beam_tree(i)%prop_out(1),beam_tree(i)%prop_out(2),beam_tree(i)%prop_out(3)
-            beam_tree_temp(j) = beam_tree(i) ! add entry to trimmed outbeam tree
-        end if
-    end do
-
-    if(job_params%debug >= 2) then
-        print*,'trimmed outbeam tree from',beam_tree_counter,' to ',j,' outbeams'
-    end if
-    
-    beam_tree_counter = j ! replace old beam counter with adjusted one
-    beam_tree = beam_tree_temp ! replace in beam_tree with trimmed one
-
-    ! stop
-
-    end subroutine
-
     subroutine transform_bins2(x,y,z,com,rot,x3,y3,z3)
     
         ! translates and rotates bins to aperture system (loop method)
@@ -223,8 +183,6 @@ module diff_mod
     real(8) frac
     real(8) a1m, b2m, a1e, b2e, b1m, a2e, a1em, a2em, b1em, b2em
     
-    ! print*,'start karcewski...'
-
     bin_vec_size = sqrt(x3**2 + y3**2 + z3**2) ! distance to each far-field bin
 
     k(1) = x3/bin_vec_size ! propagation vector components for each bin vector in aperture system
@@ -275,8 +233,6 @@ module diff_mod
     ! diff_ampl21 = 0
     ! diff_ampl22 = b2m
     ! ! ###################### 
-
-    ! print*,'end karcewski...'
     
     end subroutine
     
@@ -526,10 +482,7 @@ module diff_mod
                             yfar,       & ! the y coordinate of each far-field bin (meshgrid style)
                             zfar,       & ! the z coordinate of each far-field bin (meshgrid style)
                             lambda,     & ! wavelength
-                            amplC11s,   & ! the far-field diffraction amplitude matrix to be calculated (1,1)
-                            amplC12s,   & ! the far-field diffraction amplitude matrix to be calculated (1,2)
-                            amplC21s,   & ! the far-field diffraction amplitude matrix to be calculated (2,1)
-                            amplC22s,   & ! the far-field diffraction amplitude matrix to be calculated (2,2)
+                            amplC,      & ! the far-field diffraction amplitude matrix to be calculated
                             phi_vals,   & ! phi values
                             theta_vals)   ! theta values
     
@@ -542,7 +495,7 @@ module diff_mod
     real(8), intent(in) :: v_in(1:3,1:3) ! vertices of facet to pass to diffraction sr
     real(8), dimension(:,:), allocatable, intent(in) :: xfar, yfar, zfar ! far-field bin positions
     real(8), intent(in) :: lambda ! wavelength
-    complex(8), dimension(:,:), allocatable, intent(inout) :: amplC11s, amplC12s, amplC21s, amplC22s
+    complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: amplC
     real(8), dimension(:), allocatable, intent(in) :: phi_vals
     real(8), dimension(:), allocatable, intent(in) :: theta_vals
 
@@ -609,7 +562,7 @@ module diff_mod
     prop2 = matmul(rot2,prop1)
     perp2 = matmul(rot2,perp1)
 
-    call cross(perp2,prop2,e_par2) ! to do: turn on normalisation here
+    call cross(perp2,prop2,e_par2,.true.)
     
     if(e_par2(3) .gt. 0.0001) then
         anti_parallel = .true.
@@ -643,7 +596,6 @@ module diff_mod
         do j = 1, size(xfar,2)
 
             phi = phi_vals(i)
-            ! phi = 0d0
 
             ! karczewski theory
             call karczewski(diff_ampl,m,k,prop2,x3(i,j), y3(i,j),z3(i,j))
@@ -652,16 +604,8 @@ module diff_mod
             if(abs(dot_product(incidence2,k)) .lt. 0.999) then ! if bin is not in direct forwards
                 call cross(incidence2,k,hc)
             else ! rotate vector perp to scattering plane (y-z) into aperture system
-                ! call random_rotation(cos_rot,sin_rot)
-                ! hc = matmul(rot2,matmul(rot,(/1d0,0d0,0d0/)))
-                ! hc = matmul(rot2,matmul(rot,(/cos(my_phi_vals(i)),sin(my_phi_vals(i)),0d0/)))
-                ! hc = matmul((/cos(phi),sin(phi),0d0/),matmul(rot2,rot))
                 my_k = (/x3(i,theta_i),y3(i,theta_i),z3(i,theta_i)/)/sqrt(x3(i,theta_i)**2 + y3(i,theta_i)**2 + z3(i,theta_i)**2)
                 call cross(incidence2,my_k,hc)
-                ! hc(1) = -hc(1)
-                ! hc(2) = -hc(2)
-                ! hc = (/cos(phi),sin(phi),0d0/)
-                ! hc = matmul(rot2,matmul(rot,(/cos_rot,sin_rot,0d0/)))
             end if
 
             call cross(k,m,evo2)
@@ -672,25 +616,8 @@ module diff_mod
             rot4(1,2) = -dot_product(hc,evo2)
             rot4(2,1) = +dot_product(hc,evo2)          
 
-            ! get the premultiplication matrix to rotate the incident amplitude matrix into the scattering plane
-            ! get x-y normalised e-perp direction of scattering plane (used lab system here)
-            ! temp_vec3 = (/xfar(i,j),yfar(i,j),zfar(i,j)/) / sqrt(xfar(i,j)**2 + yfar(i,j)**2)
-            
-            ! bin_vec_size = sqrt(xfar(i,j)**2 + yfar(i,j)**2 + zfar(i,j)**2)
-            ! ! if scattering bin is close to direct forwards, get perp vector from phi value
-            ! if(abs(zfar(i,j)/bin_vec_size) .gt. 0.99999) then
-            !     ! call random_rotation(cos_rot,sin_rot)
-            !     ! temp_vec3 = (/cos_rot,-sin_rot,0d0/)
-            !     ! temp_vec3 = (/1d0,0d0,0d0/)
-            !     phi = phi_vals(i)
-            !     temp_vec3 = (/cos(phi),sin(phi),0d0/)
-
-            ! end if
-
-            temp_vec3 = (/cos(phi),sin(phi),0d0/)
-            ! temp_vec3 = (/0d0,1d0,0d0/)
-
             ! get rotation matrix to rotate from incidence plane (x-y) about incidence direction to scattering plane
+            temp_vec3 = (/cos(phi),sin(phi),0d0/)
             call getRotationMatrix(temp_rot1,-temp_vec3(2),temp_vec3(1),0d0,1d0,0d0,0d0,0d0,0d0,-1d0)
 
             ! bodge (rotation was wrong way)
@@ -698,13 +625,11 @@ module diff_mod
 
             ! apply rotation matrices
             ampl_temp2 = matmul(rot4,matmul(diff_ampl,matmul(ampl,temp_rot1)))
-            ! ampl_temp2 = matmul(diff_ampl,matmul(ampl,temp_rot1))
-            ! ampl_temp2 = ampl ! disable this!!
 
-            amplC11s(i,j) = ampl_temp2(1,1)
-            amplC12s(i,j) = ampl_temp2(1,2)
-            amplC21s(i,j) = ampl_temp2(2,1)
-            amplC22s(i,j) = ampl_temp2(2,2)
+            amplC(i,j,1,1) = ampl_temp2(1,1)
+            amplC(i,j,1,2) = ampl_temp2(1,2)
+            amplC(i,j,2,1) = ampl_temp2(2,1)
+            amplC(i,j,2,2) = ampl_temp2(2,2)
 
         end do
     end do
@@ -712,24 +637,18 @@ module diff_mod
     ! scalar fraunhofer integral, output contained in area_facs2
     call contour_integral(lambda,area_facs2,rot,rot2,v0,prop2,x3,y3,z3)
 
-    amplC11s = amplC11s * area_facs2
-    amplC12s = amplC12s * area_facs2
-    amplC21s = amplC21s * area_facs2
-    amplC22s = amplC22s * area_facs2
+    amplC(:,:,1,1) = amplC(:,:,1,1) * area_facs2(:,:)
+    amplC(:,:,1,2) = amplC(:,:,1,2) * area_facs2(:,:)
+    amplC(:,:,2,1) = amplC(:,:,2,1) * area_facs2(:,:)
+    amplC(:,:,2,2) = amplC(:,:,2,2) * area_facs2(:,:)
 
     end subroutine
     
     subroutine diff_main(   beam_outbeam_tree,          & ! tree of outgoing beams
                             beam_outbeam_tree_counter,  & ! total number of outoing beams in beam tree
-                            ampl_far_beam11,            & ! far-field diffracted beam amplitude matrix (1,1)
-                            ampl_far_beam12,            & ! far-field diffracted beam amplitude matrix (1,2)
-                            ampl_far_beam21,            & ! far-field diffracted beam amplitude matrix (2,1)
-                            ampl_far_beam22,            & ! far-field diffracted beam amplitude matrix (2,2)
+                            ampl_far_beam,            & ! far-field diffracted beam amplitude matrix
                             ext_diff_outbeam_tree,      & ! tree of outgoing external diffraction beams
-                            ampl_far_ext_diff11,        & ! far-field external diffraction amplitude matrix (1,1)
-                            ampl_far_ext_diff12,        & ! far-field external diffraction amplitude matrix (1,2)
-                            ampl_far_ext_diff21,        & ! far-field external diffraction amplitude matrix (2,1)
-                            ampl_far_ext_diff22,        & ! far-field external diffraction amplitude matrix (2,2)
+                            ampl_far_ext_diff,        & ! far-field external diffraction amplitude matrix
                             job_params)
     
         ! sr diff_main is the main shell for diffraction of all beams + external diffraction at a fixed orientation
@@ -743,9 +662,9 @@ module diff_mod
     logical is_multithreaded
     type(job_parameters_type), intent(in) :: job_params
     integer j
-    complex(8), dimension(:,:), allocatable, intent(out) :: ampl_far_beam11, ampl_far_beam12, ampl_far_beam21, ampl_far_beam22 ! total
-    complex(8), dimension(:,:), allocatable, intent(out) :: ampl_far_ext_diff11, ampl_far_ext_diff12, ampl_far_ext_diff21, ampl_far_ext_diff22 ! total
-    complex(8), dimension(:,:), allocatable :: amplC11s, amplC12s, amplC21s, amplC22s ! summand
+    complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_beam
+    complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_ext_diff
+    complex(8), dimension(:,:,:,:), allocatable :: amplC ! summand
     complex(8) ampl(1:2,1:2) ! amplitude matrix to pass to diffraction sr
     real(8) perp0(1:3) ! perp field direction to pass to diffraction sr
     real(8) prop0(1:3) ! outgoing propagation direction to pass to diffraction sr
@@ -757,7 +676,6 @@ module diff_mod
     real work_done
     integer progressInt
     integer(8) num_threads
-
 
     if(job_params%timing) then
         start = omp_get_wtime()
@@ -771,30 +689,15 @@ module diff_mod
     call make_far_field_bins(xfar,yfar,zfar,theta_vals,phi_vals) ! get meshgrid-style far-field bins x, y, z
 
     ! allocate some far-field bins and init
-    allocate(ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)))
-    allocate(ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)))
-    allocate(ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)))
-    allocate(ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)))
-    allocate(ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)))
-    allocate(ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)))
-    allocate(ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)))
-    allocate(ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)))
+    allocate(ampl_far_beam(1:size(xfar,1),1:size(xfar,2),1:2,1:2))
+    allocate(ampl_far_ext_diff(1:size(xfar,1),1:size(xfar,2),1:2,1:2))
     allocate(area_facs2(1:size(xfar,1),1:size(xfar,2)))
-    allocate(amplC11s(1:size(xfar,1),1:size(xfar,2)))
-    allocate(amplC12s(1:size(xfar,1),1:size(xfar,2)))
-    allocate(amplC21s(1:size(xfar,1),1:size(xfar,2)))
-    allocate(amplC22s(1:size(xfar,1),1:size(xfar,2)))
+    allocate(amplC(1:size(xfar,1),1:size(xfar,2),1:2,1:2))
     
     ! init
     area_facs2 = 0
-    ampl_far_beam11 = 0
-    ampl_far_beam12 = 0
-    ampl_far_beam21 = 0
-    ampl_far_beam22 = 0
-    ampl_far_ext_diff11 = 0
-    ampl_far_ext_diff12 = 0
-    ampl_far_ext_diff21 = 0
-    ampl_far_ext_diff22 = 0
+    ampl_far_beam = 0
+    ampl_far_ext_diff = 0
     progressInt = 0
     work_done = 0
 
@@ -808,7 +711,7 @@ module diff_mod
         num_threads = 1
     end if
 
-    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC11s,amplC12s,amplC21s,amplC22s,ampl,perp0,prop0,v,start1,finish1)
+    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC,ampl,perp0,prop0,v,start1,finish1)
     if(job_params%timing) then
         start1 = omp_get_wtime()
     end if
@@ -832,13 +735,10 @@ module diff_mod
         v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
     
         ! get far-field contribution from this outbeam
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)                                 
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals)                                 
 
         !$OMP CRITICAL
-        ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
-        ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
-        ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
-        ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_beam22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) + amplC(:,:,:,:)
         !$OMP END CRITICAL
     
     end do
@@ -846,13 +746,13 @@ module diff_mod
     if(omp_get_thread_num() .eq. 0) then
         if(job_params%debug >= 1) then
             print*,'end diff beam loop...'
-        if(job_params%timing) then
-            finish1 = omp_get_wtime()
-            print'(A,f16.8,A)',"beam diffraction took: ",finish1-start1," secs"
-            start1 = omp_get_wtime()
-        end if
+            if(job_params%timing) then
+                finish1 = omp_get_wtime()
+                print'(A,f16.8,A)',"beam diffraction took: ",finish1-start1," secs"
+                start1 = omp_get_wtime()
+            end if
             print*,'start ext diff loop...'
-    end if
+        end if
     end if
 
     work_done = 0
@@ -876,13 +776,10 @@ module diff_mod
         prop0(1:3) = ext_diff_outbeam_tree(j)%prop_out(1:3)
         v(1:3,1:3) = ext_diff_outbeam_tree(j)%verts(1:3,1:3)
     
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC11s,amplC12s,amplC21s,amplC22s,phi_vals,theta_vals)
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals)
 
         !$OMP CRITICAL
-        ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff11(1:size(xfar,1),1:size(xfar,2)) + amplC11s(1:size(xfar,1),1:size(xfar,2))
-        ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff12(1:size(xfar,1),1:size(xfar,2)) + amplC12s(1:size(xfar,1),1:size(xfar,2))
-        ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff21(1:size(xfar,1),1:size(xfar,2)) + amplC21s(1:size(xfar,1),1:size(xfar,2))
-        ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) = ampl_far_ext_diff22(1:size(xfar,1),1:size(xfar,2)) + amplC22s(1:size(xfar,1),1:size(xfar,2))
+        ampl_far_ext_diff(:,:,:,:) = ampl_far_ext_diff(:,:,:,:) + amplC(:,:,:,:)
         !$OMP END CRITICAL
             
     end do
@@ -898,14 +795,12 @@ module diff_mod
     end if
     !$OMP END PARALLEL
     
-    ! print*,'end ext diff loop...'
     if(job_params%debug >= 1) then
         if(job_params%timing) then
             finish = omp_get_wtime()
             print'(A,f16.8,A)',"diffraction took: ",finish-start," secs"
         end if
     end if
-    ! print*,'========== end sr diff_main'
 
     end subroutine
     
