@@ -2469,6 +2469,7 @@ subroutine recursion_ext(beam,geometry,job_params)
 
         d = 2*sqrt(interaction_area/pi) ! get diameter of area-equivalent circle
         fov = job_params%la/d ! get field of view
+        fov = fov*4 ! overestimate, just to be sure
         
         counter = 0 ! counts the number of beams added to the tree
         do i = 1, beam%nf_in ! for each illuminated facet in this beam structure

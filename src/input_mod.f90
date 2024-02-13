@@ -302,6 +302,7 @@ job_params%thresh_area = 1d-1 ! default area threshold is 0
 job_params%thresh_energy = 1d-4 ! default energy threshold 1d-4
 job_params%export_beam = .false. ! default is do not export the beam
 job_params%refl = 10 ! default is max 10 total internal reflections
+job_params%is_fast_diff = .false. ! default is no fast diffraction
 
 call print_command() ! print the command used to execute the program
 
@@ -810,9 +811,12 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             end if
 
         case ('-no2d')
-            ! print*,'found command line specifier "mt"'
             print*,'suppress 2d outputs: enabled'
             job_params%suppress_2d = .true.
+
+        case ('-fast_diff')
+            print*,'fast diffraction: enabled'
+            job_params%is_fast_diff = .true.
 
         case ('-tri')
             ! print*,'found command line specifier "mt"'
@@ -1089,6 +1093,8 @@ end if
 ! if cfn given and cft given (or guessed), set particle input method to read
 if (found_cft .and. found_cfn) c_method = "read"
 
+if(rot_method(1:len(trim(rot_method))) .ne. 'multi' .and. job_params%is_fast_diff) print*,'warning, fast diffraction is not recommended for fixed orientation computations'
+
 job_params%cfn = cfn
 job_params%cft = cft
 job_params%afn = afn
@@ -1138,6 +1144,7 @@ print*,'multithreading: ',job_params%is_multithreaded
 print*,'logging level: ',job_params%debug,'/ 3'
 print*,'extra timings: ',job_params%timing
 print*,'automatic triangulation: ',job_params%tri
+print*,'fast diffraction',job_params%is_fast_diff
 if(found_cfn) print*,'particle filename: ',job_params%cfn
 if(found_cft) print*,'particle filetype: ',job_params%cft
 

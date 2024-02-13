@@ -329,10 +329,11 @@ module diff_mod
     
     end subroutine
     
-    subroutine contour_integral(lambda,area_facs2,rot1,rot2,v0,prop2,x3,y3,z3)
+    subroutine contour_integral(lambda,area_facs2,rot1,rot2,v0,prop2,x3,y3,z3,is_in_fov)
     
         ! computes the area factor aka scalar fraunhofer diffraction pattern using contour integral method
     
+    logical, dimension(:,:), allocatable, intent(in) :: is_in_fov
     real(8), intent(in) :: lambda ! wavelength
     complex(8), dimension(:,:), allocatable, intent(inout) :: area_facs2
     real(8) bin_vec_size_k ! distance to far-field bins - important for accurate phase
@@ -390,13 +391,14 @@ module diff_mod
     
     do i2 = 1, size(x3,2)
         do i1 = 1, size(x3,1)
-            bin_vec_size_ks(i2,i1) = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
-            kxxs(i2,i1) = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_ks(i2,i1) ! kx' in derivation
-            kyys(i2,i1) = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_ks(i2,i1) ! ky' in derivation
+            if(is_in_fov(i1,i2)) then
+                bin_vec_size_ks(i2,i1) = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
+                kxxs(i2,i1) = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_ks(i2,i1) ! kx' in derivation
+                kyys(i2,i1) = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_ks(i2,i1) ! ky' in derivation
 
-            if (abs(kxxs(i2,i1)) .lt. 1e-6) kxxs(i2,i1) = 1e-6
-            if (abs(kyys(i2,i1)) .lt. 1e-6) kyys(i2,i1) = 1e-6
-
+                if (abs(kxxs(i2,i1)) .lt. 1e-6) kxxs(i2,i1) = 1e-6
+                if (abs(kyys(i2,i1)) .lt. 1e-6) kyys(i2,i1) = 1e-6
+            end if
         end do
     end do
 
@@ -426,31 +428,31 @@ module diff_mod
 
         do i2 = 1, size(x3,2)
             do i1 = 1, size(x3,1)
+                if(is_in_fov(i1,i2)) then
+                    ! 11/7/23 reduced number of flops here with some simplification and saving of values
 
-                ! 11/7/23 reduced number of flops here with some simplification and saving of values
+                    ! bin_vec_size_k = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
+                    bin_vec_size_k = bin_vec_size_ks(i2,i1) ! distance in k-space to far-field bin
+                    ! kxx = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_k ! kx' in derivation
+                    ! kyy = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_k ! ky' in derivation
 
-                ! bin_vec_size_k = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
-                bin_vec_size_k = bin_vec_size_ks(i2,i1) ! distance in k-space to far-field bin
-                ! kxx = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_k ! kx' in derivation
-                ! kyy = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_k ! ky' in derivation
+                    kxx = kxxs(i2,i1) ! kx' in derivation
+                    kyy = kyys(i2,i1) ! ky' in derivation
 
-                kxx = kxxs(i2,i1) ! kx' in derivation
-                kyy = kyys(i2,i1) ! ky' in derivation
+                    delta = kxx*xj+kyy*yj
+                    delta1 = kyy*mj+kxx
+                    delta2 = kxx*nj+kyy
+                    omega1 = dx*delta1
+                    omega2 = dy*delta2
 
-                delta = kxx*xj+kyy*yj
-                delta1 = kyy*mj+kxx
-                delta2 = kxx*nj+kyy
-                omega1 = dx*delta1
-                omega2 = dy*delta2
+                    alpha = 1/(2*kyy*delta1) ! denominator in p summand
+                    beta =  1/(2*kxx*delta2) ! denominator in q summand
 
-                alpha = 1/(2*kyy*delta1) ! denominator in p summand
-                beta =  1/(2*kxx*delta2) ! denominator in q summand
+                    sumim = +alpha*(cos(delta)-cos(delta+omega1)) - beta*(cos(delta)-cos(delta+omega2))
+                    sumre = -alpha*(sin(delta)-sin(delta+omega1)) + beta*(sin(delta)-sin(delta+omega2))
 
-                sumim = +alpha*(cos(delta)-cos(delta+omega1)) - beta*(cos(delta)-cos(delta+omega2))
-                sumre = -alpha*(sin(delta)-sin(delta+omega1)) + beta*(sin(delta)-sin(delta+omega2))
-
-                area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k),8) * cmplx(sumre,sumim,8) / lambda
-
+                    area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k),8) * cmplx(sumre,sumim,8) / lambda
+                end if
             end do
         end do
 
@@ -486,7 +488,9 @@ module diff_mod
                             lambda,     & ! wavelength
                             amplC,      & ! the far-field diffraction amplitude matrix to be calculated
                             phi_vals,   & ! phi values
-                            theta_vals)   ! theta values
+                            theta_vals, & ! theta values
+                            fov,        &
+                            job_params)
     
         ! main diffraction subroutine
         ! takes in a few arguments and outputs the far-field scattering pattern
@@ -500,6 +504,8 @@ module diff_mod
     complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: amplC
     real(8), dimension(:), allocatable, intent(in) :: phi_vals
     real(8), dimension(:), allocatable, intent(in) :: theta_vals
+    real(8), intent(in) :: fov
+    type(job_parameters_type), intent(in) :: job_params
 
     complex(8), dimension(:,:), allocatable :: area_facs2
     real(8) diff_ampl(1:2,1:2)
@@ -529,10 +535,19 @@ module diff_mod
     real(8), dimension(:), allocatable :: my_phi_vals ! phi values in aperture system for this aperture only
     logical success
     integer theta_i
+    logical, dimension(:,:), allocatable :: is_in_fov ! whether or not each far-field bin is inside the field of view
+    real(8) vec(1:3)
+    real(8) cos_fov
 
     allocate(my_phi_vals(1:size(phi_vals,1)))
     allocate(area_facs2(1:size(xfar,1),1:size(xfar,2)))
-    
+    allocate(is_in_fov(1:size(xfar,1),1:size(xfar,2)))
+
+    is_in_fov = .true. ! init
+    amplC = 0d0 ! init
+
+    cos_fov = cos(fov)
+
     ! flip vertex order to make normals face the other way (bit of a bodge) to do: find a way to remove this
     call flip_vert_lr(v)
 
@@ -594,50 +609,60 @@ module diff_mod
         end if
     end do
 
+    if(job_params%is_fast_diff) then ! according to Jackson, most of the energy is confined to the region lambda/d
+        do i = 1, size(xfar,1)
+            do j = 1, size(xfar,2)
+                vec(:) = (/x3(i,j),y3(i,j),z3(i,j)/) / sqrt(x3(i,j)**2 + y3(i,j)**2 + z3(i,j)**2) ! unit vector to far-field bin
+                if(dot_product(vec,prop2) < cos_fov) is_in_fov(i,j) = .false. ! if dot product is less than threshold, bin is outside fov
+            end do
+        end do
+    end if
+
     do i = 1, size(xfar,1)
         do j = 1, size(xfar,2)
+            if(is_in_fov(i,j)) then
 
-            phi = phi_vals(i)
+                phi = phi_vals(i)
 
-            ! karczewski theory
-            call karczewski(diff_ampl,m,k,prop2,x3(i,j), y3(i,j),z3(i,j))
+                ! karczewski theory
+                call karczewski(diff_ampl,m,k,prop2,x3(i,j), y3(i,j),z3(i,j))
 
-            ! get the vector perpendicular to the scattering plane as viewed in the aperture system
-            if(abs(dot_product(incidence2,k)) .lt. 0.999) then ! if bin is not in direct forwards
-                call cross(incidence2,k,hc)
-            else ! rotate vector perp to scattering plane (y-z) into aperture system
-                my_k = (/x3(i,theta_i),y3(i,theta_i),z3(i,theta_i)/)/sqrt(x3(i,theta_i)**2 + y3(i,theta_i)**2 + z3(i,theta_i)**2)
-                call cross(incidence2,my_k,hc)
+                ! get the vector perpendicular to the scattering plane as viewed in the aperture system
+                if(abs(dot_product(incidence2,k)) .lt. 0.999) then ! if bin is not in direct forwards
+                    call cross(incidence2,k,hc)
+                else ! rotate vector perp to scattering plane (y-z) into aperture system
+                    my_k = (/x3(i,theta_i),y3(i,theta_i),z3(i,theta_i)/)/sqrt(x3(i,theta_i)**2 + y3(i,theta_i)**2 + z3(i,theta_i)**2)
+                    call cross(incidence2,my_k,hc)
+                end if
+
+                call cross(k,m,evo2)
+
+                ! make rotation matrix to rotate from KW plane to scattering plane
+                rot4(1,1) = dot_product(hc,m)
+                rot4(2,2) = dot_product(hc,m)
+                rot4(1,2) = -dot_product(hc,evo2)
+                rot4(2,1) = +dot_product(hc,evo2)          
+
+                ! get rotation matrix to rotate from incidence plane (x-y) about incidence direction to scattering plane
+                temp_vec3 = (/cos(phi),sin(phi),0d0/)
+                call getRotationMatrix(temp_rot1,-temp_vec3(2),temp_vec3(1),0d0,1d0,0d0,0d0,0d0,0d0,-1d0)
+
+                ! bodge (rotation was wrong way)
+                temp_rot1 = transpose(temp_rot1)
+
+                ! apply rotation matrices
+                ampl_temp2 = matmul(rot4,matmul(diff_ampl,matmul(ampl,temp_rot1)))
+
+                amplC(i,j,1,1) = ampl_temp2(1,1)
+                amplC(i,j,1,2) = ampl_temp2(1,2)
+                amplC(i,j,2,1) = ampl_temp2(2,1)
+                amplC(i,j,2,2) = ampl_temp2(2,2)
             end if
-
-            call cross(k,m,evo2)
-
-            ! make rotation matrix to rotate from KW plane to scattering plane
-            rot4(1,1) = dot_product(hc,m)
-            rot4(2,2) = dot_product(hc,m)
-            rot4(1,2) = -dot_product(hc,evo2)
-            rot4(2,1) = +dot_product(hc,evo2)          
-
-            ! get rotation matrix to rotate from incidence plane (x-y) about incidence direction to scattering plane
-            temp_vec3 = (/cos(phi),sin(phi),0d0/)
-            call getRotationMatrix(temp_rot1,-temp_vec3(2),temp_vec3(1),0d0,1d0,0d0,0d0,0d0,0d0,-1d0)
-
-            ! bodge (rotation was wrong way)
-            temp_rot1 = transpose(temp_rot1)
-
-            ! apply rotation matrices
-            ampl_temp2 = matmul(rot4,matmul(diff_ampl,matmul(ampl,temp_rot1)))
-
-            amplC(i,j,1,1) = ampl_temp2(1,1)
-            amplC(i,j,1,2) = ampl_temp2(1,2)
-            amplC(i,j,2,1) = ampl_temp2(2,1)
-            amplC(i,j,2,2) = ampl_temp2(2,2)
-
         end do
     end do
 
     ! scalar fraunhofer integral, output contained in area_facs2
-    call contour_integral(lambda,area_facs2,rot,rot2,v0,prop2,x3,y3,z3)
+    call contour_integral(lambda,area_facs2,rot,rot2,v0,prop2,x3,y3,z3,is_in_fov)
 
     amplC(:,:,1,1) = amplC(:,:,1,1) * area_facs2(:,:)
     amplC(:,:,1,2) = amplC(:,:,1,2) * area_facs2(:,:)
@@ -678,6 +703,7 @@ module diff_mod
     real work_done
     integer progressInt
     integer(8) num_threads
+    real(8) fov
 
     if(job_params%timing) then
         start = omp_get_wtime()
@@ -735,9 +761,10 @@ module diff_mod
         perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
         prop0(1:3) = beam_outbeam_tree(j)%prop_out(1:3)
         v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
+        fov = beam_outbeam_tree(j)%fov
     
         ! get far-field contribution from this outbeam
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals)                                 
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params)                                 
 
         !$OMP CRITICAL
         ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) + amplC(:,:,:,:)
@@ -777,8 +804,9 @@ module diff_mod
         perp0(1:3) = ext_diff_outbeam_tree(j)%vk7(1:3)
         prop0(1:3) = ext_diff_outbeam_tree(j)%prop_out(1:3)
         v(1:3,1:3) = ext_diff_outbeam_tree(j)%verts(1:3,1:3)
+        fov = pi/2
     
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals)
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params)
 
         !$OMP CRITICAL
         ampl_far_ext_diff(:,:,:,:) = ampl_far_ext_diff(:,:,:,:) + amplC(:,:,:,:)
