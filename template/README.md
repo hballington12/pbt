@@ -49,4 +49,5 @@ This directory contains various template files you may wish to use for running t
 -debug 3 # set debugging level (0-3)
 -export_beam rec 2 # export beams in json format up to and including the 2nd recursion
 -export_beam num 50 # export beams in json format up to the 50th beam
+-fast_diff # enable faster (but less accurate) diffraction
 ```

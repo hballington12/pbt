@@ -114,6 +114,8 @@ Main source file. It contains the program entry point. The PBT reads input param
 
     - `rec <value> [<value>]` - exports by recursion number. If 1 value is given, the beam tree is exported from the first recursion to the recursion specified by the value. If 2 values are given, the beam tree is exported from the recursion specified by the first value to the recursion specified by the second value.
 
+- `-fast_diff` - enables an approximate but faster diffraction method. According to Jackson, Classical Electrodynamics Sec 10.5, most of the diffracted energy is confined within the angle $\lambda/d$, where $d$ is a linear dimension of the aperture. If this flag is enabled, any far-field bins outside an angle of $8\lambda/d$ are excluded from the diffraction calculation, for a given outgoing beam. This flag also restricts the external diffraction to the forwards scattering.
+
  ## Examples
 
  `abt -lambda 0.532 -rbi 1.3117 -ibi 0 -rec 10 -rot euler 20 35 2 -cmethod read -cft obj -cfn my_particle.obj -afn my_apertures.dat -mt -theta 0 1 180 -phi 0 2 360` - run `abt` executable with wavelength 0.532, refractive index 1.3117 + 0i, 10 beam recursions, particle rotated with euler angles 20, 35, read the particle with particle file type `.obj`, filename `my_particle.obj`, apertures specified in the file `my_apertures.dat`, with multithreading enabled. Evaluate the far-field at polar angle 0 in 1 degree steps to 180 and at azithmual angle 0 in 2 degree steps to 360.

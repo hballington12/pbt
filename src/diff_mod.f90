@@ -57,118 +57,67 @@ module diff_mod
         sin_rot = w2/help1
       end subroutine random_rotation
 
-    subroutine transform_bins2(x,y,z,com,rot,x3,y3,z3)
+    subroutine translate_far_field_bins(x,y,z,com,x1,y1,z1)
     
         ! translates and rotates bins to aperture system (loop method)
     
     real(8), dimension(:,:), allocatable, intent(in) :: x, y, z ! far-field bin positions
     real(8), intent(in) :: com(1:3) ! aperture centre of mass
-    real(8), intent(in) :: rot(1:3,1:3) ! update to new rotation matrix which aligns with incidence
-    real(8), dimension(:,:), allocatable, intent(out) :: x3, y3, z3 ! far-field bin positions
     
-    real(8), dimension(:,:), allocatable :: x1, y1, z1 ! far-field bin positions after translation to new com
+    real(8), dimension(:,:), allocatable, intent(out) :: x1, y1, z1 ! far-field bin positions after translation to new com
     
     integer i, j
-    
-    ! ===== start transform bins =====
-    
+        
     ! allocate translated far-field bins
     allocate(x1(1:size(x,1),1:size(x,2)))
     allocate(y1(1:size(x,1),1:size(x,2)))
     allocate(z1(1:size(x,1),1:size(x,2)))
+
+    ! translate far-field bins to new com
+    do j = 1, size(x,2)
+        do i = 1, size(x,1)
+            x1(i,j) = x(i,j) - com(1)
+            y1(i,j) = y(i,j) - com(2)
+            z1(i,j) = z(i,j) - com(3)
+        end do
+    end do
+    end subroutine
+
+    subroutine rotate_far_field_bins(x,y,z,rot,x3,y3,z3,mapping,mapping2)
+    
+        ! translates and rotates bins to aperture system (loop method)
+    
+    real(8), dimension(:,:), allocatable, intent(in) :: x, y, z ! far-field bin positions
+    real(8), intent(in) :: rot(1:3,1:3) ! update to new rotation matrix which aligns with incidence
+    real(8), dimension(:,:), allocatable, intent(out) :: x3, y3, z3 ! far-field bin positions
+    integer(8), dimension(:,:), allocatable, intent(in) :: mapping
+    integer(8), dimension(:), allocatable, intent(in) :: mapping2
+
+    integer(8) i, j, ii
+    
     ! allocate arrays to hold reshaped, rotated arrays
     allocate(x3(1:size(x,1),1:size(x,2)))
     allocate(y3(1:size(x,1),1:size(x,2)))
     allocate(z3(1:size(x,1),1:size(x,2)))
     
-    ! translate far-field bins to new com
-    x1 = x - com(1)
-    y1 = y - com(2)
-    z1 = z - com(3)
-    
     ! rotate
-    do i = 1, size(x,1)
-        do j = 1, size(x,2)
-            x3(i,j) = rot(1,1)*x1(i,j) + rot(1,2)*y1(i,j) + rot(1,3)*z1(i,j)
-            y3(i,j) = rot(2,1)*x1(i,j) + rot(2,2)*y1(i,j) + rot(2,3)*z1(i,j)
-            z3(i,j) = rot(3,1)*x1(i,j) + rot(3,2)*y1(i,j) + rot(3,3)*z1(i,j)
+    do j = 1, size(x,2)
+        do ii = 1, mapping2(j)
+        i = mapping(ii,j)
+            x3(i,j) = rot(1,1)*x(i,j) + rot(1,2)*y(i,j) + rot(1,3)*z(i,j)
+            y3(i,j) = rot(2,1)*x(i,j) + rot(2,2)*y(i,j) + rot(2,3)*z(i,j)
+            z3(i,j) = rot(3,1)*x(i,j) + rot(3,2)*y(i,j) + rot(3,3)*z(i,j)
         end do
     end do
     
     end subroutine
     
-    subroutine transform_bins(x,y,z,com,rot,x3,y3,z3)
-    
-        ! translates and rotates bins to aperture system (matmul method)
-        ! unused
-    
-    real(8), dimension(:,:), allocatable, intent(in) :: x, y, z ! far-field bin positions
-    real(8), intent(in) :: com(1:3) ! aperture centre of mass
-    real(8), intent(in) :: rot(1:3,1:3) ! update to new rotation matrix which aligns with incidence
-    real(8), dimension(:,:), allocatable, intent(out) :: x3, y3, z3 ! far-field bin positions
-    
-    real(8), dimension(:,:), allocatable :: x1, y1, z1 ! far-field bin positions after translation to new com
-    real(8), dimension(:), allocatable :: x2, y2, z2
-    real(8), dimension(:,:), allocatable :: binvecs
-    real(8), dimension(:,:), allocatable :: rotbinvecs
-    
-    integer i
-    
-    ! ===== start transform bins =====
-    
-    ! allocate translated far-field bins
-    allocate(x1(1:size(x,1),1:size(x,2)))
-    allocate(y1(1:size(x,1),1:size(x,2)))
-    allocate(z1(1:size(x,1),1:size(x,2)))
-    
-    ! translate far-field bins to new com
-    x1 = x - com(1)
-    y1 = y - com(2)
-    z1 = z - com(3)
-    
-    ! allocate arrays to hold reshaped arrays, ready for rotating
-    allocate(x2(1:size(x1,1)*size(x1,2)))
-    allocate(y2(1:size(x1,1)*size(x1,2)))
-    allocate(z2(1:size(x1,1)*size(x1,2)))
-    
-    ! reshape for rotating
-    x2 = reshape(x1,shape(x2))
-    y2 = reshape(y1,shape(y2))
-    z2 = reshape(z1,shape(z2))
-    
-    ! allocate bin vectors array
-    allocate(binvecs(1:3,1:size(x2)))
-    
-    ! stitch together for matrix multiplication
-    do i = 1, size(x2)
-        binvecs(1,i) = x2(i)
-        binvecs(2,i) = y2(i)
-        binvecs(3,i) = z2(i)
-    end do
-    
-    ! allocate rotated bin vectors array
-    allocate(rotbinvecs(1:3,1:size(x2)))
-    
-    ! rotate
-    rotbinvecs = matmul(rot,binvecs)
-    
-    ! allocate arrays to hold reshaped, rotated arrays
-    allocate(x3(1:size(x,1),1:size(x,2)))
-    allocate(y3(1:size(x,1),1:size(x,2)))
-    allocate(z3(1:size(x,1),1:size(x,2)))
-    
-    x3 = reshape(rotbinvecs(1,1:size(rotbinvecs,2)),shape(x3))
-    y3 = reshape(rotbinvecs(2,1:size(rotbinvecs,2)),shape(x3))
-    z3 = reshape(rotbinvecs(3,1:size(rotbinvecs,2)),shape(x3))
-    
-    end subroutine
-    
-    
     subroutine karczewski(  diff_ampl, & ! polarisation matrix
                             m, & ! KW perp field vector
                             k, & ! KW par field vector
                             prop2, & ! outgoing propagation direction in aperture system
-                            x3, y3, z3) ! x, y, z coordinate of far-field bin
+                            x3, y3, z3, & ! x, y, z coordinate of far-field bin
+                            r) ! distance to bin vector
         
         ! sr karczewski computes the diff ampl matrix for polarisation of far-field diffraction at a far-field bin
         ! to do: add a debug mode with the numerical checks found in matlab code
@@ -178,12 +127,13 @@ module diff_mod
     real(8), intent(out) :: k(1:3)
     real(8), intent(in) :: prop2(1:3)
     real(8), intent(in) :: x3, y3, z3 ! far-field bin positions
+    real(8), intent(in) :: r ! distance to bin vector
     real(8) bin_vec_size ! far-field bin distances
     real(8) big_kx, big_ky, big_kz ! outward propagation vector in aperture system
     real(8) frac
     real(8) a1m, b2m, a1e, b2e, b1m, a2e, a1em, a2em, b1em, b2em
     
-    bin_vec_size = sqrt(x3**2 + y3**2 + z3**2) ! distance to each far-field bin
+    bin_vec_size = r ! distance to each far-field bin
 
     k(1) = x3/bin_vec_size ! propagation vector components for each bin vector in aperture system
     k(2) = y3/bin_vec_size
@@ -329,11 +279,12 @@ module diff_mod
     
     end subroutine
     
-    subroutine contour_integral(lambda,area_facs2,rot1,rot2,v0,prop2,x3,y3,z3,is_in_fov)
+    subroutine contour_integral(lambda,area_facs2,rot1,rot2,v0,prop2,x3,y3,z3,mapping,mapping2)
     
         ! computes the area factor aka scalar fraunhofer diffraction pattern using contour integral method
     
-    logical, dimension(:,:), allocatable, intent(in) :: is_in_fov
+    integer(8), dimension(:,:), allocatable, intent(in) :: mapping
+    integer(8), dimension(:), allocatable, intent(in) :: mapping2
     real(8), intent(in) :: lambda ! wavelength
     complex(8), dimension(:,:), allocatable, intent(inout) :: area_facs2
     real(8) bin_vec_size_k ! distance to far-field bins - important for accurate phase
@@ -344,7 +295,7 @@ module diff_mod
     real(8), intent(in) :: rot2(1:3,1:3) ! rotation matrix (about x-axis)
     real(8) rot(1:3,1:3) ! update to new rotation matrix which aligns with incidence
     real(8) v1(1:3,1:3) ! vertices of facet after rotating
-    integer j, i1, i2
+    integer(8) j, i1, i2, ii
     real(8), dimension(:,:), allocatable, intent(in) :: x3, y3, z3
     real(8), dimension(:,:), allocatable :: kxxs, kyys, bin_vec_size_ks
     real(8), intent(in) :: prop2(1:3)
@@ -390,15 +341,14 @@ module diff_mod
     area_facs2 = 0
     
     do i2 = 1, size(x3,2)
-        do i1 = 1, size(x3,1)
-            if(is_in_fov(i1,i2)) then
-                bin_vec_size_ks(i2,i1) = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
-                kxxs(i2,i1) = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_ks(i2,i1) ! kx' in derivation
-                kyys(i2,i1) = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_ks(i2,i1) ! ky' in derivation
+        do ii = 1, mapping2(i2) ! looping over the number of phi values to evaluate at, for this theta
+            i1 = mapping(ii,i2)
+            bin_vec_size_ks(i2,i1) = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
+            kxxs(i2,i1) = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_ks(i2,i1) ! kx' in derivation
+            kyys(i2,i1) = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_ks(i2,i1) ! ky' in derivation
 
-                if (abs(kxxs(i2,i1)) .lt. 1e-6) kxxs(i2,i1) = 1e-6
-                if (abs(kyys(i2,i1)) .lt. 1e-6) kyys(i2,i1) = 1e-6
-            end if
+            if (abs(kxxs(i2,i1)) .lt. 1e-6) kxxs(i2,i1) = 1e-6
+            if (abs(kyys(i2,i1)) .lt. 1e-6) kyys(i2,i1) = 1e-6
         end do
     end do
 
@@ -427,32 +377,31 @@ module diff_mod
         dy = yj_plus1 - yj
 
         do i2 = 1, size(x3,2)
-            do i1 = 1, size(x3,1)
-                if(is_in_fov(i1,i2)) then
-                    ! 11/7/23 reduced number of flops here with some simplification and saving of values
+            do ii = 1, mapping2(i2) ! looping over the number of phi values to evaluate at, for this theta
+                i1 = mapping(ii,i2)
+                ! 11/7/23 reduced number of flops here with some simplification and saving of values
 
-                    ! bin_vec_size_k = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
-                    bin_vec_size_k = bin_vec_size_ks(i2,i1) ! distance in k-space to far-field bin
-                    ! kxx = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_k ! kx' in derivation
-                    ! kyy = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_k ! ky' in derivation
+                ! bin_vec_size_k = waveno*sqrt(x3(i1,i2)**2 + y3(i1,i2)**2 + z3(i1,i2)**2) ! distance in k-space to far-field bin
+                bin_vec_size_k = bin_vec_size_ks(i2,i1) ! distance in k-space to far-field bin
+                ! kxx = kinc(1) - waveno*waveno*x3(i1,i2)/bin_vec_size_k ! kx' in derivation
+                ! kyy = kinc(2) - waveno*waveno*y3(i1,i2)/bin_vec_size_k ! ky' in derivation
 
-                    kxx = kxxs(i2,i1) ! kx' in derivation
-                    kyy = kyys(i2,i1) ! ky' in derivation
+                kxx = kxxs(i2,i1) ! kx' in derivation
+                kyy = kyys(i2,i1) ! ky' in derivation
 
-                    delta = kxx*xj+kyy*yj
-                    delta1 = kyy*mj+kxx
-                    delta2 = kxx*nj+kyy
-                    omega1 = dx*delta1
-                    omega2 = dy*delta2
+                delta = kxx*xj+kyy*yj
+                delta1 = kyy*mj+kxx
+                delta2 = kxx*nj+kyy
+                omega1 = dx*delta1
+                omega2 = dy*delta2
 
-                    alpha = 1/(2*kyy*delta1) ! denominator in p summand
-                    beta =  1/(2*kxx*delta2) ! denominator in q summand
+                alpha = 1/(2*kyy*delta1) ! denominator in p summand
+                beta =  1/(2*kxx*delta2) ! denominator in q summand
 
-                    sumim = +alpha*(cos(delta)-cos(delta+omega1)) - beta*(cos(delta)-cos(delta+omega2))
-                    sumre = -alpha*(sin(delta)-sin(delta+omega1)) + beta*(sin(delta)-sin(delta+omega2))
+                sumim = +alpha*(cos(delta)-cos(delta+omega1)) - beta*(cos(delta)-cos(delta+omega2))
+                sumre = -alpha*(sin(delta)-sin(delta+omega1)) + beta*(sin(delta)-sin(delta+omega2))
 
-                    area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k),8) * cmplx(sumre,sumim,8) / lambda
-                end if
+                area_facs2(i1,i2) = area_facs2(i1,i2) + cmplx(cos(bin_vec_size_k),sin(bin_vec_size_k),8) * cmplx(sumre,sumim,8) / lambda
             end do
         end do
 
@@ -518,7 +467,7 @@ module diff_mod
     real(8) hc(1:3)
     real(8) evo2(1:3)
     real(8) rot4(1:2,1:2)
-    integer i, j
+    integer(8) i, j, ii
     real(8) temp_rot1(1:2,1:2) 
     real(8) temp_vec3(1:3)
     complex(8) ampl_temp2(1:2,1:2)
@@ -527,25 +476,33 @@ module diff_mod
     real(8) prop1(1:3), perp1(1:3)
     real(8) angle
     real(8) prop2(1:3), perp2(1:3), e_par2(1:3)
-    real(8), dimension(:,:), allocatable:: x3, y3, z3 ! far-field bin positions
+    real(8), dimension(:,:), allocatable:: x3, y3, z3 ! translated, rotated far-field bin positions
+    real(8), dimension(:,:), allocatable:: x1, y1, z1 ! translated, unrotated far-field bin positions
     ! real(8) cos_rot, sin_rot
     ! real(8) bin_vec_size ! distance to far-field bins - important for accurate phase
     real(8) phi
     real(8) my_k(1:3)
     real(8), dimension(:), allocatable :: my_phi_vals ! phi values in aperture system for this aperture only
     logical success
-    integer theta_i
+    integer(8) theta_i
     logical, dimension(:,:), allocatable :: is_in_fov ! whether or not each far-field bin is inside the field of view
     real(8) vec(1:3)
     real(8) cos_fov
+    integer(8), dimension(:,:), allocatable :: mapping ! maps theta and phi index
+    integer(8), dimension(:), allocatable :: mapping2 ! number of phi values at each theta value
+    real(8), dimension(:,:), allocatable :: r1 ! far-field bin distances
 
     allocate(my_phi_vals(1:size(phi_vals,1)))
     allocate(area_facs2(1:size(xfar,1),1:size(xfar,2)))
     allocate(is_in_fov(1:size(xfar,1),1:size(xfar,2)))
+    allocate(mapping(1:size(xfar,1),1:size(xfar,2)))
+    allocate(mapping2(1:size(xfar,2)))
+    allocate(r1(1:size(xfar,1),1:size(xfar,2)))
 
-    is_in_fov = .true. ! init
-    amplC = 0d0 ! init
-
+    is_in_fov(:,:) = .true. ! init
+    amplC(:,:,:,:) = 0d0 ! init
+    mapping(:,:) = 0 ! init
+    mapping2(:) = 0 ! init
     cos_fov = cos(fov)
 
     ! flip vertex order to make normals face the other way (bit of a bodge) to do: find a way to remove this
@@ -594,8 +551,10 @@ module diff_mod
     incidence = (/0, 0, -1/) ! incident illumination)
     incidence2 = matmul(rot2,matmul(rot,incidence))
 
-    call transform_bins2(xfar,yfar,zfar,com,matmul(rot2,rot),x3,y3,z3)
-    
+    call translate_far_field_bins(xfar,yfar,zfar,com,x1,y1,z1)
+
+    r1(:,:) = sqrt(x1(:,:)**2 + y1(:,:)**2 + z1(:,:)**2) ! distance to each far-field bin
+
     ! bodge to fix numerical error for rot4 rotation matrix
     ! if incidence direction is almost parallel to bin vector, phi is not well defined
     ! therefore, get phi for the direct forwards direction from the phi values of the closest bin with theta value greater than 1
@@ -612,20 +571,37 @@ module diff_mod
     if(job_params%is_fast_diff) then ! according to Jackson, most of the energy is confined to the region lambda/d
         do i = 1, size(xfar,1)
             do j = 1, size(xfar,2)
-                vec(:) = (/x3(i,j),y3(i,j),z3(i,j)/) / sqrt(x3(i,j)**2 + y3(i,j)**2 + z3(i,j)**2) ! unit vector to far-field bin
-                if(dot_product(vec,prop2) < cos_fov) is_in_fov(i,j) = .false. ! if dot product is less than threshold, bin is outside fov
+                vec(:) = (/x1(i,j),y1(i,j),z1(i,j)/) / r1(i,j) ! unit vector to far-field bin
+                if(dot_product(vec,prop0) < cos_fov .and. j /= theta_i) then ! if in field of view, and not needed for numerical fix
+                    is_in_fov(i,j) = .false. ! if dot product is less than threshold, bin is outside fov
+                end if
             end do
         end do
     end if
 
-    do i = 1, size(xfar,1)
-        do j = 1, size(xfar,2)
-            if(is_in_fov(i,j)) then
+    ! create mapping, to allow for vectorisation
+    mapping2(:) = 0 ! init
+    do j = 1, size(xfar,2) ! looping over theta
+        ii = 0 ! reset counter for each value of theta
+        do i = 1, size(xfar,1) ! looping over values of phi
+            if(is_in_fov(i,j)) then ! if far-field is to be evaluated
+                ii = ii + 1 ! update number of phi values to evaluate at, for this theta
+                mapping(ii,j) = i ! save the position of this phi value
+            end if
+        end do ! end: looping over values of phi
+        mapping2(j) = ii ! save the number of phi values to evaluate at
+    end do
 
-                phi = phi_vals(i)
+    call rotate_far_field_bins(x1,y1,z1,matmul(rot2,rot),x3,y3,z3,mapping,mapping2)
+
+    do j = 1, size(xfar,2) ! looping over theta
+        do ii = 1, mapping2(j) ! looping over the number of phi values to evaluate at, for this theta
+            i = mapping(ii,j) ! get the position of this phi value in the main arrays, and continue as normal
+
+                phi = phi_vals(i) 
 
                 ! karczewski theory
-                call karczewski(diff_ampl,m,k,prop2,x3(i,j), y3(i,j),z3(i,j))
+                call karczewski(diff_ampl,m,k,prop2,x3(i,j), y3(i,j),z3(i,j),r1(i,j))
 
                 ! get the vector perpendicular to the scattering plane as viewed in the aperture system
                 if(abs(dot_product(incidence2,k)) .lt. 0.999) then ! if bin is not in direct forwards
@@ -657,17 +633,20 @@ module diff_mod
                 amplC(i,j,1,2) = ampl_temp2(1,2)
                 amplC(i,j,2,1) = ampl_temp2(2,1)
                 amplC(i,j,2,2) = ampl_temp2(2,2)
-            end if
         end do
     end do
 
     ! scalar fraunhofer integral, output contained in area_facs2
-    call contour_integral(lambda,area_facs2,rot,rot2,v0,prop2,x3,y3,z3,is_in_fov)
-
-    amplC(:,:,1,1) = amplC(:,:,1,1) * area_facs2(:,:)
-    amplC(:,:,1,2) = amplC(:,:,1,2) * area_facs2(:,:)
-    amplC(:,:,2,1) = amplC(:,:,2,1) * area_facs2(:,:)
-    amplC(:,:,2,2) = amplC(:,:,2,2) * area_facs2(:,:)
+    call contour_integral(lambda,area_facs2,rot,rot2,v0,prop2,x3,y3,z3,mapping,mapping2)
+    do j = 1, size(xfar,2) ! looping over theta
+        do ii = 1, mapping2(j) ! looping over the number of phi values to evaluate at, for this theta
+            i = mapping(ii,j) ! get the position of this phi value in the main arrays, and continue as normal
+            amplC(i,j,1,1) = amplC(i,j,1,1) * area_facs2(i,j)
+            amplC(i,j,1,2) = amplC(i,j,1,2) * area_facs2(i,j)
+            amplC(i,j,2,1) = amplC(i,j,2,1) * area_facs2(i,j)
+            amplC(i,j,2,2) = amplC(i,j,2,2) * area_facs2(i,j)
+        end do
+    end do
 
     end subroutine
     
@@ -688,7 +667,7 @@ module diff_mod
     real(8), dimension(:,:), allocatable :: xfar, yfar, zfar ! far-field bin positions
     logical is_multithreaded
     type(job_parameters_type), intent(in) :: job_params
-    integer j
+    integer(8) j
     complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_beam
     complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_ext_diff
     complex(8), dimension(:,:,:,:), allocatable :: amplC ! summand
@@ -739,7 +718,7 @@ module diff_mod
         num_threads = 1
     end if
 
-    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC,ampl,perp0,prop0,v,start1,finish1)
+    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC,ampl,perp0,prop0,v,start1,finish1,fov)
     if(job_params%timing) then
         start1 = omp_get_wtime()
     end if
