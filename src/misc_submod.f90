@@ -13,6 +13,49 @@
         
         contains
 
+        subroutine print_output_params(output_parameters)
+
+        type(output_parameters_type), intent(in) :: output_parameters
+
+        print*,'======================================================'
+        print*,'geometric cross section:',output_parameters%geo_cross_sec
+        print*,'scattering cross section:',output_parameters%scatt
+        print*,'absorption cross section:',output_parameters%abs
+        print*,'extinction cross section:',output_parameters%ext
+        print*,'scattering efficiency:',output_parameters%scatt_eff
+        print*,'absorption efficiency:',output_parameters%abs_eff
+        print*,'extinction efficiency:',output_parameters%ext_eff    
+        print*,'asymmetry parameter:',output_parameters%albedo
+        print*,'single-scattering albedo:',output_parameters%albedo
+        print*,'back scatt. cross section:',output_parameters%back_scatt
+        print*,'======================================================'
+
+        end subroutine
+
+        subroutine write_geometry_info(geometry)
+
+        type(geometry_type), intent(in) :: geometry
+
+        write(101,*)'======================================================'
+        write(101,*)'=================GEOMETRY INFORMATION================='
+        write(101,*)'======================================================'
+
+        write(101,*)'number of parents: ',geometry%na
+        write(101,*)'number of vertices: ',geometry%nv
+        write(101,*)'number of faces: ',geometry%nf
+        write(101,*)'number of normals: ',geometry%nn
+        write(101,*)'max vertices per face:',maxval(geometry%f(:)%nv)
+        write(101,*)'total surface area: ',geometry%area
+        write(101,*)'min facet area: ',minval(geometry%f(:)%area)
+        write(101,*)'max facet area: ',maxval(geometry%f(:)%area)
+        write(101,*)'centre of mass: ',geometry%com(:)
+
+        write(101,*)'======================================================'
+        write(101,*)'======================================================'
+        write(101,*)'======================================================'
+
+        end subroutine
+
         subroutine move_geometry_to_origin(geometry)
 
         ! sr move_geometry_to_origin
@@ -334,7 +377,9 @@
             character(len=32) cache_id_string
             character(len=255) line
             real(8) junk
-            
+
+            print*,'attempting to resume job using cache #',job_params%cache_id
+
             cache_id = job_params%cache_id
             
             if(cache_id .eq. -1) then
@@ -571,82 +616,138 @@
             
         end subroutine
         
-        subroutine write_job_params(job_params)
+        subroutine print_job_params(job_params)
             
-            character(100) cfn ! crystal filename
-            character(100) cft ! crystal file type
-            character(100) afn ! apertures filename
-            real(8) la ! wavelength
-            real(8) rbi ! real part of the refractive index
-            real(8) ibi ! imaginary part of the refractive index
-            integer rec ! max number of internal beam recursions
-            character(100) rot_method ! rotation method
-            logical is_multithreaded ! whether or not code should use multithreading
-            integer num_orients ! number of orientations
-            logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
-            character(100) c_method ! method of particle file input
-            character(255) job_name ! name of job / output directory
-            type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
             type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
             
             integer i
             
-            cfn = job_params%cfn
-            cft = job_params%cft
-            afn = job_params%afn
-            la = job_params%la
-            rbi = job_params%rbi
-            ibi = job_params%ibi
-            rec = job_params%rec
-            rot_method = job_params%rot_method
-            is_multithreaded = job_params%is_multithreaded
-            num_orients = job_params%num_orients
-            intellirot = job_params%intellirot
-            c_method = job_params%c_method
-            job_name = job_params%job_name
-            cc_hex_params = job_params%cc_hex_params
-            
-            write(101,*)'======================================================'
-            write(101,*)'=====================JOB SETTINGS====================='
-            write(101,*)'======================================================'
-            write(101,*)'job_name:                      "',trim(job_name),'"'
-            write(101,*)'lambda:                      ',la
-            write(101,*)'refractive index real:      ',rbi
-            write(101,*)'refractive index imag:       ',ibi
-            write(101,*)'max beam recursions:',rec
-            write(101,*)'rotation method:               "',rot_method(1:len(trim(rot_method))),'"'
-            write(101,*)'no. of orientations:',num_orients
-            if (is_multithreaded) then
-                write(101,*)'multithreading:                ','enabled'
+            print*,'======================================================'
+            print*,'=====================JOB SETTINGS====================='
+            print*,'======================================================'
+            print*,'job_name: "',trim(job_params%job_name),'"'
+            print*,'lambda: ',job_params%la
+            print*,'refractive index real: ',job_params%rbi
+            print*,'refractive index imag: ',job_params%ibi
+            print*,'max beam recursions: ',job_params%rec
+            print*,'max total internal reflections: ',job_params%refl
+            print*,'rotation method: "',job_params%rot_method(1:len(trim(job_params%rot_method))),'"'
+            print*,'no. of orientations: ',job_params%num_orients
+            if (job_params%is_multithreaded) then
+                print*,'multithreading: ','enabled'
             else
-                write(101,*)'multithreading:                ','disabled'
+                print*,'multithreading: ','disabled'
             end if
-            write(101,*)'particle input method:         "',c_method(1:len(trim(c_method))),'"'
-            if (intellirot .and. num_orients .gt. 1) then
-                write(101,*)'multirot method:        intelligent'
-            else if (.not. intellirot .and. num_orients .gt. 1) then
-                write(101,*)'multirot method:        random'
+            print*,'particle input method:"',job_params%c_method(1:len(trim(job_params%c_method))),'"'
+            if(job_params%num_orients > 1) then
+                if (job_params%intellirot) then
+                    print*,'multirot method: intelligent'
+                    print*,'beta symmetry from',job_params%beta_lims(1),' to ',job_params%beta_lims(2)
+                    print*,'gamma symmetry from',job_params%gamma_lims(1),' to ',job_params%gamma_lims(2)
+                else
+                    print*,'multirot method: random'
+                end if
+                if(job_params%output_eulers) then
+                    print*,'output euler angles to file: enabled'
+                else
+                    print*,'output euler angles to file: disabled'
+                end if
+            else
+                if(job_params%rot_method(1:len(trim(job_params%rot_method))) .eq. "euler") then
+                    print*,'rotation method: euler'
+                    print*,'euler alpha: ',job_params%eulers(1)
+                    print*,'euler beta: ',job_params%eulers(2)
+                    print*,'euler gamma: ',job_params%eulers(3)
+                else if (job_params%rot_method(1:len(trim(job_params%rot_method))) .eq. "off") then
+                    print*,'rotation method: off'
+                    print*,'off setting 1: ',job_params%offs(1)
+                    print*,'off setting 2: ',job_params%offs(2)
+                else if (job_params%rot_method(1:len(trim(job_params%rot_method))) .eq. "none") then
+                    print*,'rotation method: none'
+                end if
             end if
-            if(c_method(1:len(trim(c_method))) .eq. "read") then ! if particle is to be read from file
-                write(101,*)'particle filename:             "',cfn(1:len(trim(cfn))),'"'
-                write(101,*)'particle file type:            "',cft(1:len(trim(cft))),'"'
-                write(101,*)'apertures filename:            "',afn(1:len(trim(afn))),'"'
-            else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
-                write(101,*)'gaussian random particle parameters...'
-                write(101,*)'L:                                ',cc_hex_params%l
-                write(101,*)'hexagon edge length:              ',cc_hex_params%hr
-                write(101,*)'no. facets per hex. edge: ',cc_hex_params%nfhr
-                write(101,*)'prism edge length:                ',cc_hex_params%pfl
-                write(101,*)'no. facets per prism edge:',cc_hex_params%nfpl
-                write(101,*)'no. rotations at p-b:     ',cc_hex_params%pher
-                write(101,*)'no. rotations at p-p:     ',cc_hex_params%pper
-                write(101,*)'no. roughness scales:     ',cc_hex_params%nscales
-                do i = 1, cc_hex_params%nscales
-                    write(101,'(A,I1,A,f16.8)')' corr. length ',i,':                ',cc_hex_params%cls(i)
-                    write(101,'(A,I1,A,f16.8)')' std. deviation ',i,':              ',cc_hex_params%sds(i)
+            if(job_params%c_method(1:len(trim(job_params%c_method))) .eq. "read") then ! if particle is to be read from file
+                print*,'particle filename: "',job_params%cfn(1:len(trim(job_params%cfn))),'"'
+                print*,'particle file type: "',job_params%cft(1:len(trim(job_params%cft))),'"'
+                print*,'apertures filename: "',job_params%afn(1:len(trim(job_params%afn))),'"'
+            else if(job_params%c_method(1:len(trim(job_params%c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
+                print*,'gaussian random particle parameters...'
+                print*,'1) L: ',job_params%cc_hex_params%l
+                print*,'2) hexagon edge length: ',job_params%cc_hex_params%hr
+                print*,'3) no. facets per hex. edge: ',job_params%cc_hex_params%nfhr
+                print*,'4) prism edge length: ',job_params%cc_hex_params%pfl
+                print*,'5) no. facets per prism edge:',job_params%cc_hex_params%nfpl
+                print*,'6) no. rotations at prism-basal intersections: ',job_params%cc_hex_params%pher
+                print*,'7) no. rotations at prism-prism intersections: ',job_params%cc_hex_params%pper
+                print*,'8) no. roughness scales: ',job_params%cc_hex_params%nscales
+                do i = 1, job_params%cc_hex_params%nscales
+                    print('(A,I1,A,f16.8)'),' correlation length ',i,': ',job_params%cc_hex_params%cls(i)
+                    print('(A,I1,A,f16.8)'),' standard deviation ',i,': ',job_params%cc_hex_params%sds(i)
                 end do
             end if
-            
+            if(job_params%suppress_2d) then
+                print*,'suppress 2d output: yes'
+            else
+                print*,'suppress 2d output: no'
+            end if
+            if(job_params%tri) then
+                print*,'automatic triangulation: enabled'
+                print*,'triangulation max edge length: ',job_params%tri_edge_length
+                print*,'triangulation roughness: ',job_params%tri_roughness
+            else
+                print*,'automatic triangulation: disabled'
+            end if
+            if(job_params%time_limit < 10000) then
+                print*,'time limit: ',job_params%time_limit,' hours'
+            else
+                print*,'time limit: none'
+            end if
+            if(job_params%resume) then
+                print*,'resuming a cached job: yes'
+                print*,'cache id: ',job_params%cache_id
+            else
+                print*,'resuming a cached job: no'
+            end if
+            if(job_params%scaling) then
+                print*,'diffraction energy scaling: enabled'
+            else
+                print*,'diffraction energy scaling: disabled'
+            end if
+            print*,'debugging level: ',job_params%debug
+            if(job_params%timing) then
+                print*,'timing: enabled'
+            else
+                print*,'timing: disabled'
+            end if
+            print*,'minimum area needed for new beam propagation: ',job_params%thresh_area
+            print*,'minumum energy needed for new beam propagation: ',job_params%thresh_energy
+            if(job_params%export_beam) then
+                print*,'beam exporting: enabled'
+                if(job_params%export_beam_rec) then
+                    print*,'export by recursion number'
+                    print*,'from recursion ',job_params%export_beam_lims(1),'to recursion ',job_params%export_beam_lims(2)
+                else
+                    print*,'export by beam number'
+                    print*,'from beam ',job_params%export_beam_lims(1),'to beam ',job_params%export_beam_lims(2)
+                end if
+            else
+                print*,'beam exporting: disabled'
+            end if
+            if(job_params%is_fast_diff) then
+                print*,'fast diffraction: enabled'
+            else
+                print*,'fast diffraction: disabled'
+            end if
+            print*,'output directory: "',trim(job_params%output_dir),'/"'
+            print*,'temporary files directory: "',trim(job_params%output_dir)//"/tmp/",'"'
+
+
+
+            print*,'======================================================'
+            print*,'======================================================'
+            print*,'======================================================'
+
+
         end subroutine
         
         subroutine write_outbins(output_dir,theta_vals,phi_vals)
@@ -729,9 +830,7 @@
             end if
             
             call StripSpaces(cwd_out)
-            
-            
-            
+                        
         end subroutine
         
         subroutine make_cache_dir(dir_path_in,cwd_out)
@@ -1077,7 +1176,7 @@
             real(8), dimension(:), allocatable :: faceAreas ! area of each facet
             real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
     
-
+            write(101,*)'calling triangulate with max edge length: ',max_edge_length
 
             ! allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
             allocate(apertures_temp(1:geometry%nf)) ! make an array to hold the input apertures
@@ -1223,9 +1322,9 @@
                 
             end do
             
-            print*,'finished triangulation'
-            print*,'total vertices: ',vert_counter_total
-            print*,'total faces: ',face_counter_total
+            ! print*,'finished triangulation'
+            ! print*,'total vertices: ',vert_counter_total
+            ! print*,'total faces: ',face_counter_total
             
             num_vert = vert_counter_total
             num_face = face_counter_total
@@ -1452,7 +1551,7 @@
             num_faces = geometry%nf
             
             print*,'writing rotated particle to file...'
-            print*,'file output is: "',trim(output_dir)//"/"//trim(filename),'"'
+            print*,'file output is: "',trim(output_dir)//"/"//trim(filename),'*"'
     
             ! write to wavefront file
             open(10,file=trim(output_dir)//"/"//trim(filename)//".obj") ! wavefront format
@@ -2128,12 +2227,14 @@
     num_args = command_argument_count()
     command_line = ""
 
+    write(*, '(a)', advance='no') 'job executed with command: "'
     do i = 0, num_args
         call get_command_argument(i, command_line)
-        write(*, '(a)', advance='no') trim(command_line)//" "
+        write(*, '(a)', advance='no') trim(command_line)
+        if(i /= num_args) write(*, '(a)', advance='no') " "
     end do
+    write(*, '(a)', advance='no') '"'
 
-    ! Print a newline after the command line
     write(*, *)
 
     end subroutine print_command
@@ -2363,21 +2464,21 @@
                 
                     
                     if (done .LE. 1) then
-                        write(6,'(a)',advance='no') ' -> In progress... ['
+                        write(101,'(a)',advance='no') ' -> In progress... ['
                     end if
                         ! do counter = 1, 10
                         !     write(6,'(a)',advance='no') '='
                         ! end do
                     if ((done .GE. 0) .and. (done .LT. 10)) then
                         ! do counter = 1, done
-                            write(6,'(i2,a2)',advance='no') step,'%|'
+                            write(101,'(i2,a2)',advance='no') step,'%|'
                         ! end do
                         ! do counter = done+1, 10
                         !     write(6,'(a)',advance='no') '='
                         ! end do 
                     else
                         ! do counter = 1, 10
-                            write(6,'(i3,a2)') step,'%]'
+                            write(101,'(i3,a2)') step,'%]'
                         ! end do
                     end if
                     ! write(6,'(I3.1)',advance='no') step

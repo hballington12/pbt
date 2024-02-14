@@ -53,16 +53,16 @@ module beam_loop_mod
             proj_area_outgoing = proj_area_outgoing + beam_tree_part(i)%proj_area_outgoing
         end do
 
-        print'(a,f14.8)','geo cross section in: ',proj_area_in
-        print'(a,f14.8)','geo cross section illuminated: ',proj_area_ill
-        print'(a,f14.8)','geo cross section outgoing: ',proj_area_outgoing
-        print'(a,f14.8,a)','geo cross section conservation: ',(proj_area_ill+proj_area_outgoing)/proj_area_in*100d0,' %'
-        print'(a,f14.8)','power in: ',p_i
-        print'(a,f14.8)','power reflected: ',pr
-        print'(a,f14.8)','power transmitted: ',pt
-        print'(a,f14.8)','power outgoing: ',po
-        print'(a,f14.8)','power absorbed: ',abs
-        print'(a,f14.8,a)','energy conservation: ',(abs+pt+pr+po)/p_i*100d0,' %'
+        write(101,'(a,f14.8)')'geo cross section in: ',proj_area_in
+        write(101,'(a,f14.8)')'geo cross section illuminated: ',proj_area_ill
+        write(101,'(a,f14.8)')'geo cross section outgoing: ',proj_area_outgoing
+        write(101,'(a,f14.8,a)')'geo cross section conservation: ',(proj_area_ill+proj_area_outgoing)/proj_area_in*100d0,' %'
+        write(101,'(a,f14.8)')'power in: ',p_i
+        write(101,'(a,f14.8)')'power reflected: ',pr
+        write(101,'(a,f14.8)')'power transmitted: ',pt
+        write(101,'(a,f14.8)')'power outgoing: ',po
+        write(101,'(a,f14.8)')'power absorbed: ',abs
+        write(101,'(a,f14.8,a)')'energy conservation: ',(abs+pt+pr+po)/p_i*100d0,' %'
 
 
     end subroutine
@@ -326,32 +326,32 @@ module beam_loop_mod
         type(beam_type), intent(in) :: beam
         type(job_parameters_type), intent(in) :: job_params
         
-        print*,'-----------------------------------------------'
+        write(101,*)'-----------------------------------------------'
         if(beam%is_int) then
-            print'(a,i6,a)','beam ',beam%id,': is internally propagating'
+            write(101,'(a,i6,a)')'beam ',beam%id,': is internally propagating'
             if(beam%is_tir) then
-                print'(a,i6,a)','beam ',beam%id,': is total internal reflection'
+                write(101,'(a,i6,a)')'beam ',beam%id,': is total internal reflection'
             else
-                print'(a,i6,a)','beam ',beam%id,': is not total internal reflection'
+                write(101,'(a,i6,a)')'beam ',beam%id,': is not total internal reflection'
             end if  
         else
-            print'(a,i6,a)','beam ',beam%id,': is externally propagating'
+            write(101,'(a,i6,a)')'beam ',beam%id,': is externally propagating'
         end if      
-        print'(a,i6,a,i8)','beam ',beam%id,': recursion: ',beam%rec
-        print'(a,i6,a,i8)','beam ',beam%id,': number of tir events: ',beam%refl
-        print'(a,i6,a,i8)','beam ',beam%id,': originates from aperture: ',beam%ap
-        print'(a,i6,a,i8)','beam ',beam%id,': number of facets in this beam: ',beam%nf_in
-        print'(a,i6,a,i8)','beam ',beam%id,': number of facets illuminated: ',beam%nf_out
-        print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section in: ',beam%proj_area_in
-        print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section illuminated: ',beam%proj_area_ill            
-        print'(a,i6,a,f14.8)','beam ',beam%id,': geo cross section outgoing: ',beam%proj_area_outgoing            
-        print'(a,i6,a,f14.8,a)','beam ',beam%id,': geo cross section conservation: ',(beam%proj_area_ill+beam%proj_area_outgoing)/beam%proj_area_in*100d0,' %'
-        print'(a,i6,a,f14.8)','beam ',beam%id,': power in: ',beam%pi
-        print'(a,i6,a,f14.8)','beam ',beam%id,': power reflected: ',beam%pr
-        print'(a,i6,a,f14.8)','beam ',beam%id,': power transmitted: ',beam%pt
-        print'(a,i6,a,f14.8)','beam ',beam%id,': power absorbed: ',beam%abs
-        print'(a,i6,a,f14.8)','beam ',beam%id,': power outgoing: ',beam%po
-        print'(a,i6,a,f14.8,a)','beam ',beam%id,': energy conservation: ',(beam%abs+beam%pt+beam%pr+beam%po)/beam%pi*100d0,' %'
+        write(101,'(a,i6,a,i8)')'beam ',beam%id,': recursion: ',beam%rec
+        write(101,'(a,i6,a,i8)')'beam ',beam%id,': number of tir events: ',beam%refl
+        write(101,'(a,i6,a,i8)')'beam ',beam%id,': originates from aperture: ',beam%ap
+        write(101,'(a,i6,a,i8)')'beam ',beam%id,': number of facets in this beam: ',beam%nf_in
+        write(101,'(a,i6,a,i8)')'beam ',beam%id,': number of facets illuminated: ',beam%nf_out
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': geo cross section in: ',beam%proj_area_in
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': geo cross section illuminated: ',beam%proj_area_ill            
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': geo cross section outgoing: ',beam%proj_area_outgoing            
+        write(101,'(a,i6,a,f14.8,a)')'beam ',beam%id,': geo cross section conservation: ',(beam%proj_area_ill+beam%proj_area_outgoing)/beam%proj_area_in*100d0,' %'
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': power in: ',beam%pi
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': power reflected: ',beam%pr
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': power transmitted: ',beam%pt
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': power absorbed: ',beam%abs
+        write(101,'(a,i6,a,f14.8)')'beam ',beam%id,': power outgoing: ',beam%po
+        write(101,'(a,i6,a,f14.8,a)')'beam ',beam%id,': energy conservation: ',(beam%abs+beam%pt+beam%pr+beam%po)/beam%pi*100d0,' %'
 
         
         
@@ -1473,7 +1473,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         real(8) area
         
         if(job_params%debug >= 1) then
-            print*,'========== start sr energy_checks'
+            write(101,*)'========== start sr energy_checks'
         end if
         
         energy_in = output_parameters%geo_cross_sec
@@ -1521,7 +1521,6 @@ subroutine recursion_ext(beam,geometry,job_params)
         output_parameters%ext_energy_out = energy_out_ext_diff
         
         if(job_params%debug >= 1) then
-            write(101,*)'------------------------------------------------------'
             write(101,'(a41,f16.8)')'energy in (ill. geom. cross sec.): ', energy_in
             write(101,'(a41,f16.8)')'beam energy out: ',energy_out_beam
             write(101,'(a41,f16.8)')'absorbed beam energy: ',output_parameters%abs
@@ -1529,14 +1528,14 @@ subroutine recursion_ext(beam,geometry,job_params)
             write(101,'(a41,f16.8,a2)')'beam energy conservation: ',(energy_out_beam+output_parameters%abs)/energy_in*100,' %'
             write(101,'(a41,f16.8,a2)')'ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
             
-            print'(a40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
-            print'(a40,f16.8)','beam energy out: ',energy_out_beam
-            print'(a40,f16.8)','absorbed beam energy: ',output_parameters%abs
-            print'(a40,f16.8)','ext diff energy out: ',energy_out_ext_diff
-            print'(a40,f16.8,a2)','beam energy conservation: ',(energy_out_beam+output_parameters%abs)/energy_in*100,' %'
-            print'(a40,f16.8,a2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
+            ! print'(a40,f16.8)','energy in (ill. geom. cross sec.): ', energy_in
+            ! print'(a40,f16.8)','beam energy out: ',energy_out_beam
+            ! print'(a40,f16.8)','absorbed beam energy: ',output_parameters%abs
+            ! print'(a40,f16.8)','ext diff energy out: ',energy_out_ext_diff
+            ! print'(a40,f16.8,a2)','beam energy conservation: ',(energy_out_beam+output_parameters%abs)/energy_in*100,' %'
+            ! print'(a40,f16.8,a2)','ext diff energy conservation: ',energy_out_ext_diff/energy_in*100,' %'
             
-            print*,'========== end sr energy_checks'
+            write(101,*)'========== end sr energy_checks'
         end if
         ! stop
         
@@ -1593,7 +1592,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         endif
         
         if(job_params%debug >= 1) then
-            print*,'start beam loop...'
+            write(101,*)'start beam loop...'
         end if
         
         beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
@@ -1603,7 +1602,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         allocate(beam_tree(1:50000)) ! allocate some space to hold beams to be traced (might need to add more space later)
         
         if(job_params%debug >= 2) then
-            print*,'incidence:'
+            write(101,*)'incidence:'
             if(job_params%timing) then
                 start1 = omp_get_wtime()
             end if
@@ -1620,10 +1619,9 @@ subroutine recursion_ext(beam,geometry,job_params)
         if(job_params%timing) then
             if(job_params%debug >= 2) then
                 finish1 = omp_get_wtime()
-                print*,'======================================'
-                print'(a,f16.8,a)',"incidence - time taken: ",finish1-start1," secs"
+                write(101,*)'======================================'
                 write(101,'(a,f16.8,a)')"incidence - time taken: ",finish1-start1," secs"
-                print*,'======================================'
+                write(101,*)'======================================'
             end if
         end if
         
@@ -1635,7 +1633,7 @@ subroutine recursion_ext(beam,geometry,job_params)
             i_end = num_beams ! entry in beam tree to stop at
             
             if(job_params%debug >= 2) then
-                print*,'internal recursion: ',rec
+                write(101,*)'internal recursion: ',rec
                 if(job_params%timing) then
                     start1 = omp_get_wtime()
                 end if
@@ -1678,11 +1676,10 @@ subroutine recursion_ext(beam,geometry,job_params)
             if(job_params%timing) then
                 if(job_params%debug >= 2) then
                     finish1 = omp_get_wtime()
-                    print*,'======================================'
-                    print'(a,i3,a,f16.8,a)',"recursion",rec," - time taken: ",finish1-start1," secs"
+                    write(101,*)'======================================'
                     call print_recursion_info(beam_tree(i_start:i_end),job_params)
                     write(101,'(a,i3,a,f16.8,a)')"recursion",rec," - time taken: ",finish1-start1," secs"
-                    print*,'======================================'
+                    write(101,*)'======================================'
                 end if
             end if
 
@@ -1693,8 +1690,8 @@ subroutine recursion_ext(beam,geometry,job_params)
         if(job_params%debug >= 1) then
             if(job_params%timing) then
                 finish = omp_get_wtime()
-                print*,'=========='
-                print'(a,f16.8,a)',"end beam loop - time elapsed: ",finish-start," secs"   
+                write(101,*)'=========='
+                write(101,'(a,f16.8,a)')"end beam loop - time elapsed: ",finish-start," secs"   
             end if
         end if
         
@@ -1708,13 +1705,13 @@ subroutine recursion_ext(beam,geometry,job_params)
         geometry)
         
         if(job_params%debug >= 2) then
-            print'(a)','memory usage breakdown (per mpi process):'
-            print'(a,f8.2,a)','particle geometry: ',real(sizeof(geometry))/1048576d0,' mb'
-            print'(a,f8.2,a)','beam tree: ',real(sizeof(beam_tree))/1048576d0,' mb'
-            print'(a,f8.2,a)','ext. diffraction tree: ',real(sizeof(ext_diff_outbeam_tree))/1048576d0,' mb'
-            print'(a,f8.2,a)','outbeam tree: ',real(sizeof(beam_outbeam_tree))/1048576d0,' mb'
-            ! print'(a)','note: this is an underestimate of the total memory usage.'
-            print'(a)',' =========='
+            write(101,'(a)')'memory usage breakdown (per mpi process):'
+            write(101,'(a,f8.2,a)')'particle geometry: ',real(sizeof(geometry))/1048576d0,' mb'
+            write(101,'(a,f8.2,a)')'beam tree: ',real(sizeof(beam_tree))/1048576d0,' mb'
+            write(101,'(a,f8.2,a)')'ext. diffraction tree: ',real(sizeof(ext_diff_outbeam_tree))/1048576d0,' mb'
+            write(101,'(a,f8.2,a)')'outbeam tree: ',real(sizeof(beam_outbeam_tree))/1048576d0,' mb'
+            ! write(101,'(a)')'note: this is an underestimate of the total memory usage.'
+            write(101,'(a)')' =========='
         end if
         
         if(job_params%export_beam) then ! if beam exporting enabled
@@ -2489,7 +2486,11 @@ subroutine recursion_ext(beam,geometry,job_params)
             end if
         end do
         
-        if(job_params%debug >= 3) print'(a,i6,a,i8,a,i8,a)','beam ',beam%id,': added ',counter,' beams to outbeam tree -->',beam_outbeam_tree_counter,' total outbeams'
+        if(job_params%debug >= 3) then
+            write(101,*)'-----------------------------------------------'
+            write(101,'(a,i6,a,i8,a,i8,a)')'beam ',beam%id,': added ',counter,' beams to outbeam tree -->',beam_outbeam_tree_counter,' total outbeams'
+            write(101,*)'-----------------------------------------------'
+        end if
         
     end subroutine
     

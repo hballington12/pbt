@@ -63,6 +63,7 @@ real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d
 integer ierr
 integer tag
 integer p
+logical flag
 integer source, dest
 integer status(MPI_STATUS_SIZE)
 integer my_start, my_end, my_rank
@@ -70,6 +71,9 @@ integer n1, n2
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 logical i_finished_early, other_finished_early
 logical is_job_cached
+integer(8) my_iter, total_iter
+! integer, dimension(:), allocatable :: request
+integer request
 
 ! sr finalise
 type(output_parameters_type) output_parameters 
@@ -88,19 +92,22 @@ call MPI_INIT(ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, my_rank, ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, p, ierr)
 tag = 1
+total_iter = 0 ! init
+print*,'p=',p
+! allocate(request(1:p-1))
 i_finished_early = .false.
 is_job_cached = .false.
 
-print*,'========== start main'
+if(my_rank == 0) print*,'========== start pbt: mpi'
 start = omp_get_wtime()
 seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
 
-print*,'my rank: ',my_rank
+if(my_rank == 0) call print_command() ! print the command used to execute the program
 
 call parse_command_line(job_params)
 
 if(job_params%resume) then
-    print*,'attempting to resume job using cache #',job_params%cache_id
+    if(my_rank == 0) print*,'attempting to resume job using cache #',job_params%cache_id
     call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
     if(my_rank .ne. 0) then ! only rank 0 should keep summed parameters from the cache, reset vals for all other processes
         deallocate(mueller_total)
@@ -117,28 +124,21 @@ if (my_rank .eq. 0) then
     print*,'output directory is "',trim(job_params%output_dir),'"'
     ! result = makedirqq(trim(job_params%output_dir)//"/logs") ! make directory for logs
     call system("mkdir "//trim(job_params%output_dir)//"/logs")
-    print*,'log files directory is "',trim(job_params%output_dir)//"/logs/",'"'
+    ! print*,'log files directory is "',trim(job_params%output_dir)//"/logs/",'"'
     call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for temp files
-    print*,'temporary files directory is "',trim(job_params%output_dir)//"/tmp/",'"'
-    print*,'sending...'
-    print*,'job_params%output_dir: ',job_params%output_dir
     do dest = 1, p-1
         CALL MPI_SEND(job_params%output_dir, 255, MPI_CHARACTER, dest, tag, MPI_COMM_WORLD, ierr)
     end do
-    ! print*,'sending complete.'
 else
     call MPI_RECV(job_params%output_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
 end if
 
-! write job parameters to log file
-call write_job_params(job_params)
+if (my_rank .eq. 0) call print_job_params(job_params) ! write job parameters to log file
 
 write(my_rank_str,*) my_rank
 call StripSpaces(my_rank_str)
-print*,'my_rank_str: ',my_rank_str
 write(my_log_dir,*) trim(job_params%output_dir)//"/logs/log",trim(my_rank_str)
 my_log_dir = adjustl(my_log_dir)
-! print*,'my rank is : ,',my_rank,' , my output directory is "',trim(my_log_dir),'"'
 
 open(101,file=trim(my_log_dir),status="new") ! open global non-standard log file for important records
 
@@ -146,12 +146,7 @@ open(101,file=trim(my_log_dir),status="new") ! open global non-standard log file
 call PDAL2( job_params,     & ! <-  job parameters
             geometry)         !  -> particle geometry   
 
-max_edge_length = job_params%la*2
-max_area = max_edge_length**2*sqrt(3D0)/4D0
-print*,'area threshold: ',max_area
-
 if (job_params%tri) then
-    print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
     call triangulate(   job_params%tri_edge_length, &
                         '-Q -q', &
                         job_params%tri_roughness, &
@@ -162,6 +157,8 @@ if (job_params%tri) then
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
     ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
 end if
+
+call write_geometry_info(geometry) ! write geometry info to log file
 
 if (my_rank .eq. 0) then
     ! write unrotated particle to file (optional)            
@@ -213,7 +210,9 @@ if (my_rank .ge. n2) then
     my_start = my_start - my_rank + n2
     my_end = my_end - my_rank + n2 - 1
 end if
-print*,'my rank:',my_rank,'start: ',my_start,'end: ',my_end
+
+if (my_rank .eq. 0) print*,'starting orientation loop...'
+write(101,*)'starting orientation loop... start: ',my_start,'end: ',my_end
 
 do i = my_start, my_end
 
@@ -243,13 +242,13 @@ do i = my_start, my_end
                     beam_geometry, &
                     beam_inc)
 
-    ! if(num_orients .gt. 1) then
-    !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',i_loop,' / ',num_orients,' (total progress: ',dble(i_loop-1)/dble(num_orients)*100,' %)'
+    ! if(num_remaining_orients > 1 .and. my_rank == 0 .and. i > my_start) then
+    !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',total_iter,' / ',num_remaining_orients,' (total progress: ',dble(total_iter)/dble(num_remaining_orients)*100,' %)'
     !     ! print*,'total time elapsed: ',omp_get_wtime()-start
     !     ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i_loop)
     !     if (i_loop .gt. 1) then
     !         print'(A20,F12.4,A5)','est. time remaining: '
-    !         call PROUST(nint(dble(num_orients-i_loop+1)*(omp_get_wtime()-start) / dble(i_loop)))
+    !         call PROUST(nint(dble(num_remaining_orients-total_iter)*(omp_get_wtime()-start) / dble(total_iter+1)))
     !     end if
     ! end if
     
@@ -272,17 +271,16 @@ do i = my_start, my_end
 
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
-    ! if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .and. i /= my_end) then
         i_finished_early = .true.
         exit ! break out of the orientation loop    
     end if
 
-
+    my_iter = i - my_start + 1 ! save progress for this rank
+    
 end do
 
-print*,'my rank:',my_rank,'finished'
-print*,'rank',my_rank,'finished early?',i_finished_early
+if (my_rank .eq. 0) print*,'end orientation loop'
 
 call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
@@ -293,15 +291,13 @@ if (my_rank .eq. 0) then ! if my rank is 0
         call MPI_RECV(other_finished_early, 1, MPI_LOGICAL, dest, tag, MPI_COMM_WORLD,status, ierr)
         if(other_finished_early) is_job_cached = .true. ! if another process didnt finish, the job is set to be cached
     end do
-    print*,'sending complete. is job to be cached? ',is_job_cached
 else
     call MPI_SEND(i_finished_early, 1, MPI_LOGICAL, 0, tag, MPI_COMM_WORLD,status, ierr)
 end if
 
 call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
-! broadcast job cache decision to all processes from rank 0
-call MPI_Bcast(is_job_cached, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr)
+call MPI_Bcast(is_job_cached, 1, MPI_LOGICAL, 0, MPI_COMM_WORLD, ierr) ! broadcast job cache decision to all processes from rank 0
 
 if(is_job_cached) then ! if the job is to be cached
 
@@ -309,11 +305,9 @@ if(is_job_cached) then ! if the job is to be cached
     if (my_rank .eq. 0) then
         call make_cache_dir("cache/",cache_dir)
         print*,'cache directory is "',trim(cache_dir),'"'
-        print*,'sending...'
         do dest = 1, p-1
             CALL MPI_SEND(cache_dir, 255, MPI_CHARACTER, dest, tag, MPI_COMM_WORLD, ierr)
         end do
-        print*,'sending complete.'
     else
         call MPI_RECV(cache_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
     end if
@@ -326,12 +320,10 @@ if(is_job_cached) then ! if the job is to be cached
     ! 1 by 1, write remaining orientations to file...
     do j = 1, p ! for each process
         if(my_rank .eq. j-1) then ! if its my turn to write to the file
-            print*,'my_rank:',my_rank,'opening file, did i finish early?',i_finished_early
             if(i_finished_early) then ! if my rank didnt finish
                 open(unit=10,file=trim(cache_dir)//"/orient_remaining.dat",status="old",access="append") ! open file in append mode
                     ! write my remaining orientations to the file
                     do k = i+1, my_end ! loop from one after my current loop index to my end index
-                        print*,'rank',my_rank,'writing orient, k=',k
                         write(10,*) remaining_orients(k) ! write my remaining orientations to file
                     end do
                 ! print*,'my_rank:',my_rank,'wrote to file'
@@ -367,7 +359,6 @@ if(is_job_cached) then ! if the job is to be cached
 else ! else, if the job is not to be cached
 
     ! sum up across all mpi processes
-    print*,'i have finished. my rank = ',my_rank
     call mpi_send_sum(  ierr,                       & ! mpi parameter
                         tag,                        & ! mpi parameter
                         p,                          & ! mpi parameter
@@ -392,6 +383,8 @@ else ! else, if the job is not to be cached
         output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%num_orients
         output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients
         output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
+
+        call print_output_params(output_parameters)
 
         ! writing to file
         call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)

@@ -65,37 +65,34 @@ integer(8) num_remaining_orients
 
 ! ############################################################################################################
 ! start main
-print*,'========== start main'
+print*,'========== start pbt: seq'
 start = omp_get_wtime()
 my_rank = 0
 loop_start = 1
 seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
 
+call print_command() ! print the command used to execute the program
+
 call parse_command_line(job_params)
 
 if(job_params%resume) then
-    print*,'attempting to resume job using cache #',job_params%cache_id
     call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
     ! stop
 end if
 
 call make_dir(job_params%job_name,job_params%output_dir)
-print*,'output directory is "',trim(job_params%output_dir),'"'
+
 call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for temp files
-print*,'temporary files directory is "',trim(job_params%output_dir)//"/tmp/",'"'
+
 open(101,file=trim(job_params%output_dir)//"/"//"log") ! open global non-standard log file for important records
 
-! write job parameters to log file
-call write_job_params(job_params)
+call print_job_params(job_params) ! write job parameters to std out
 
 ! get input particle geometry
 call PDAL2( job_params,     & ! <-  job parameters
             geometry)         !  -> particle geometry            
 
-
 if (job_params%tri) then
-    print*,'calling triangulate with max edge length: ',job_params%tri_edge_length
-    print*,'================================='
     call triangulate(   job_params%tri_edge_length, &
                         '-Q -q', &
                         job_params%tri_roughness, &
@@ -108,8 +105,9 @@ if (job_params%tri) then
     ! max_area = max_edge_length**2*sqrt(3D0)/4D0
     ! print*,'area threshold: ',max_area
     ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than threshold
-    print*,'================================='
 end if
+
+call write_geometry_info(geometry) ! write geometry info to log file
 
 ! write unrotated particle to file (optional)            
 call PDAS(  job_params%output_dir,     & ! <-  output directory
@@ -136,6 +134,9 @@ else ! if we are not resuming a cached job
         remaining_orients(i) = i
     end do
 end if
+
+print*,'starting orientation loop...'
+write(101,*)'starting orientation loop... start: ',1,'end: ',num_remaining_orients
 
 do i = 1, num_remaining_orients
 
@@ -218,6 +219,8 @@ do i = 1, num_remaining_orients
 
 end do
 
+print*,'end orientation loop'
+
 ! divide by no. of orientations
 mueller_total = mueller_total / job_params%num_orients 
 mueller_1d_total = mueller_1d_total / job_params%num_orients 
@@ -231,6 +234,8 @@ output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / job_para
 output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%num_orients 
 output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients 
 output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
+
+call print_output_params(output_parameters)
 
 ! writing to file
 call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)

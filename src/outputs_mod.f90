@@ -76,7 +76,7 @@
       ampl_far(:,:,:,:) = ampl_far_beam(:,:,:,:) + ampl_far_ext_diff(:,:,:,:)
 
       if(job_params%debug >= 1) then    
-         print*,'making 2d mueller matrices...'
+         write(101,*)'making 2d mueller matrices...'
       end if
 
       call ampl_to_mueller(ampl_far,mueller)
@@ -84,7 +84,7 @@
       call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
 
       if(job_params%debug >= 1) then
-         print*,'making 1d mueller matrices...'
+         write(101,*)'making 1d mueller matrices...'
       end if
 
       write(101,*)'------------------------------------------------------'
@@ -94,7 +94,7 @@
       call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
 
       if(job_params%debug >= 1) then
-         print*,'calculating integrated parameters...'
+         write(101,*)'calculating integrated parameters...'
       end if
 
       ! theta integrations...
@@ -104,16 +104,16 @@
       
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
+         ! print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
-         print'(A40,f16.8)','scattering cross section (total):',scatt
+         ! print'(A40,f16.8)','scattering cross section (total):',scatt
          write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         ! print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
       end if
 
       if (job_params%scaling) then
          if(job_params%debug >= 2) then 
-            print'(A40)','applying diffraction energy scaling...'
+            write(101,'(A40)')'applying diffraction energy scaling...'
          end if
          ! scale the beam diffraction energy to match near field
          ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) / sqrt(scatt_beam/output_parameters%beam_energy_out)
@@ -124,7 +124,7 @@
          ampl_far(:,:,:,:) = ampl_far_beam(:,:,:,:) + ampl_far_ext_diff(:,:,:,:)
          
          if(job_params%debug >= 2) then  
-            print*,'remaking 2d mueller matrices...'
+            write(101,*)'remaking 2d mueller matrices...'
          end if
 
          call ampl_to_mueller(ampl_far,mueller)
@@ -132,7 +132,7 @@
          call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
    
          if(job_params%debug >= 2) then  
-            print*,'remaking 1d mueller matrices...'
+            write(101,*)'remaking 1d mueller matrices...'
          end if
          
          call get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
@@ -140,7 +140,7 @@
          call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
    
          if(job_params%debug >= 2) then  
-            print*,'recalculating integrated parameters...'
+            write(101,*)'recalculating integrated parameters...'
          end if
 
          ! theta integrations...
@@ -174,25 +174,25 @@
 
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
-         print'(A40,f16.8)','scattering cross section (total):',scatt
+         ! print'(A40,f16.8)','scattering cross section (total):',scatt
          write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
+         ! print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (beam):',scatt_beam," (",scatt_beam/output_parameters%beam_energy_out*100," %)"
          write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
-         print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
+         ! print'(A40,f16.8,A2,f10.6,A3)','scattering cross section (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
          write(101,'(A40,f16.8)')'abs. cross section:',absorption
-         print'(A40,f16.8)','abs. cross:',absorption 
+         ! print'(A40,f16.8)','abs. cross:',absorption 
          write(101,'(A40,f16.8)')'ext. cross section:',ext
-         print'(A40,f16.8)','ext. cross:',ext  
+         ! print'(A40,f16.8)','ext. cross:',ext  
          write(101,'(A40,f16.8)')'single-scattering albedo:',albedo
-         print'(A40,f16.8)','single-scatt. albedo:',albedo
+         ! print'(A40,f16.8)','single-scatt. albedo:',albedo
          write(101,'(A40,f16.8)')'asymmetry parameter (total):',asymmetry
-         print'(A40,f16.8)','asymmetry parameter (total):',asymmetry
+         ! print'(A40,f16.8)','asymmetry parameter (total):',asymmetry
          write(101,'(A40,f16.8)')'asymmetry parameter (beam):',asymmetry_beam
-         print'(A40,f16.8)','asymmetry parameter (beam):',asymmetry_beam
+         ! print'(A40,f16.8)','asymmetry parameter (beam):',asymmetry_beam
          write(101,'(A40,f16.8)')'asymmetry parameter (ext diff):',asymmetry_ext_diff  
-         print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
+         ! print'(A40,f16.8)','asymmetry parameter (ext diff):',asymmetry_ext_diff  
          write(101,'(A40,f16.8)')'back scatt. cross section:',back_scatt
-         print'(A40,f16.8)','back scatt. cross:',back_scatt
+         ! print'(A40,f16.8)','back scatt. cross:',back_scatt
       end if  
       
       output_parameters%scatt = scatt

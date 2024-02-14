@@ -304,8 +304,6 @@ job_params%export_beam = .false. ! default is do not export the beam
 job_params%refl = 10 ! default is max 10 total internal reflections
 job_params%is_fast_diff = .false. ! default is no fast diffraction
 
-call print_command() ! print the command used to execute the program
-
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'
 i = 0
@@ -342,7 +340,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else
                         read(arg,*) eulers(1)
-                        print*,'alpha: ',eulers(1)
+                        ! print*,'alpha: ',eulers(1)
                         ! do something
                     end if
 
@@ -386,7 +384,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else
                         read(arg,*) offs(2)
-                        print*,'off(2): ',offs(2)
+                        ! print*,'off(2): ',offs(2)
                     end if
                     
                 case('multi')
@@ -811,11 +809,11 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             end if
 
         case ('-no2d')
-            print*,'suppress 2d outputs: enabled'
+            ! print*,'suppress 2d outputs: enabled'
             job_params%suppress_2d = .true.
 
         case ('-fast_diff')
-            print*,'fast diffraction: enabled'
+            ! print*,'fast diffraction: enabled'
             job_params%is_fast_diff = .true.
 
         case ('-tri')
@@ -825,7 +823,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
 
         case ('-scaling')
             ! print*,'found command line specifier "mt"'
-            print*,'diffraction energy scaling: enabled'
+            ! print*,'diffraction energy scaling: enabled'
             job_params%scaling = .true.
 
         case ('-resume')
@@ -835,10 +833,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 print*,'error: no option found for "resume"'
                 stop
             else
-                print*,'resume from cached data: enabled'
+                ! print*,'resume from cached data: enabled'
                 job_params%resume = .true.
                 read(arg,*) job_params%cache_id
-                print*,'job_params%cache_id: ', job_params%cache_id
+                ! print*,'job_params%cache_id: ', job_params%cache_id
             end if
 
         case ('-tri_edge')
@@ -849,7 +847,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%tri_edge_length
-                print*,'job_params%tri_edge: ', job_params%tri_edge_length
+                ! print*,'job_params%tri_edge: ', job_params%tri_edge_length
             end if  
 
         case ('-tri_rough')
@@ -860,7 +858,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%tri_roughness
-                print*,'job_params%tri_roughness: ', job_params%tri_roughness
+                ! print*,'job_params%tri_roughness: ', job_params%tri_roughness
             end if 
 
         case ('-intellirot')
@@ -876,7 +874,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%time_limit
-                print*,'job_params%time_limit: ', job_params%time_limit,' hours'
+                ! print*,'job_params%time_limit: ', job_params%time_limit,' hours'
             end if  
 
         case ('-beta_min')
@@ -887,7 +885,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%beta_lims(1)
-                print*,'job_params%beta_lims(1): ', job_params%beta_lims(1)
+                ! print*,'job_params%beta_lims(1): ', job_params%beta_lims(1)
             end if  
 
         case ('-beta_max')
@@ -898,7 +896,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%beta_lims(2)
-                print*,'job_params%beta_lims(2): ', job_params%beta_lims(2)
+                ! print*,'job_params%beta_lims(2): ', job_params%beta_lims(2)
             end if  
 
         case ('-gamma_min')
@@ -909,7 +907,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%gamma_lims(1)
-                print*,'job_params%gamma_lims(1): ', job_params%gamma_lims(1)
+                ! print*,'job_params%gamma_lims(1): ', job_params%gamma_lims(1)
             end if  
 
         case ('-gamma_max')
@@ -920,7 +918,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%gamma_lims(2)
-                print*,'job_params%gamma_lims(2): ', job_params%gamma_lims(2)
+                ! print*,'job_params%gamma_lims(2): ', job_params%gamma_lims(2)
             end if 
 
         case ('-output_eulers')
@@ -936,13 +934,13 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%debug
-                print*,'job_params%debug: ', job_params%debug
+                ! print*,'job_params%debug: ', job_params%debug
             end if 
             
         case ('-timing')
             ! print*,'found command line specifier "timing"'
             job_params%timing = .true.
-            print*,'timing: enabled'
+            ! print*,'timing: enabled'
             ! do something
 
         case ('-export_beam')
@@ -951,14 +949,15 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             i = i + 1 ! update counter to read the rotation method
             call get_command_argument(i,arg,status=my_status)
             if (my_status .eq. 1) then ! if no argument found
-                print*,'error: no option found for "mt"'
+                print*,'error: no option found for "export_beam"'
+                stop
             else
-                print*,'arg: "',trim(arg),'"'
+                ! print*,'arg: "',trim(arg),'"'
                 if(trim(arg(1:1)) == "-") then ! if found next flag, skip
-                    print*,'found next flag, recycling'
+                    ! print*,'found next flag, recycling'
                     i = i - 1
                 else if(trim(arg(1:len(trim(arg)))) == "rec") then
-                    print*,'found export_beam option "rec"'
+                    ! print*,'found export_beam option "rec"'
                     job_params%export_beam_rec = .true. ! set to export by recursion number
                     i = i + 1 ! go to next command line argument
                     call get_command_argument(i,arg,status=my_status) ! get next arg
@@ -967,22 +966,22 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else ! else, if found first number
                         read(arg,*) job_params%export_beam_lims(2) ! set it as the end recursion
-                        print*,'read first value for -export_beam rec <value> [<value>]:',job_params%export_beam_lims(2)
+                        ! print*,'read first value for -export_beam rec <value> [<value>]:',job_params%export_beam_lims(2)
                         ! attempt to read second number
                         i = i + 1 ! go to next command line argument
                         call get_command_argument(i,arg,status=my_status) ! get next arg
                         if (my_status .eq. 1 .or. len(trim(arg)) .eq. 0 .or. trim(arg(1:1)) == "-") then ! if found next flag, or didnt find a number
-                            print*,'didnt find second value for -export_beam rec <value> [<value>]'
+                            ! print*,'didnt find second value for -export_beam rec <value> [<value>]'
                             job_params%export_beam_lims(1) = 1 ! set the start index to 1
                             i = i - 1
                         else ! if found argument
                             job_params%export_beam_lims(1) = job_params%export_beam_lims(2) ! set the first value we read as the start
                             read(arg,*) job_params%export_beam_lims(2) ! and read the second value as the end
-                            print*,'found 2 values:',job_params%export_beam_lims(1:2)
+                            ! print*,'found 2 values:',job_params%export_beam_lims(1:2)
                         end if
                     end if
                 else if(trim(arg(1:len(trim(arg)))) == "num") then
-                    print*,'found export_beam option "num"'
+                    ! print*,'found export_beam option "num"'
                     job_params%export_beam_rec = .false. ! set to export by beam number
                     i = i + 1 ! go to next command line argument
                     call get_command_argument(i,arg,status=my_status) ! get next arg
@@ -991,19 +990,19 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                         stop
                     else ! else, if found first number
                         read(arg,*) job_params%export_beam_lims(2) ! set it as the end recursion
-                        print*,'read first value for -export_beam num <value> [<value>]:',job_params%export_beam_lims(2)
+                        ! print*,'read first value for -export_beam num <value> [<value>]:',job_params%export_beam_lims(2)
                         ! attempt to read second number
                         i = i + 1 ! go to next command line argument
                         call get_command_argument(i,arg,status=my_status) ! get next arg
                         if (my_status .eq. 1 .or. len(trim(arg)) .eq. 0 .or. trim(arg(1:1)) == "-") then ! if found next flag, or didnt find a number
-                            print*,'didnt find second value for -export_beam num <value> [<value>]'
+                            ! print*,'didnt find second value for -export_beam num <value> [<value>]'
                             job_params%export_beam_lims(1) = 1 ! set the start index to 1
-                            print*,'found next flag, recycling'
+                            ! print*,'found next flag, recycling'
                             i = i - 1
                         else ! if found argument
                             job_params%export_beam_lims(1) = job_params%export_beam_lims(2) ! set the first value we read as the start
                             read(arg,*) job_params%export_beam_lims(2) ! and read the second value as the end
-                            print*,'found 2 values:',job_params%export_beam_lims(1:2)
+                            ! print*,'found 2 values:',job_params%export_beam_lims(1:2)
                         end if
                     end if
                 else
@@ -1018,65 +1017,30 @@ do while (i .lt. command_argument_count()) ! looping over command line args
     ! print*,'i:',i
 end do ! end loop over command line args
 
-! check for missing required arguments
-if (found_la .eqv. .false.) then
-    ! print*,'error: missing required argument "lambda"'
-    ! print*,'using default lambda value: 0.532'
-    ! stop
-else if (found_rbi .eqv. .false.) then
-    ! print*,'error: missing required argument "rbi"'
-    ! print*,'using default rbi value: 1.31'
-    ! stop
-else if (found_ibi .eqv. .false.) then
-    ! print*,'error: missing required argument "ibi"'
-    ! print*,'using default ibi value: 0'
-    ! stop
-else if (found_rec .eqv. .false.) then
-    ! print*,'error: missing required argument "rec"'
-    ! print*,'using default rec value: 8'
-    ! stop
-else if (found_c_method .eqv. .false.) then
-    print*,'error: missing required argument "cmethod"'
-    stop
-else if (found_c_method .eqv. .true.) then
-    if (c_method .eq. "read") then
-        if (found_cfn .eqv. .false.) then
-            print*,'error: missing required argument "cfn"'
-            stop
-        else if (found_afn .eqv. .false.) then
-            ! print*,'error: missing required argument "afn"'
-            print*,'no input for afn. Using automatic aperture assignment...'
-            ! stop
-        else if (found_cft .eqv. .false.) then
-            print*,'error: missing required argument "cft"'
-            stop
-        end if
-    end if
-end if
 ! if cfn found but cft not found, attempt to guess filetype from the extension
 if (.not. found_cft .and. found_cfn) then
     ! if particle filename is long enough, look for file extensions...
     if(len(trim(cfn)) .gt. 4) then
         if(cfn(len(trim(cfn))-3:len(trim(cfn))) .eq. ".obj") then
             cft = "obj"
-            if(job_params%debug >= 2) then
-                print*,'guessed obj particle file type'
-            end if
+            ! if(job_params%debug >= 2) then
+            !     print*,'guessed obj particle file type'
+            ! end if
             found_cft = .true.
         else if(cfn(len(trim(cfn))-3:len(trim(cfn))) .eq. ".cry") then
             cft = "mrt"
-            if(job_params%debug >= 2) then
-                print*,'guessed mrt file type'
-            end if
+            ! if(job_params%debug >= 2) then
+            !     print*,'guessed mrt file type'
+            ! end if
             found_cft = .true.
         end if
     end if
     if(len(trim(cfn)) .gt. 8) then
         if(cfn(len(trim(cfn))-7:len(trim(cfn))) .eq. ".crystal") then
             cft = "mrt"
-            if(job_params%debug >= 2) then
-                print*,'guessed mrt file type'
-            end if
+            ! if(job_params%debug >= 2) then
+            !     print*,'guessed mrt file type'
+            ! end if
             found_cft = .true.
         end if
     end if
@@ -1093,7 +1057,7 @@ end if
 ! if cfn given and cft given (or guessed), set particle input method to read
 if (found_cft .and. found_cfn) c_method = "read"
 
-if(rot_method(1:len(trim(rot_method))) .ne. 'multi' .and. job_params%is_fast_diff) print*,'warning, fast diffraction is not recommended for fixed orientation computations'
+! if(rot_method(1:len(trim(rot_method))) .ne. 'multi' .and. job_params%is_fast_diff) print*,'warning, fast diffraction is not recommended for fixed orientation computations'
 
 job_params%cfn = cfn
 job_params%cft = cft
@@ -1117,6 +1081,7 @@ job_params%phi_vals = phi_vals
 if(job_params%export_beam) then ! if beam exporting enabled, check values
     print*,'beam exporting enabled'
     if(job_params%export_beam_lims(1) > job_params%export_beam_lims(2)) error stop "beam export limits must be equal or increasing values"
+    stop
     if(job_params%export_beam_rec) then
         print*,'exporting by recursion number:',job_params%export_beam_lims(1:2)
         ! if(job_params%export_beam_lims(2) > job_params%rec) then 
@@ -1124,33 +1089,33 @@ if(job_params%export_beam) then ! if beam exporting enabled, check values
         !     print*,'changed'
         ! end if
     else
-        print*,'exporting by beam number:',job_params%export_beam_lims(1:2)
+        ! print*,'exporting by beam number:',job_params%export_beam_lims(1:2)
     end if
 end if
 
-print*,'job settings:'
+! print*,'job settings:'
 
-print*,'wavelength: ',job_params%la
-print*,'refractive index (real): ',job_params%rbi
-print*,'refractive index (imag): ',job_params%ibi
-print*,'beam recursions: ',job_params%rec
-print*,'total internal reflections: ',job_params%refl
-print*,'particle rotation method: ',job_params%rot_method
-print*,'number of orientations: ',job_params%num_orients
-print*,'intelligent orientations: ',job_params%intellirot
-print*,'particle input method: ',job_params%c_method
-print*,'job_name: ',job_params%job_name
-print*,'multithreading: ',job_params%is_multithreaded
-print*,'logging level: ',job_params%debug,'/ 3'
-print*,'extra timings: ',job_params%timing
-print*,'automatic triangulation: ',job_params%tri
-print*,'fast diffraction',job_params%is_fast_diff
-if(found_cfn) print*,'particle filename: ',job_params%cfn
-if(found_cft) print*,'particle filetype: ',job_params%cft
+! print*,'wavelength: ',job_params%la
+! print*,'refractive index (real): ',job_params%rbi
+! print*,'refractive index (imag): ',job_params%ibi
+! print*,'beam recursions: ',job_params%rec
+! print*,'total internal reflections: ',job_params%refl
+! print*,'particle rotation method: ',job_params%rot_method
+! print*,'number of orientations: ',job_params%num_orients
+! print*,'intelligent orientations: ',job_params%intellirot
+! print*,'particle input method: ',job_params%c_method
+! print*,'job_name: ',job_params%job_name
+! print*,'multithreading: ',job_params%is_multithreaded
+! print*,'logging level: ',job_params%debug,'/ 3'
+! print*,'extra timings: ',job_params%timing
+! print*,'automatic triangulation: ',job_params%tri
+! print*,'fast diffraction',job_params%is_fast_diff
+! if(found_cfn) print*,'particle filename: ',job_params%cfn
+! if(found_cft) print*,'particle filetype: ',job_params%cft
 
 
 
-print*,'=========='
+! print*,'=========='
 
 ! stop
 
@@ -1620,17 +1585,17 @@ subroutine PROT_CC(verts)
     real(8) s1, s2, s3, c1, c2, c3
     ! real(8) rand
 
-    print*,'========== start sr PROT_CC'
+    write(101,*)'========== start sr PROT_CC'
 
     eulers(1) = 90.0
     eulers(2) = 0.0
     eulers(3) = 0.0
 
-    print*,'first pre-rotation...'
+    write(101,*)'first pre-rotation...'
 
-    print*,'alpha:',eulers(1)
-    print*,'beta:',eulers(2)
-    print*,'gamma:',eulers(3)
+    write(101,*)'alpha:',eulers(1)
+    write(101,*)'beta:',eulers(2)
+    write(101,*)'gamma:',eulers(3)
 
     eulers = eulers*pi/180 ! convert to rad
 
@@ -1663,11 +1628,11 @@ subroutine PROT_CC(verts)
     eulers(2) = 90.0
     eulers(3) = 0.0
 
-    print*,'second pre-rotation...'
+    write(101,*)'second pre-rotation...'
 
-    print*,'alpha:',eulers(1)
-    print*,'beta:',eulers(2)
-    print*,'gamma:',eulers(3)
+    write(101,*)'alpha:',eulers(1)
+    write(101,*)'beta:',eulers(2)
+    write(101,*)'gamma:',eulers(3)
 
     eulers = eulers*pi/180 ! convert to rad
 
@@ -1697,7 +1662,7 @@ subroutine PROT_CC(verts)
 
     ! stop
 
-    print*,'========== end sr PROT_CC'
+    write(101,*)'========== end sr PROT_CC'
 
 end subroutine
 
@@ -1734,13 +1699,13 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
     eulers = job_params%eulers
     offs = job_params%offs
 
-    if(job_params%debug >= 1) then 
-        print*,'========== start sr PROT_MPI'
-        write(101,*)'======================================================'
-        write(101,*)'======================================================'
-        write(101,*)'orientation: ',loop_index,' / ',num_orients
-        print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
-    end if
+    ! if(job_params%debug >= 1) then 
+    !     print*,'========== start sr PROT_MPI'
+    !     write(101,*)'======================================================'
+    !     write(101,*)'======================================================'
+    !     write(101,*)'orientation: ',loop_index,' / ',num_orients
+    !     print*,'rotation method: "',rot_method(1:len(trim(rot_method))),'"'
+    ! end if
 
     allocate(verts_rot(1:geometry%nv,1:3)) ! allocate array for rotated vertices
 
@@ -1755,20 +1720,20 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
         call UN_PROT_CC(verts_rot)
 
         if(offs(1) .eq. 30 .and. offs(2) .eq. 0) then
-            print*,'off setting: 30x0'
-            write(101,*)'off setting: "30x0"'
+            ! print*,'off setting: 30x0'
+            ! write(101,*)'off setting: "30x0"'
             vec = (/-0.866025,-0.5,0.0/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 10) then
-            print*,'off setting: 30x10'
-            write(101,*)'off setting: "30x10"'
+            ! print*,'off setting: 30x10'
+            ! write(101,*)'off setting: "30x10"'
             vec = (/-0.866025,-0.492404,0.0868240/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 20) then
-            print*,'off setting: 30x20'
-            write(101,*)'off setting: "30x20"'
+            ! print*,'off setting: 30x20'
+            ! write(101,*)'off setting: "30x20"'
             vec = (/-0.866025,-0.469846,0.171010/)
         else if(offs(1) .eq. 30 .and. offs(2) .eq. 30) then
-            print*,'off setting: 30x30'
-            write(101,*)'off setting: "30x30"'
+            ! print*,'off setting: 30x30'
+            ! write(101,*)'off setting: "30x30"'
             vec = (/-0.866025,-0.433013,0.25/)
         end if
 
@@ -1805,12 +1770,12 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
 
     else if(rot_method(1:len(trim(rot_method))) .eq. 'euler') then
         ! call read_input_vals_real(ifn,"rot euler",eulers,3)
-        print*,'alpha:',eulers(1)
-        write(101,*)'alpha:',eulers(1)
-        print*,'beta: ',eulers(2)
-        write(101,*)'beta: ',eulers(2)
-        print*,'gamma:',eulers(3)
-        write(101,*)'gamma:',eulers(3)
+        ! print*,'alpha:',eulers(1)
+        ! write(101,*)'alpha:',eulers(1)
+        ! print*,'beta: ',eulers(2)
+        ! write(101,*)'beta: ',eulers(2)
+        ! print*,'gamma:',eulers(3)
+        ! write(101,*)'gamma:',eulers(3)
 
         eulers = eulers*pi/180.0 ! convert to rad
 
@@ -1851,11 +1816,12 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
         eulers(3) = 2*pi*(rand)
 
         if(job_params%debug >= 1) then 
-            print*,'alpha:',eulers(1)*180.0/pi
+            write(101,*)'orientation: ',loop_index
+            ! print*,'alpha:',eulers(1)*180.0/pi
             write(101,*)'alpha:',eulers(1)*180.0/pi
-            print*,'beta: ',eulers(2)*180.0/pi
+            ! print*,'beta: ',eulers(2)*180.0/pi
             write(101,*)'beta: ',eulers(2)*180.0/pi
-            print*,'gamma:',eulers(3)*180.0/pi
+            ! print*,'gamma:',eulers(3)*180.0/pi
             write(101,*)'gamma:',eulers(3)*180.0/pi
         end if
 
@@ -1895,9 +1861,9 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
     call compute_geometry_apertures(rot_geometry)
 
     ! stop
-    if(job_params%debug >= 1) then 
-        print*,'========== end sr PROT_MPI'
-    end if
+    ! if(job_params%debug >= 1) then 
+    !     print*,'========== end sr PROT_MPI'
+    ! end if
 
 end subroutine
 
@@ -2463,11 +2429,10 @@ subroutine PDAL2(   job_params,     &
 
     if(trim(afn) .eq. "(null)") auto_apertures = .true.
 
-    print*,'particle input method: "',c_method(1:len(trim(c_method))),'"'
-    print*,'========== start sr PDAL2'
-    write(101,*)'======================================================'
-    write(101,*)'=================PARTICLE INFORMATION================='
-    write(101,*)'======================================================'
+    ! print*,'particle input method: "',c_method(1:len(trim(c_method))),'"'
+    ! write(101,*)'======================================================'
+    ! write(101,*)'=================PARTICLE INFORMATION================='
+    ! write(101,*)'======================================================'
 
     if(c_method(1:len(trim(c_method))) .eq. "read") then ! if particle is to be read from file
 
@@ -2486,7 +2451,7 @@ subroutine PDAL2(   job_params,     &
         ! print*,'apertures filename: "',afn(1:len(trim(afn))),'"'
         write(101,*)'apertures filename:     "',afn(1:len(trim(afn))),'"'
 
-        print*,'crystal file type: "',trim(cft),'"'
+        write(101,*)'crystal file type: "',trim(cft),'"'
         ! write(101,*)'particle filename:      "',cfn(1:len(trim(cfn))),'"'    
         ! write(101,*)'particle file type:     "',trim(cft),'"'
 
@@ -2534,7 +2499,7 @@ subroutine PDAL2(   job_params,     &
             face_ids_temp = 0
             norms = 0
 
-            ! print*,'num_norm',num_norm
+            ! write(101,*)'num_norm',num_norm
             num_face_vert = 0 ! initialise
 
             do  ! reading through the lines in the crystal file...
@@ -2608,14 +2573,14 @@ subroutine PDAL2(   job_params,     &
             allocate(face_ids(num_face,num_face_vert_max)) ! allocate an array for the vertex IDs in each face
             face_ids = face_ids_temp(1:num_face,1:num_face_vert_max) ! truncate excess columns
             
-            print*,'crystal geometry:'
-            print*,'number of unique vertices: ',num_vert
+            ! print*,'crystal geometry:'
+            ! print*,'number of unique vertices: ',num_vert
             
-            print*,'number of unique faces: ',num_face
-            print*,'number of normals: ',num_norm
+            ! print*,'number of unique faces: ',num_face
+            ! print*,'number of normals: ',num_norm
             
-            !print*,'number of unique normals: ',num_norm
-            print*,'max vertices per face: ',num_face_vert_max
+            ! !print*,'number of unique normals: ',num_norm
+            ! print*,'max vertices per face: ',num_face_vert_max
 
             
             !! print the number of vertices in each face
@@ -2662,7 +2627,6 @@ subroutine PDAL2(   job_params,     &
                 print*,'warning: no normals found in wavefront file.'
                 print*,'this code is therefore unable to check that vertices are correctly ordered.'
                 print*,'the user should ensure that the vertex ids in each face should be in an anti-clockwise order as viewed externally.'
-                print*,'poor energy conservation in the beam loop my result if this is not taken care of.'
             else ! else, if some normals read, perform checks to see if vertices need reordering
                 ! if(job_params%debug >= 1) print*,'validating vertex ordering...'
                 ! call validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
@@ -2675,7 +2639,7 @@ subroutine PDAL2(   job_params,     &
             ! print*,'opening crystal file'
             open(unit = 10, file = cfn, status = 'old')
             read(10, *) num_face
-            print*,'number of unique faces: ',num_face
+            ! print*,'number of unique faces: ',num_face
 
             allocate(face_ids_temp(num_face,num_face_vert_max_in)) ! allocate an array for the vertex IDs in each face
             allocate(num_face_vert(num_face)) ! allocate array for the number of vertices in each face
@@ -2712,7 +2676,7 @@ subroutine PDAL2(   job_params,     &
 
             num_vert = m
 
-            print*,'total vertices to be read: ',num_vert
+            ! print*,'total vertices to be read: ',num_vert
 
             allocate(face_ids(num_face,num_face_vert_max)) ! allocate an array for the vertex IDs in each face
             face_ids(1:num_face,1:num_face_vert_max) = face_ids_temp(1:num_face,1:num_face_vert_max)
@@ -2736,7 +2700,7 @@ subroutine PDAL2(   job_params,     &
                 ! print*,'read expected number of vertices'
             end if
 
-            print*,'succesfully finished reading mrt particle file'
+            ! print*,'succesfully finished reading mrt particle file'
                 
 
             ! do i = 1, num_face ! for each face
@@ -2770,7 +2734,7 @@ subroutine PDAL2(   job_params,     &
         end if
 
     else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
-        print*,'attempting to make cc crystal'
+        write(101,*)'attempting to make cc crystal'
         call CC_HEX_MAIN(cc_hex_params,face_ids,verts,apertures)
         call PROT_CC(verts) ! align prism axis with z axis
         num_vert = size(verts,1)
@@ -2778,27 +2742,24 @@ subroutine PDAL2(   job_params,     &
         num_face_vert_max = 3
         allocate(num_face_vert(num_face))
         num_face_vert = 3
-        print*,'back from cc_hex_main'
+        ! write(101,*)'back from cc_hex_main'
     else
         print*,'error: ',c_method(1:len(trim(c_method))),' is not a valid method of particle file input'
         stop
     end if
 
-    write(101,*)'number of vertices:   ',num_vert
-    write(101,*)'number of faces:      ',num_face
-    write(101,*)'max vertices per face:',num_face_vert_max
 
     if (num_face_vert_max .gt. 3) then
         if(job_params%debug >= 1) then
-            print*,'warning: max vertices per facet greater than 3 detected. particle must be triangulated to proceed.'
-            print*,' attempting automatic triangulation...'
+            write(101,*)'warning: max vertices per facet greater than 3 detected. particle must be triangulated to proceed.'
+            write(101,*)' attempting automatic triangulation...'
         end if
         job_params%tri = .true.        
     end if
 
     call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas (for doing some checks in the following sr)
 
-    call area_stats(faceAreas)
+    ! call area_stats(faceAreas)
 
     ! now put everything into a data strucute (work in progress)
     ! vertices
@@ -2829,15 +2790,28 @@ subroutine PDAL2(   job_params,     &
     call compute_geometry_areas(geometry)
 
     call compute_geometry_com(geometry)
-    if(job_params%debug >= 2) print*,'centre of mass: ',geometry%com(:)
-    if(job_params%debug >= 2) print*,'translating centre of mass to origin...'
+    if(job_params%debug >= 2) write(101,*)'centre of mass: ',geometry%com(:)
+    if(job_params%debug >= 2) write(101,*)'translating centre of mass to origin...'
     call move_geometry_to_origin(geometry)
 
     call compute_geometry_midpoints(geometry) ! recompute after translating to origin
     call compute_geometry_normals(geometry)
     call compute_geometry_apertures(geometry)
 
-    print*,'========== end sr PDAL2'
+    ! write(101,*)'number of parents: ',geometry%na
+    ! write(101,*)'number of vertices: ',geometry%nv
+    ! write(101,*)'number of faces: ',geometry%nf
+    ! write(101,*)'number of normals: ',geometry%nn
+    ! write(101,*)'max vertices per face:',maxval(geometry%f(:)%nv)
+    ! write(101,*)'total surface area: ',geometry%area
+    ! write(101,*)'min facet area: ',minval(geometry%f(:)%area)
+    ! write(101,*)'max facet area: ',maxval(geometry%f(:)%area)
+    ! write(101,*)'centre of mass: ',geometry%com(:)
+    
+
+    ! write(101,*)'======================================================'
+    ! write(101,*)'======================================================'
+    ! write(101,*)'======================================================'
 
 end subroutine
 

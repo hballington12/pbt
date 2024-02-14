@@ -95,12 +95,12 @@ module cc_hex_mod
         ! OPEN(UNIT=3, FILE=TRIM(fn), STATUS='REPLACE') !output file
         
         !coordinates for 1/12th of the crystal
-        PRINT*, "Generating part of the crystal"
+        write(101,*) "Generating part of the crystal"
         ALLOCATE(fc1(szfc1,3))
         CALL coordgen(offset, nfhr, nfpl, hradius, pflength, szfc1, fc1)
         
         !calculate rough surface(s)
-        PRINT*, "Generating roughness"
+        write(101,*) "Generating roughness"
         DO j1=1,nscales
             CALL GRFStrip(L, clen(j1), stdev(j1), targetdiff, fc1, szfc1)
         END DO
@@ -141,7 +141,7 @@ module cc_hex_mod
         END IF
         
         !rotate basal facet into position and do rotations on and near the boundary between the prism facet and the basal facet
-        PRINT*, "Doing basal facet-prism facet boundary rotations"
+        write(101,*) "Doing basal facet-prism facet boundary rotations"
         szfc2=szfc1*2
         ALLOCATE(fc2(szfc2,3))
         fc2(1:szfc1,:)=fc1(1:szfc1,:)
@@ -183,7 +183,7 @@ module cc_hex_mod
         END DO
         
         !perform edge rotations on the prism facet (where it will border other prism facets)
-        PRINT*, "Doing prism facet-prism facet boundary rotations"
+        write(101,*) "Doing prism facet-prism facet boundary rotations"
         szpfr1=CEILING(REAL(nfpl/4))
         szpfr2=FLOOR(REAL(nfpl/4))
         ALLOCATE(pfr1(szpfr1), pfr2(szpfr2))
@@ -215,7 +215,7 @@ module cc_hex_mod
         END DO
         
         !make another 1/6th basal facet and 1/2th prism facet and rotate into position
-        PRINT*, "Duplicating to generate a half-crystal"
+        write(101,*) "Duplicating to generate a half-crystal"
         fc2(szfc1+1:2*szfc1,:)=fc2(1:szfc1,:)
         CALL rotx(fc2(szfc1+1:2*szfc1,:), szfc1, pi, z)
         fc2(szfc1+1:2*szfc1,3)=-fc2(szfc1+1:2*szfc1,3)
@@ -234,7 +234,7 @@ module cc_hex_mod
         CALL rotx(fc3(2*szfc2+1:3*szfc2,:), szfc2, 4.*pi/3., z)
         
         !convert into Macke format
-        PRINT*, "Converting to Macke format"
+        write(101,*) "Converting to Macke format"
         ALLOCATE(p(szp,3))
         DO j1=1,6
             cmv=MOD(j1,2) !if cmv=0, convmacke reverses surface normals
@@ -242,7 +242,7 @@ module cc_hex_mod
         END DO
         
         !create subfacets to join each prism facet
-        PRINT*, 'Filling gaps between prism facets'
+        write(101,*) 'Filling gaps between prism facets'
         DEALLOCATE(pfr2)
         ALLOCATE(pfr2b(szpfr2+1))
         ALLOCATE(pfr1b(szpfr1))
@@ -271,7 +271,7 @@ module cc_hex_mod
         CALL revnorm(p, szp)
         
         !mirror to get 2nd basal facet and 2nd half of all prism facets
-        PRINT*, "Duplicating the half-crystal to create the whole crystal"
+        write(101,*) "Duplicating the half-crystal to create the whole crystal"
         p(1:szp/2,1)=p(1:szp/2,1)-MAXVAL(p(1:szp/2,1))
         p(szp/2+1:szp,:)=p(1:szp/2,:)
         p(szp/2+1:szp,1)=-p(szp/2+1:szp,1)
@@ -286,7 +286,7 @@ module cc_hex_mod
         
         
         !output the crystal file
-        ! PRINT*, "Not saving the crystal"
+        ! write(101,*) "Not saving the crystal"
         !format is:
         !row 1: number of parent facets
         !rows 2-9: number of vertices for each parent facet
@@ -347,8 +347,8 @@ module cc_hex_mod
                 vert_counter = vert_counter + 1
                 face_ids(face_counter,3-k1+1) = vert_counter
             end do
-            ! print*,'apertures(',face_counter,')',apertures(face_counter)
-            ! print*,'face_ids(',face_counter,',1:3)',face_ids(face_counter,1), face_ids(face_counter,2), face_ids(face_counter,3)
+            ! write(101,*)'apertures(',face_counter,')',apertures(face_counter)
+            ! write(101,*)'face_ids(',face_counter,',1:3)',face_ids(face_counter,1), face_ids(face_counter,2), face_ids(face_counter,3)
             ! WRITE(UNIT=3, FMT=*) 3, 1
         END DO
         DO j1=nf16bf+1,nf1s
@@ -783,9 +783,9 @@ module cc_hex_mod
         
         ! CLOSE(UNIT=3) 
         
-        print*,'total # faces: ',face_counter
+        write(101,*)'total # faces: ',face_counter
         
-        ! PRINT*, 'Output filename is:', TRIM(fn)
+        ! write(101,*) 'Output filename is:', TRIM(fn)
         
         DEALLOCATE(p, fc3)
         
@@ -1026,7 +1026,7 @@ module cc_hex_mod
                 zpq(pqval-p,pqval-q)=zpqr-i*zpqi
             END DO
         END DO
-        !PRINT*, 'Coefficient values set'
+        !write(101,*) 'Coefficient values set'
         
         !calculate z_xy for all points
         n=0

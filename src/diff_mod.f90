@@ -709,7 +709,7 @@ module diff_mod
     work_done = 0
 
     if(job_params%debug >= 1) then
-        print*,'start diff beam loop...'
+        write(101,*)'start diff beam loop...'
     end if
 
     if(job_params%is_multithreaded) then
@@ -753,13 +753,13 @@ module diff_mod
 
     if(omp_get_thread_num() .eq. 0) then
         if(job_params%debug >= 1) then
-            print*,'end diff beam loop...'
+            write(101,*)'end diff beam loop...'
             if(job_params%timing) then
                 finish1 = omp_get_wtime()
-                print'(A,f16.8,A)',"beam diffraction took: ",finish1-start1," secs"
+                write(101,'(A,f16.8,A)')"beam diffraction took: ",finish1-start1," secs"
                 start1 = omp_get_wtime()
             end if
-            print*,'start ext diff loop...'
+            write(101,*)'start ext diff loop...'
         end if
     end if
 
@@ -795,10 +795,10 @@ module diff_mod
 
     if(omp_get_thread_num() .eq. 0) then
         if(job_params%debug >= 1) then
-            print*,'end ext diff loop...'
+            write(101,*)'end ext diff loop...'
             if(job_params%timing) then
                 finish1 = omp_get_wtime()
-                print'(A,f16.8,A)',"external diffraction took: ",finish1-start1," secs"
+                write(101,'(A,f16.8,A)')"external diffraction took: ",finish1-start1," secs"
             end if
         end if
     end if
@@ -807,7 +807,7 @@ module diff_mod
     if(job_params%debug >= 1) then
         if(job_params%timing) then
             finish = omp_get_wtime()
-            print'(A,f16.8,A)',"diffraction took: ",finish-start," secs"
+            write(101,'(A,f16.8,A)')"diffraction took: ",finish-start," secs"
         end if
     end if
 
