@@ -50,4 +50,9 @@ This directory contains various template files you may wish to use for running t
 -export_beam rec 2 # export beams in json format up to and including the 2nd recursion
 -export_beam num 50 # export beams in json format up to the 50th beam
 -fast_diff # enable faster (but less accurate) diffraction
+-intellirot # use uniformly distributed euler angles for orientation averaging
+-beta_min # set the minimum beta angle, to account for particle symmetry
+-beta_max # set the maximum beta angle, to account for particle symmetry
+-gamma_min # set the minimum gamma angle, to account for particle symmetry
+-gamma_max # set the maximum gamma angle, to account for particle symmetry
 ```
