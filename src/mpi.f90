@@ -268,7 +268,7 @@ do i = my_start, my_end
 
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .and. i /= my_end) then
         i_finished_early = .true.
-        exit ! break out of the orientation loop    
+        if(my_rank == 0) print*,'time limit reached. caching job...'
     end if
 
     my_iter = i - my_start + 1 ! save progress for this rank
@@ -311,6 +311,8 @@ do i = my_start, my_end
         end if
     end if
 
+    if(i_finished_early) exit
+
 end do
 
 if (my_rank .eq. 0) print*,'end orientation loop'
@@ -323,7 +325,7 @@ if (my_rank == 0) then
         total_iter = total_iter + recv_iter ! update total progress
         iter_to_collect = num_remaining_orients-total_iter-(my_end-my_iter) ! progress left to collect
     end if
-    do while (iter_to_collect > 0) ! while there is stuff left to receive
+    do while (iter_to_collect > 0 .and. (omp_get_wtime() - start)/3600D0 .lt. job_params%time_limit ) ! while there is stuff left to receive, and the time limit has not been reached
         call MPI_IRECV(recv_iter, 1, MPI_INTEGER, MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, recv_request, ierr)
         call MPI_WAIT(recv_request, MPI_STATUS_IGNORE, ierr) ! wait for current receive to finish
         total_iter = total_iter + recv_iter ! update total progress
