@@ -61,7 +61,7 @@ real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d
 
 ! mpi
 integer ierr
-integer tag
+integer, parameter :: tag = 1
 integer p
 logical flag
 integer source, dest
@@ -71,9 +71,11 @@ integer n1, n2
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 logical i_finished_early, other_finished_early
 logical is_job_cached
-integer(8) my_iter, total_iter
+integer my_iter, total_iter, recv_iter, iter_done, iter_to_collect
 ! integer, dimension(:), allocatable :: request
 integer request
+integer send_request, recv_request
+logical sent_request, cont
 
 ! sr finalise
 type(output_parameters_type) output_parameters 
@@ -91,9 +93,10 @@ integer(8) num_remaining_orients
 call MPI_INIT(ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, my_rank, ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, p, ierr)
-tag = 1
 total_iter = 0 ! init
 print*,'p=',p
+flag = .true.
+sent_request = .false.
 ! allocate(request(1:p-1))
 i_finished_early = .false.
 is_job_cached = .false.
@@ -216,6 +219,8 @@ write(101,*)'starting orientation loop... start: ',my_start,'end: ',my_end
 
 do i = my_start, my_end
 
+    cont = .false.
+
     i_loop = remaining_orients(i)
 
     ! rotate particle
@@ -241,16 +246,6 @@ do i = my_start, my_end
                     rotated_geometry, &
                     beam_geometry, &
                     beam_inc)
-
-    ! if(num_remaining_orients > 1 .and. my_rank == 0 .and. i > my_start) then
-    !     print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',total_iter,' / ',num_remaining_orients,' (total progress: ',dble(total_iter)/dble(num_remaining_orients)*100,' %)'
-    !     ! print*,'total time elapsed: ',omp_get_wtime()-start
-    !     ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i_loop)
-    !     if (i_loop .gt. 1) then
-    !         print'(A20,F12.4,A5)','est. time remaining: '
-    !         call PROUST(nint(dble(num_remaining_orients-total_iter)*(omp_get_wtime()-start) / dble(total_iter+1)))
-    !     end if
-    ! end if
     
     ! diffraction
     call diff_main( beam_outbeam_tree,          & ! <-  outgoing beams from the beam tracing
@@ -277,10 +272,74 @@ do i = my_start, my_end
     end if
 
     my_iter = i - my_start + 1 ! save progress for this rank
-    
+    total_iter = total_iter + 1 ! sum total progress
+
+    if (my_rank /= 0) then ! if not rank 0 process
+        iter_done = 1 ! set amount of work done
+        ! send work done to rank 0
+        call MPI_ISEND(iter_done, 1, MPI_INTEGER, 0, tag, MPI_COMM_WORLD, send_request, ierr)
+    end if
+
+    ! Process 1 posts a non-blocking receive
+    if (my_rank == 0) then ! if rank 0 process
+        iter_to_collect = num_remaining_orients-total_iter-(my_end-my_iter) ! .calc progress left to collect
+        do while (iter_to_collect > 0 .and. .not. cont) ! while there is progress to collect, and not ready to continue
+            if(.not. sent_request) then ! if no send request has yet to be sent
+                ! send a non-blocking request to receive progress
+                call MPI_IRECV(recv_iter, 1, MPI_INTEGER, MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, recv_request, ierr)
+                sent_request = .true. ! receive request has been sent
+            end if
+            ! test for received data
+            call MPI_TEST(recv_request, flag, MPI_STATUS_IGNORE, ierr)
+            if(flag) then ! if data has been received
+                sent_request = .false. ! keep track, so that a new request can be made to receive progress
+                total_iter = total_iter + recv_iter ! update total progress
+                iter_to_collect = num_remaining_orients-total_iter-(my_end-my_iter) ! calc progress left to collect
+            else ! else, if no data was receive
+                cont = .true. ! continue with our own work
+            end if
+        end do
+    end if
+
+    if(num_remaining_orients > 1 .and. my_rank == 0 .and. total_iter > 1) then
+        print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',total_iter,' / ',num_remaining_orients,' (total progress: ',dble(total_iter)/dble(num_remaining_orients)*100,' %)'
+        ! print*,'total time elapsed: ',omp_get_wtime()-start
+        ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i_loop)
+        if (i_loop .gt. 1) then 
+            print'(A20,F12.4,A5)','est. time remaining: '
+            call PROUST(nint(dble(num_remaining_orients-total_iter)*(omp_get_wtime()-start) / dble(total_iter+1)))
+        end if
+    end if
+
 end do
 
 if (my_rank .eq. 0) print*,'end orientation loop'
+
+    ! Process 1 posts a non-blocking receive
+if (my_rank == 0) then
+    ! if receive request exists, but not yet received, wait
+    if(.not. flag) then
+        call MPI_WAIT(recv_request, MPI_STATUS_IGNORE, ierr) ! wait for current receive to finish
+        total_iter = total_iter + recv_iter ! update total progress
+        iter_to_collect = num_remaining_orients-total_iter-(my_end-my_iter) ! progress left to collect
+    end if
+    do while (iter_to_collect > 0) ! while there is stuff left to receive
+        call MPI_IRECV(recv_iter, 1, MPI_INTEGER, MPI_ANY_SOURCE, TAG, MPI_COMM_WORLD, recv_request, ierr)
+        call MPI_WAIT(recv_request, MPI_STATUS_IGNORE, ierr) ! wait for current receive to finish
+        total_iter = total_iter + recv_iter ! update total progress
+        iter_to_collect = num_remaining_orients-total_iter-(my_end-my_iter) ! progress left to collect
+
+        if(num_remaining_orients > 1 .and. my_rank == 0 .and. total_iter > 1) then
+            print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',total_iter,' / ',num_remaining_orients,' (total progress: ',dble(total_iter)/dble(num_remaining_orients)*100,' %)'
+            ! print*,'total time elapsed: ',omp_get_wtime()-start
+            ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i_loop)
+            if (i_loop .gt. 1) then 
+                print'(A20,F12.4,A5)','est. time remaining: '
+                call PROUST(nint(dble(num_remaining_orients-total_iter)*(omp_get_wtime()-start) / dble(total_iter+1)))
+            end if
+        end if
+    end do ! end receive loop
+end if
 
 call MPI_BARRIER(MPI_COMM_WORLD,ierr)
 
