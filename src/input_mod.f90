@@ -1181,8 +1181,8 @@ subroutine init_loop(   alpha_vals, &
     allocate(beta_vals(1:num_orients))
     allocate(gamma_vals(1:num_orients))
 
-    print*,'job_params%beta_lims',job_params%beta_lims
-    print*,'job_params%gamma_lims',job_params%gamma_lims
+    ! print*,'job_params%beta_lims',job_params%beta_lims
+    ! print*,'job_params%gamma_lims',job_params%gamma_lims
 
         ! check the validity of beta and gamma lims
     if(job_params%beta_lims(1) .gt. job_params%beta_lims(2)) then
@@ -1209,9 +1209,9 @@ subroutine init_loop(   alpha_vals, &
     ! get beta (h) and gamma (w) limits when mapped to number in range 0 to 1
     
     h = (job_params%beta_lims(2) - job_params%beta_lims(1)) / 180D0
-    print*,'h=',h
+    ! print*,'h=',h
     w = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
-    print*,'w=',w
+    ! print*,'w=',w
 
     if (intellirot) then
 
@@ -1232,18 +1232,18 @@ subroutine init_loop(   alpha_vals, &
         ! num_gamma_angles = floor(sqrt(real(num_orients)))
         ! print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
         ! print*,'num_beta_angles=',num_beta_angles,'(',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h),')'
-        print*,'num_gamma_angles=',num_gamma_angles,'(',(-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w),')'
+        ! print*,'num_gamma_angles=',num_gamma_angles,'(',(-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w),')'
 
         ! num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
         num_beta_angles = floor(num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)))
         ! num_beta_angles = floor(sqrt(real(num_orients)))
         ! print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
         ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)),')'
-        print*,'num_beta_angles=',num_beta_angles,'(',num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)),')'
+        ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)),')'
 
 
         leftover_angles = num_orients - num_beta_angles*num_gamma_angles
-        print*,'number of (leftover) random euler angles: ',leftover_angles
+        ! print*,'number of (leftover) random euler angles: ',leftover_angles
 
         ! stop
 

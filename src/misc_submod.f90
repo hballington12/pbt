@@ -25,7 +25,7 @@
         print*,'scattering efficiency:',output_parameters%scatt_eff
         print*,'absorption efficiency:',output_parameters%abs_eff
         print*,'extinction efficiency:',output_parameters%ext_eff    
-        print*,'asymmetry parameter:',output_parameters%albedo
+        print*,'asymmetry parameter:',output_parameters%asymmetry
         print*,'single-scattering albedo:',output_parameters%albedo
         print*,'back scatt. cross section:',output_parameters%back_scatt
         print*,'======================================================'
@@ -646,6 +646,8 @@
                     print*,'gamma symmetry from',job_params%gamma_lims(1),' to ',job_params%gamma_lims(2)
                 else
                     print*,'multirot method: random'
+                    print*,'beta symmetry from',job_params%beta_lims(1),' to ',job_params%beta_lims(2)
+                    print*,'gamma symmetry from',job_params%gamma_lims(1),' to ',job_params%gamma_lims(2)
                 end if
                 if(job_params%output_eulers) then
                     print*,'output euler angles to file: enabled'
