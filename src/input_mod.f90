@@ -293,7 +293,7 @@ job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
 job_params%scaling = .false.
-job_params%beta_lims = (/0D0,360D0/)
+job_params%beta_lims = (/0D0,180D0/)
 job_params%gamma_lims = (/0D0,360D0/)
 job_params%output_eulers = .false.
 job_params%debug = 1 ! default value is some debugging output
@@ -1181,6 +1181,38 @@ subroutine init_loop(   alpha_vals, &
     allocate(beta_vals(1:num_orients))
     allocate(gamma_vals(1:num_orients))
 
+    ! print*,'job_params%beta_lims',job_params%beta_lims
+    ! print*,'job_params%gamma_lims',job_params%gamma_lims
+
+        ! check the validity of beta and gamma lims
+    if(job_params%beta_lims(1) .gt. job_params%beta_lims(2)) then
+        print*,'error: lower beta limit was greater than the upper beta limit'
+        stop
+    else if(job_params%beta_lims(1) .lt. -1D-4 .or. job_params%beta_lims(1) .gt. 180D0) then
+        print*,'error: lower beta limit must lie in the range 0 to 180'
+        stop
+    else if(job_params%beta_lims(2) .lt. -0.0001 .or. job_params%beta_lims(2) .gt. 180D0) then
+        print*,'error: upper beta limit must lie in the range 0 to 180'
+        stop
+    end if
+    if(job_params%gamma_lims(1) .gt. job_params%gamma_lims(2)) then
+        print*,'error: lower gamma limit was greater than the upper gamma limit'
+        stop
+    else if(job_params%gamma_lims(1) .lt. -1D-4 .or. job_params%gamma_lims(1) .gt. 360D0) then
+        print*,'error: lower gamma limit must lie in the range 0 to 180'
+        stop
+    else if(job_params%gamma_lims(2) .lt. -0.0001 .or. job_params%gamma_lims(2) .gt. 360D0) then
+        print*,'error: upper gamma limit must lie in the range 0 to 180'
+        stop
+    end if
+
+    ! get beta (h) and gamma (w) limits when mapped to number in range 0 to 1
+    
+    h = (job_params%beta_lims(2) - job_params%beta_lims(1)) / 180D0
+    ! print*,'h=',h
+    w = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
+    ! print*,'w=',w
+
     if (intellirot) then
 
         ! the spacing for beta and gamma must be uniformly distributed
@@ -1189,34 +1221,10 @@ subroutine init_loop(   alpha_vals, &
         ! print*,'job_params%beta_lims',job_params%beta_lims
         ! print*,'job_params%gamma_lims',job_params%gamma_lims
 
-        ! check the validity of beta and gamma lims
-        if(job_params%beta_lims(1) .gt. job_params%beta_lims(2)) then
-            print*,'error: lower beta limit was greater than the upper beta limit'
-            stop
-        else if(job_params%beta_lims(1) .lt. -1D-4 .or. job_params%beta_lims(1) .gt. 180D0) then
-            print*,'error: lower beta limit must lie in the range 0 to 180'
-            stop
-        else if(job_params%beta_lims(2) .lt. -0.0001 .or. job_params%beta_lims(2) .gt. 180D0) then
-            print*,'error: upper beta limit must lie in the range 0 to 180'
-            stop
-        end if
-        if(job_params%gamma_lims(1) .gt. job_params%gamma_lims(2)) then
-            print*,'error: lower gamma limit was greater than the upper gamma limit'
-            stop
-        else if(job_params%gamma_lims(1) .lt. -1D-4 .or. job_params%gamma_lims(1) .gt. 360D0) then
-            print*,'error: lower gamma limit must lie in the range 0 to 180'
-            stop
-        else if(job_params%gamma_lims(2) .lt. -0.0001 .or. job_params%gamma_lims(2) .gt. 360D0) then
-            print*,'error: upper gamma limit must lie in the range 0 to 180'
-            stop
-        end if
+
 
         ! stop
 
-        h = (job_params%beta_lims(2) - job_params%beta_lims(1)) / 180D0
-        ! print*,'w=',w
-        w = (job_params%gamma_lims(2) - job_params%gamma_lims(1)) / 360D0
-        ! print*,'h=',h
 
 
         ! num_beta_angles = floor(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
@@ -1224,18 +1232,18 @@ subroutine init_loop(   alpha_vals, &
         ! num_gamma_angles = floor(sqrt(real(num_orients)))
         ! print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
         ! print*,'num_beta_angles=',num_beta_angles,'(',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h),')'
-        print*,'num_gamma_angles=',num_gamma_angles,'(',(-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w),')'
+        ! print*,'num_gamma_angles=',num_gamma_angles,'(',(-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w),')'
 
         ! num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
         num_beta_angles = floor(num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)))
         ! num_beta_angles = floor(sqrt(real(num_orients)))
         ! print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
         ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)),')'
-        print*,'num_beta_angles=',num_beta_angles,'(',num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)),')'
+        ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)),')'
 
 
         leftover_angles = num_orients - num_beta_angles*num_gamma_angles
-        print*,'number of (leftover) random euler angles: ',leftover_angles
+        ! print*,'number of (leftover) random euler angles: ',leftover_angles
 
         ! stop
 
@@ -1252,14 +1260,14 @@ subroutine init_loop(   alpha_vals, &
             do i = 1, num_beta_angles ! for each entry, linear interpolate from 0 to 1
                 beta_intelli_vals(i) = beta_spacing * (i-1) + &
                     ! beta_spacing / 4D0 + & ! with small shift to avoid normal incidence
-                    job_params%beta_lims(1) / 180D0 ! note that beta_lims(1) shouldnt be in the range 0 to 180 deg.
+                    job_params%beta_lims(1) / 180D0 ! note that beta_lims(1) should be in the range 0 to 180 deg.
                     
                 ! print*,'beta_intelli_vals(i)',beta_intelli_vals(i)
             end do 
             gamma_spacing = w/real(num_gamma_angles)
             do i = 1, num_gamma_angles ! for each entry, linear interpolate from 0 to 1
                 gamma_intelli_vals(i) = gamma_spacing * (i-1) + &
-                    job_params%gamma_lims(1) / 360D0 ! note that gamma_lims(1) shouldnt be in the range 0 to 360 deg.
+                    job_params%gamma_lims(1) / 360D0 ! note that gamma_lims(1) should be in the range 0 to 360 deg.
                 ! print*,'gamma_intelli_vals(i)',gamma_intelli_vals(i)
             end do                        
         end if
@@ -1287,9 +1295,11 @@ subroutine init_loop(   alpha_vals, &
             ! alpha_vals(counter) = rand
             alpha_vals(counter) = 0D0
             call random_number(rand)
-            beta_vals(counter) = rand
+            ! beta_vals(counter) = rand
+            beta_vals(counter) = rand*h + job_params%beta_lims(1)/180D0
             call random_number(rand)
-            gamma_vals(counter) = rand                        
+            ! gamma_vals(counter) = rand
+            gamma_vals(counter) = rand*w + job_params%gamma_lims(1)/360D0
         end do
 
         ! print intelligent euler angles
@@ -1303,8 +1313,10 @@ subroutine init_loop(   alpha_vals, &
             ! call random_number(alpha_vals(i))
             ! for random orientation, alpha has no effect on the 1d patterns, so set it to a constant
             alpha_vals(i) = 0D0
-            call random_number(beta_vals(i))
-            call random_number(gamma_vals(i))
+            call random_number(rand)
+            beta_vals(i) = rand*h + job_params%beta_lims(1)/180D0
+            call random_number(rand)
+            gamma_vals(i) = rand*w + job_params%gamma_lims(1)/360D0
         end do
     end if
 

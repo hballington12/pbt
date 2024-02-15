@@ -9,7 +9,7 @@ Compile instructions (gcc-13.0.1 & openmpi-4.0.5)
 - `cd src/seq; make` - compiles sequential code
 - `cd src/mpi; make` - compiles mpi code
 
-Example shell scripts for submitting jobs may be found in `template/`
+Example shell scripts and a short summary of command line flags for submitting jobs may be found in `template/`.
 
 ## Input Flags
 
@@ -115,6 +115,16 @@ Main source file. It contains the program entry point. The PBT reads input param
     - `rec <value> [<value>]` - exports by recursion number. If 1 value is given, the beam tree is exported from the first recursion to the recursion specified by the value. If 2 values are given, the beam tree is exported from the recursion specified by the first value to the recursion specified by the second value.
 
 - `-fast_diff` - enables an approximate but faster diffraction method. According to Jackson, Classical Electrodynamics Sec 10.5, most of the diffracted energy is confined within the angle $\lambda/d$, where $d$ is a linear dimension of the aperture. If this flag is enabled, any far-field bins outside an angle of $8\lambda/d$ are excluded from the diffraction calculation, for a given outgoing beam. This flag also restricts the external diffraction to the forwards scattering.
+
+- `intellirot` - sets the euler angles for orientation averaging to be uniformly distributed, instead of randomly distrubuted.
+
+- `beta_min <value>` - sets the minimum beta angle for orientation averaging, which can be used to take advantage of particle symmetry. Must be in the range `0` to `180`.
+
+- `beta_max <value>` - sets the maximum beta angle for orientation averaging, which can be used to take advantage of particle symmetry. Must be in the range `0` to `180`.
+
+- `gamma_min <value>` - sets the minimum gamma angle for orientation averaging, which can be used to take advantage of particle symmetry. Must be in the range `0` to `360`.
+
+- `gamma_max <value>` - sets the maximum gamma angle for orientation averaging, which can be used to take advantage of particle symmetry. Must be in the range `0` to `360`.
 
  ## Examples
 
