@@ -300,13 +300,15 @@ do i = my_start, my_end
         end do
     end if
 
-    if(num_remaining_orients > 1 .and. my_rank == 0 .and. total_iter > 1) then
+    if(num_remaining_orients > 1 .and. my_rank == 0) then
         print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',total_iter,' / ',num_remaining_orients,' (total progress: ',dble(total_iter)/dble(num_remaining_orients)*100,' %)'
         ! print*,'total time elapsed: ',omp_get_wtime()-start
         ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i_loop)
-        if (i_loop .gt. 1) then 
-            print'(A20,F12.4,A5)','est. time remaining: '
-            call PROUST(nint(dble(num_remaining_orients-total_iter)*(omp_get_wtime()-start) / dble(total_iter+1)))
+        if(job_params%timing) then
+            if (total_iter > 1) then 
+                print'(A20,F12.4,A5)','est. time remaining: '
+                call PROUST(nint(dble(num_remaining_orients-total_iter)*(omp_get_wtime()-start) / dble(total_iter+1)))
+            end if
         end if
     end if
 
