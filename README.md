@@ -126,6 +126,8 @@ Main source file. It contains the program entry point. The PBT reads input param
 
 - `gamma_max <value>` - sets the maximum gamma angle for orientation averaging, which can be used to take advantage of particle symmetry. Must be in the range `0` to `360`.
 
+- `-output_eulers` - outputs the euler angles used for orientation averaging to a file
+
  ## Examples
 
  `abt -lambda 0.532 -rbi 1.3117 -ibi 0 -rec 10 -rot euler 20 35 2 -cmethod read -cft obj -cfn my_particle.obj -afn my_apertures.dat -mt -theta 0 1 180 -phi 0 2 360` - run `abt` executable with wavelength 0.532, refractive index 1.3117 + 0i, 10 beam recursions, particle rotated with euler angles 20, 35, read the particle with particle file type `.obj`, filename `my_particle.obj`, apertures specified in the file `my_apertures.dat`, with multithreading enabled. Evaluate the far-field at polar angle 0 in 1 degree steps to 180 and at azimuthal angle 0 in 2 degree steps to 360.
