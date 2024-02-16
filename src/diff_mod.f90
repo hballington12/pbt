@@ -364,6 +364,8 @@ module diff_mod
 
         if(abs(mj) .gt. HUGE(1D0)) mj = 1e6 ! fix infinite gradient (these terms have little contribution becaese x_(j+1) = x(j) and they cancel)
         if(abs(nj) .gt. HUGE(1D0)) nj = 1e6 ! fix infinite 1/gradient
+        if(abs(mj) .lt. 1d-9) nj = 1e6 ! fix infinite 1/gradient
+        if(abs(nj) .lt. 1d-9) mj = 1e6 ! fix infinite 1/gradient
 
         if(j .eq. 3) then
             xj_plus1 = x(1)
