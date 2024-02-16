@@ -1190,6 +1190,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%pr = 0 ! init
                 beam_tree(num_beams)%pt = 0 ! init
                 beam_tree(num_beams)%po = 0 ! init
+                beam_tree(num_beams)%abs = 0 ! init
                 beam_tree(num_beams)%proj_area_in = 0 ! init
                 beam_tree(num_beams)%proj_area_ill = 0 ! init
                 beam_tree(num_beams)%proj_area_outgoing = 0 ! init
@@ -1214,6 +1215,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 beam_tree(num_beams)%pr = 0 ! init
                 beam_tree(num_beams)%pt = 0 ! init
                 beam_tree(num_beams)%po = 0 ! init
+                beam_tree(num_beams)%abs = 0 ! init
                 beam_tree(num_beams)%proj_area_in = 0 ! init
                 beam_tree(num_beams)%proj_area_ill = 0 ! init
                 beam_tree(num_beams)%proj_area_outgoing = 0 ! init
@@ -1586,6 +1588,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         finish = 0d0
         finish1 = 0d0
         done = .false.
+        output_parameters%abs = 0d0 ! init absorption cross section for this orientation
         
         if(job_params%timing) then
             start = omp_get_wtime()
@@ -1655,7 +1658,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                 if(beam%is_int) then ! if the beam is internally propagating
                     call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                     !$omp critical
-                    if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section
+                    if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section for this orientation
                     if( beam%rec < job_params%rec .or. &
                     (beam%is_tir .and. beam%refl < job_params%refl)) call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree (if max recursions hasnt been reached, or if beam was total internal reflection and max total internal reflections hasnt been reached)
                     !$omp end critical
