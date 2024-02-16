@@ -686,8 +686,8 @@
                 write(10,*)'7) no. rotations at prism-prism intersections: ',job_params%cc_hex_params%pper
                 write(10,*)'8) no. roughness scales: ',job_params%cc_hex_params%nscales
                 do i = 1, job_params%cc_hex_params%nscales
-                    print('(A,I1,A,f16.8)'),' correlation length ',i,': ',job_params%cc_hex_params%cls(i)
-                    print('(A,I1,A,f16.8)'),' standard deviation ',i,': ',job_params%cc_hex_params%sds(i)
+                    write(10,'(A,I1,A,f16.8)')' correlation length ',i,': ',job_params%cc_hex_params%cls(i)
+                    write(10,'(A,I1,A,f16.8)')' standard deviation ',i,': ',job_params%cc_hex_params%sds(i)
                 end do
             end if
             if(job_params%suppress_2d) then
