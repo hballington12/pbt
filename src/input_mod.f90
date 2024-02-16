@@ -389,7 +389,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                     
                 case('multi')
                     read(arg,*) rot_method
-                    print*,'rot_method: ', trim(rot_method)
+                    ! print*,'rot_method: ', trim(rot_method)
                     i = i + 1 ! update counter to read the number of orientations
                     call get_command_argument(i,arg,status=my_status)
                     if (my_status .eq. 1) then ! if no argument found
