@@ -86,7 +86,7 @@ call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for 
 
 open(101,file=trim(job_params%output_dir)//"/"//"log") ! open global non-standard log file for important records
 
-call print_job_params(job_params) ! write job parameters to std out
+call write_job_params(job_params,job_params%output_dir) ! write job parameters to std out
 
 ! get input particle geometry
 call PDAL2( job_params,     & ! <-  job parameters

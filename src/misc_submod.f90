@@ -616,139 +616,143 @@
             
         end subroutine
         
-        subroutine print_job_params(job_params)
+        subroutine write_job_params(job_params,dir)
             
             type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
+            character(len=*), intent(in) :: dir ! output directory
             
             integer i
+
+            open(10,file=trim(dir)//"/job_settings.txt")
             
-            print*,'======================================================'
-            print*,'=====================JOB SETTINGS====================='
-            print*,'======================================================'
-            print*,'job_name: "',trim(job_params%job_name),'"'
-            print*,'lambda: ',job_params%la
-            print*,'refractive index real: ',job_params%rbi
-            print*,'refractive index imag: ',job_params%ibi
-            print*,'max beam recursions: ',job_params%rec
-            print*,'max total internal reflections: ',job_params%refl
-            print*,'rotation method: "',job_params%rot_method(1:len(trim(job_params%rot_method))),'"'
-            print*,'no. of orientations: ',job_params%num_orients
+            write(10,*)'======================================================'
+            write(10,*)'=====================JOB SETTINGS====================='
+            write(10,*)'======================================================'
+            write(10,*)'job_name: "',trim(job_params%job_name),'"'
+            write(10,*)'lambda: ',job_params%la
+            write(10,*)'refractive index real: ',job_params%rbi
+            write(10,*)'refractive index imag: ',job_params%ibi
+            write(10,*)'max beam recursions: ',job_params%rec
+            write(10,*)'max total internal reflections: ',job_params%refl
+            write(10,*)'rotation method: "',job_params%rot_method(1:len(trim(job_params%rot_method))),'"'
+            write(10,*)'no. of orientations: ',job_params%num_orients
             if (job_params%is_multithreaded) then
-                print*,'multithreading: ','enabled'
+                write(10,*)'multithreading: ','enabled'
             else
-                print*,'multithreading: ','disabled'
+                write(10,*)'multithreading: ','disabled'
             end if
-            print*,'particle input method:"',job_params%c_method(1:len(trim(job_params%c_method))),'"'
+            write(10,*)'particle input method:"',job_params%c_method(1:len(trim(job_params%c_method))),'"'
             if(job_params%num_orients > 1) then
                 if (job_params%intellirot) then
-                    print*,'multirot method: intelligent'
-                    print*,'beta symmetry from',job_params%beta_lims(1),' to ',job_params%beta_lims(2)
-                    print*,'gamma symmetry from',job_params%gamma_lims(1),' to ',job_params%gamma_lims(2)
+                    write(10,*)'multirot method: intelligent'
+                    write(10,*)'beta symmetry from',job_params%beta_lims(1),' to ',job_params%beta_lims(2)
+                    write(10,*)'gamma symmetry from',job_params%gamma_lims(1),' to ',job_params%gamma_lims(2)
                 else
-                    print*,'multirot method: random'
-                    print*,'beta symmetry from',job_params%beta_lims(1),' to ',job_params%beta_lims(2)
-                    print*,'gamma symmetry from',job_params%gamma_lims(1),' to ',job_params%gamma_lims(2)
+                    write(10,*)'multirot method: random'
+                    write(10,*)'beta symmetry from',job_params%beta_lims(1),' to ',job_params%beta_lims(2)
+                    write(10,*)'gamma symmetry from',job_params%gamma_lims(1),' to ',job_params%gamma_lims(2)
                 end if
                 if(job_params%output_eulers) then
-                    print*,'output euler angles to file: enabled'
+                    write(10,*)'output euler angles to file: enabled'
                 else
-                    print*,'output euler angles to file: disabled'
+                    write(10,*)'output euler angles to file: disabled'
                 end if
             else
                 if(job_params%rot_method(1:len(trim(job_params%rot_method))) .eq. "euler") then
-                    print*,'rotation method: euler'
-                    print*,'euler alpha: ',job_params%eulers(1)
-                    print*,'euler beta: ',job_params%eulers(2)
-                    print*,'euler gamma: ',job_params%eulers(3)
+                    write(10,*)'rotation method: euler'
+                    write(10,*)'euler alpha: ',job_params%eulers(1)
+                    write(10,*)'euler beta: ',job_params%eulers(2)
+                    write(10,*)'euler gamma: ',job_params%eulers(3)
                 else if (job_params%rot_method(1:len(trim(job_params%rot_method))) .eq. "off") then
-                    print*,'rotation method: off'
-                    print*,'off setting 1: ',job_params%offs(1)
-                    print*,'off setting 2: ',job_params%offs(2)
+                    write(10,*)'rotation method: off'
+                    write(10,*)'off setting 1: ',job_params%offs(1)
+                    write(10,*)'off setting 2: ',job_params%offs(2)
                 else if (job_params%rot_method(1:len(trim(job_params%rot_method))) .eq. "none") then
-                    print*,'rotation method: none'
+                    write(10,*)'rotation method: none'
                 end if
             end if
             if(job_params%c_method(1:len(trim(job_params%c_method))) .eq. "read") then ! if particle is to be read from file
-                print*,'particle filename: "',job_params%cfn(1:len(trim(job_params%cfn))),'"'
-                print*,'particle file type: "',job_params%cft(1:len(trim(job_params%cft))),'"'
-                print*,'apertures filename: "',job_params%afn(1:len(trim(job_params%afn))),'"'
+                write(10,*)'particle filename: "',job_params%cfn(1:len(trim(job_params%cfn))),'"'
+                write(10,*)'particle file type: "',job_params%cft(1:len(trim(job_params%cft))),'"'
+                write(10,*)'apertures filename: "',job_params%afn(1:len(trim(job_params%afn))),'"'
             else if(job_params%c_method(1:len(trim(job_params%c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
-                print*,'gaussian random particle parameters...'
-                print*,'1) L: ',job_params%cc_hex_params%l
-                print*,'2) hexagon edge length: ',job_params%cc_hex_params%hr
-                print*,'3) no. facets per hex. edge: ',job_params%cc_hex_params%nfhr
-                print*,'4) prism edge length: ',job_params%cc_hex_params%pfl
-                print*,'5) no. facets per prism edge:',job_params%cc_hex_params%nfpl
-                print*,'6) no. rotations at prism-basal intersections: ',job_params%cc_hex_params%pher
-                print*,'7) no. rotations at prism-prism intersections: ',job_params%cc_hex_params%pper
-                print*,'8) no. roughness scales: ',job_params%cc_hex_params%nscales
+                write(10,*)'gaussian random particle parameters...'
+                write(10,*)'1) L: ',job_params%cc_hex_params%l
+                write(10,*)'2) hexagon edge length: ',job_params%cc_hex_params%hr
+                write(10,*)'3) no. facets per hex. edge: ',job_params%cc_hex_params%nfhr
+                write(10,*)'4) prism edge length: ',job_params%cc_hex_params%pfl
+                write(10,*)'5) no. facets per prism edge:',job_params%cc_hex_params%nfpl
+                write(10,*)'6) no. rotations at prism-basal intersections: ',job_params%cc_hex_params%pher
+                write(10,*)'7) no. rotations at prism-prism intersections: ',job_params%cc_hex_params%pper
+                write(10,*)'8) no. roughness scales: ',job_params%cc_hex_params%nscales
                 do i = 1, job_params%cc_hex_params%nscales
                     print('(A,I1,A,f16.8)'),' correlation length ',i,': ',job_params%cc_hex_params%cls(i)
                     print('(A,I1,A,f16.8)'),' standard deviation ',i,': ',job_params%cc_hex_params%sds(i)
                 end do
             end if
             if(job_params%suppress_2d) then
-                print*,'suppress 2d output: yes'
+                write(10,*)'suppress 2d output: yes'
             else
-                print*,'suppress 2d output: no'
+                write(10,*)'suppress 2d output: no'
             end if
             if(job_params%tri) then
-                print*,'automatic triangulation: enabled'
-                print*,'triangulation max edge length: ',job_params%tri_edge_length
-                print*,'triangulation roughness: ',job_params%tri_roughness
+                write(10,*)'automatic triangulation: enabled'
+                write(10,*)'triangulation max edge length: ',job_params%tri_edge_length
+                write(10,*)'triangulation roughness: ',job_params%tri_roughness
             else
-                print*,'automatic triangulation: disabled'
+                write(10,*)'automatic triangulation: disabled'
             end if
             if(job_params%time_limit < 10000) then
-                print*,'time limit: ',job_params%time_limit,' hours'
+                write(10,*)'time limit: ',job_params%time_limit,' hours'
             else
-                print*,'time limit: none'
+                write(10,*)'time limit: none'
             end if
             if(job_params%resume) then
-                print*,'resuming a cached job: yes'
-                print*,'cache id: ',job_params%cache_id
+                write(10,*)'resuming a cached job: yes'
+                write(10,*)'cache id: ',job_params%cache_id
             else
-                print*,'resuming a cached job: no'
+                write(10,*)'resuming a cached job: no'
             end if
             if(job_params%scaling) then
-                print*,'diffraction energy scaling: enabled'
+                write(10,*)'diffraction energy scaling: enabled'
             else
-                print*,'diffraction energy scaling: disabled'
+                write(10,*)'diffraction energy scaling: disabled'
             end if
-            print*,'debugging level: ',job_params%debug
+            write(10,*)'debugging level: ',job_params%debug
             if(job_params%timing) then
-                print*,'timing: enabled'
+                write(10,*)'timing: enabled'
             else
-                print*,'timing: disabled'
+                write(10,*)'timing: disabled'
             end if
-            print*,'minimum area needed for new beam propagation: ',job_params%thresh_area
-            print*,'minumum energy needed for new beam propagation: ',job_params%thresh_energy
+            write(10,*)'minimum area needed for new beam propagation: ',job_params%thresh_area
+            write(10,*)'minumum energy needed for new beam propagation: ',job_params%thresh_energy
             if(job_params%export_beam) then
-                print*,'beam exporting: enabled'
+                write(10,*)'beam exporting: enabled'
                 if(job_params%export_beam_rec) then
-                    print*,'export by recursion number'
-                    print*,'from recursion ',job_params%export_beam_lims(1),'to recursion ',job_params%export_beam_lims(2)
+                    write(10,*)'export by recursion number'
+                    write(10,*)'from recursion ',job_params%export_beam_lims(1),'to recursion ',job_params%export_beam_lims(2)
                 else
-                    print*,'export by beam number'
-                    print*,'from beam ',job_params%export_beam_lims(1),'to beam ',job_params%export_beam_lims(2)
+                    write(10,*)'export by beam number'
+                    write(10,*)'from beam ',job_params%export_beam_lims(1),'to beam ',job_params%export_beam_lims(2)
                 end if
             else
-                print*,'beam exporting: disabled'
+                write(10,*)'beam exporting: disabled'
             end if
             if(job_params%is_fast_diff) then
-                print*,'fast diffraction: enabled'
+                write(10,*)'fast diffraction: enabled'
             else
-                print*,'fast diffraction: disabled'
+                write(10,*)'fast diffraction: disabled'
             end if
-            print*,'output directory: "',trim(job_params%output_dir),'/"'
-            print*,'temporary files directory: "',trim(job_params%output_dir)//"/tmp/",'"'
+            write(10,*)'output directory: "',trim(job_params%output_dir),'/"'
+            write(10,*)'temporary files directory: "',trim(job_params%output_dir)//"/tmp/",'"'
 
 
 
-            print*,'======================================================'
-            print*,'======================================================'
-            print*,'======================================================'
+            write(10,*)'======================================================'
+            write(10,*)'======================================================'
+            write(10,*)'======================================================'
 
+            close(10)
 
         end subroutine
         

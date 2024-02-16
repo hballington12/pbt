@@ -136,7 +136,7 @@ else
     call MPI_RECV(job_params%output_dir,255,MPI_CHARACTER,0,tag,MPI_COMM_WORLD,status,ierr)
 end if
 
-if (my_rank .eq. 0) call print_job_params(job_params) ! write job parameters to log file
+if (my_rank .eq. 0) call write_job_params(job_params,job_params%output_dir) ! write job parameters to log file
 
 write(my_rank_str,*) my_rank
 call StripSpaces(my_rank_str)
