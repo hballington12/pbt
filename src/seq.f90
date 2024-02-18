@@ -77,16 +77,14 @@ call parse_command_line(job_params)
 
 if(job_params%resume) then
     call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
-    ! stop
 end if
 
 call make_dir(job_params%job_name,job_params%output_dir)
-
+print*,'output directory is "',trim(job_params%output_dir),'"'
 call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for temp files
-
 open(101,file=trim(job_params%output_dir)//"/"//"log") ! open global non-standard log file for important records
 
-call write_job_params(job_params,job_params%output_dir) ! write job parameters to std out
+call write_job_params(job_params,job_params%output_dir) ! write job parameters to file
 
 ! get input particle geometry
 call PDAL2( job_params,     & ! <-  job parameters
@@ -101,9 +99,6 @@ if (job_params%tri) then
                         geometry) ! triangulate the particle
     ! call merge_vertices(vert_in, face_ids, 1D-1, geometry) ! merge vertices that are close enough
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
-    ! max_edge_length = job_params%la*2
-    ! max_area = max_edge_length**2*sqrt(3D0)/4D0
-    ! print*,'area threshold: ',max_area
     ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than threshold
 end if
 
@@ -119,12 +114,11 @@ call init_loop( alpha_vals, &
                 beta_vals, &
                 gamma_vals, &
                 job_params)
-
 if(job_params%output_eulers) then
     call output_eulers(alpha_vals,beta_vals,gamma_vals,job_params%output_dir,job_params)
 end if
-! stop
-! some stuff
+
+! initialise the remaining orientation indices
 if(job_params%resume) then ! if we are resuming a cached job
     ! do nothing because we've already read this in sr resume_job
 else ! if we are not resuming a cached job
@@ -173,10 +167,12 @@ do i = 1, num_remaining_orients
                     beam_geometry, &
                     beam_inc)
 
-    if(num_remaining_orients .gt. 1) then ! print progress for this job
+    if(num_remaining_orients > 1) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
-        ! print*,'total time elapsed: ',omp_get_wtime()-start
-        ! print*,'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
+        if(job_params%debug >= 2) then
+            write(*,'(A,f10.2,A)') 'total time elapsed: ',omp_get_wtime()-start,' secs'
+            write(*,'(A,f10.2,A)') 'average time per rotation: ',(omp_get_wtime()-start) / dble(i)
+        end if
         if(job_params%timing) then
             if (i .gt. 1) then
                 print'(A20,F12.4,A5)','est. time remaining: '
@@ -219,7 +215,7 @@ do i = 1, num_remaining_orients
 
 end do
 
-print*,'end orientation loop'
+print*,'end orientation loop.'
 
 ! divide by no. of orientations
 mueller_total = mueller_total / job_params%num_orients 
