@@ -1080,8 +1080,10 @@ job_params%phi_vals = phi_vals
 
 if(job_params%export_beam) then ! if beam exporting enabled, check values
     print*,'beam exporting enabled'
-    if(job_params%export_beam_lims(1) > job_params%export_beam_lims(2)) error stop "beam export limits must be equal or increasing values"
-    stop
+    if(job_params%export_beam_lims(1) > job_params%export_beam_lims(2)) then 
+        error stop "beam export limits must be equal or increasing values"
+        stop
+    end if
     if(job_params%export_beam_rec) then
         print*,'exporting by recursion number:',job_params%export_beam_lims(1:2)
         ! if(job_params%export_beam_lims(2) > job_params%rec) then 
@@ -1788,6 +1790,8 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
         ! write(101,*)'beta: ',eulers(2)
         ! print*,'gamma:',eulers(3)
         ! write(101,*)'gamma:',eulers(3)
+
+        if(abs(eulers(2)) < 1d-4) eulers(2) = 1d-4 ! fix
 
         eulers = eulers*pi/180.0 ! convert to rad
 

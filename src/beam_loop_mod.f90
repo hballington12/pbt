@@ -964,15 +964,32 @@ subroutine recursion_ext(beam,geometry,job_params)
         real(8) a, b, alpha, nf
         real(8), dimension(1:3) :: a_vec, b_vec
         
+        ! print*,'theta_i',theta_i
+        ! print*,'theta_t',theta_t
+        ! print*,'norm',norm
+        ! print*,'prop_in',prop_in
+    
         alpha = pi - theta_t
-        a = sin(theta_t-theta_i)/sin(theta_i)
-        b = sin(alpha)/sin(theta_i)
+        if(theta_t < 1e-5) then
+            a = 0.25
+            b = 0.75
+        else
+            a = abs(sin(theta_t-theta_i)/sin(theta_i))
+            b = sin(alpha)/sin(theta_i)
+        end if
         b_vec(:) = prop_in(:)
         a_vec(:) = norm(:)
         prop_out(:) = b*b_vec(:) - a*a_vec(:)
         nf = sqrt(prop_out(1)**2 + prop_out(2)**2 + prop_out(3)**2)
         prop_out(:) = prop_out(:) / nf
+
+        ! print*,'a',a
+        ! print*,'b',b
+        ! print*,'prop_out',prop_out(:)
         
+        ! stop
+
+
     end subroutine
     
     subroutine add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params)
@@ -1411,7 +1428,12 @@ subroutine recursion_ext(beam,geometry,job_params)
         rot2 = 0 ! initialise
         rot = 0 ! initialise
         
+        print*,'beam%prop(:)',beam%prop(:)
+
         theta_1 = 2*pi - atan2(beam%prop(2),beam%prop(1)) ! angle to rotate about z axis into x-z plane in +ive x direction
+        
+        print*,'theta_1',theta_1
+
         rot1(1,1) = cos(theta_1)
         rot1(1,2) = -sin(theta_1)
         rot1(2,1) = sin(theta_1)
