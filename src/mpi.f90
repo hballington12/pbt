@@ -271,12 +271,12 @@ do i = mpi%start, mpi%end
 
 end do
 
+! wait for and collect progress from other processes
 call mpi_track_progress_cleanup(mpi,iter_done,total_iter,num_remaining_orients,sent_request,my_iter,recv_request,recv_iter,job_params, start)
 
 call MPI_BARRIER(MPI_COMM_WORLD,mpi%ierr)
 
 if (mpi%rank .eq. 0) print*,'end orientation loop'
-
 
 ! all processes send whether or not they have finished
 if (mpi%rank .eq. 0) then ! if my rank is 0
