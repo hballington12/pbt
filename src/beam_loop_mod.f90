@@ -1428,12 +1428,8 @@ subroutine recursion_ext(beam,geometry,job_params)
         rot2 = 0 ! initialise
         rot = 0 ! initialise
         
-        print*,'beam%prop(:)',beam%prop(:)
-
         theta_1 = 2*pi - atan2(beam%prop(2),beam%prop(1)) ! angle to rotate about z axis into x-z plane in +ive x direction
         
-        print*,'theta_1',theta_1
-
         rot1(1,1) = cos(theta_1)
         rot1(1,2) = -sin(theta_1)
         rot1(2,1) = sin(theta_1)
