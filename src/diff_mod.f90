@@ -83,7 +83,7 @@ module diff_mod
     end do
     end subroutine
 
-    subroutine rotate_far_field_bins(x,y,z,rot,x3,y3,z3,mapping,mapping2)
+    subroutine rotate_far_field_bins(x,y,z,rot,x3,y3,z3,mapping,mapping2,theta_i)
     
         ! translates and rotates bins to aperture system (loop method)
     
@@ -92,6 +92,7 @@ module diff_mod
     real(8), dimension(:,:), allocatable, intent(out) :: x3, y3, z3 ! far-field bin positions
     integer(8), dimension(:,:), allocatable, intent(in) :: mapping
     integer(8), dimension(:), allocatable, intent(in) :: mapping2
+    integer(8), intent(in), optional :: theta_i
 
     integer(8) i, j, ii
     
@@ -110,6 +111,14 @@ module diff_mod
         end do
     end do
     
+    if(present(theta_i)) then
+        do j = 1, size(x,1)
+            x3(j,theta_i) = rot(1,1)*x(j,theta_i) + rot(1,2)*y(j,theta_i) + rot(1,3)*z(j,theta_i)
+            y3(j,theta_i) = rot(2,1)*x(j,theta_i) + rot(2,2)*y(j,theta_i) + rot(2,3)*z(j,theta_i)
+            z3(j,theta_i) = rot(3,1)*x(j,theta_i) + rot(3,2)*y(j,theta_i) + rot(3,3)*z(j,theta_i)
+        end do
+    end if
+
     end subroutine
     
     subroutine karczewski(  diff_ampl, & ! polarisation matrix
@@ -574,7 +583,8 @@ module diff_mod
         do i = 1, size(xfar,1)
             do j = 1, size(xfar,2)
                 vec(:) = (/x1(i,j),y1(i,j),z1(i,j)/) / r1(i,j) ! unit vector to far-field bin
-                if(dot_product(vec,prop0) < cos_fov .and. j /= theta_i) then ! if in field of view, and not needed for numerical fix
+                ! if(dot_product(vec,prop0) < cos_fov .and. j /= theta_i) then ! if in field of view, and not needed for numerical fix
+                if(dot_product(vec,prop0) < cos_fov) then ! if in field of view, and not needed for numerical fix
                     is_in_fov(i,j) = .false. ! if dot product is less than threshold, bin is outside fov
                 end if
             end do
@@ -594,7 +604,7 @@ module diff_mod
         mapping2(j) = ii ! save the number of phi values to evaluate at
     end do
 
-    call rotate_far_field_bins(x1,y1,z1,matmul(rot2,rot),x3,y3,z3,mapping,mapping2)
+    call rotate_far_field_bins(x1,y1,z1,matmul(rot2,rot),x3,y3,z3,mapping,mapping2,theta_i)
 
     do j = 1, size(xfar,2) ! looping over theta
         do ii = 1, mapping2(j) ! looping over the number of phi values to evaluate at, for this theta
