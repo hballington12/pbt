@@ -974,7 +974,7 @@ subroutine recursion_ext(beam,geometry,job_params)
             a = 0.25
             b = 0.75
         else
-            a = abs(sin(theta_t-theta_i)/sin(theta_i))
+            a = sin(theta_t-theta_i)/sin(theta_i)
             b = sin(alpha)/sin(theta_i)
         end if
         b_vec(:) = prop_in(:)
