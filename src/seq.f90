@@ -231,7 +231,14 @@ output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%n
 output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients 
 output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
 
-call print_output_params(output_parameters)
+output_parameters_total%scatt_beam = output_parameters_total%scatt_beam / job_params%num_orients 
+output_parameters_total%scatt_ext_diff = output_parameters_total%scatt_ext_diff / job_params%num_orients 
+output_parameters_total%asymmetry_beam = output_parameters_total%asymmetry_beam / job_params%num_orients 
+output_parameters_total%asymmetry_ext_diff = output_parameters_total%asymmetry_ext_diff / job_params%num_orients 
+output_parameters_total%scatt_eff_beam = output_parameters_total%scatt_eff_beam / job_params%num_orients 
+output_parameters_total%scatt_eff_ext_diff = output_parameters_total%scatt_eff_ext_diff / job_params%num_orients 
+
+call print_output_params(output_parameters_total)
 
 ! writing to file
 call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)

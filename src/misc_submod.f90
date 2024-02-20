@@ -20,12 +20,18 @@
         print*,'======================================================'
         print*,'geometric cross section:',output_parameters%geo_cross_sec
         print*,'scattering cross section:',output_parameters%scatt
+        print*,'scattering cross section (beam):',output_parameters%scatt_beam
+        print*,'scattering cross section (ext diff):',output_parameters%scatt_ext_diff
         print*,'absorption cross section:',output_parameters%abs
         print*,'extinction cross section:',output_parameters%ext
         print*,'scattering efficiency:',output_parameters%scatt_eff
+        print*,'scattering efficiency (beam):',output_parameters%scatt_eff_beam
+        print*,'scattering efficiency (ext diff):',output_parameters%scatt_eff_ext_diff
         print*,'absorption efficiency:',output_parameters%abs_eff
         print*,'extinction efficiency:',output_parameters%ext_eff    
         print*,'asymmetry parameter:',output_parameters%asymmetry
+        print*,'asymmetry parameter (beam):',output_parameters%asymmetry_beam
+        print*,'asymmetry parameter (ext diff):',output_parameters%asymmetry_ext_diff
         print*,'single-scattering albedo:',output_parameters%albedo
         print*,'back scatt. cross section:',output_parameters%back_scatt
         print*,'======================================================'
@@ -432,6 +438,13 @@
             read(10,*) output_parameters_total%ext_eff
             read(10,*) output_parameters_total%geo_cross_sec
             read(10,*) output_parameters_total%back_scatt
+
+            read(10,*) output_parameters_total%scatt_beam
+            read(10,*) output_parameters_total%scatt_ext_diff
+            read(10,*) output_parameters_total%asymmetry_beam
+            read(10,*) output_parameters_total%asymmetry_ext_diff
+            read(10,*) output_parameters_total%scatt_eff_beam
+            read(10,*) output_parameters_total%scatt_eff_ext_diff
             close(10)
             
             print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/theta_vals.dat"
@@ -589,6 +602,13 @@
             write(10,*) output_parameters_total%ext_eff
             write(10,*) output_parameters_total%geo_cross_sec
             write(10,*) output_parameters_total%back_scatt
+
+            write(10,*) output_parameters_total%scatt_beam
+            write(10,*) output_parameters_total%scatt_ext_diff
+            write(10,*) output_parameters_total%asymmetry_beam
+            write(10,*) output_parameters_total%asymmetry_ext_diff
+            write(10,*) output_parameters_total%scatt_eff_beam
+            write(10,*) output_parameters_total%scatt_eff_ext_diff
             close(10)
             
         end subroutine

@@ -205,6 +205,14 @@
       output_parameters%ext_eff = ext / output_parameters%geo_cross_sec
       output_parameters%back_scatt = back_scatt
 
+      output_parameters%scatt_beam = scatt_beam
+      output_parameters%scatt_ext_diff = scatt_ext_diff
+      output_parameters%asymmetry_beam = asymmetry_beam
+      output_parameters%asymmetry_ext_diff = asymmetry_ext_diff
+      output_parameters%scatt_eff_beam = scatt_beam / output_parameters%geo_cross_sec
+      output_parameters%scatt_eff_ext_diff = scatt_ext_diff / output_parameters%geo_cross_sec
+
+
 
 
       ! open(10,file="mueller_scatgrid")
@@ -337,16 +345,22 @@
       
       open(10,file=trim(output_dir)//"/"//"params")
       write(10,*) 'scattering parameters (orientation averaged)...'
-      write(10,'(A30,f16.8)') 'geo. cross section: ',output_parameters_total%geo_cross_sec
-      write(10,'(A30,f16.8)') 'abs. cross section: ',output_parameters_total%abs
-      write(10,'(A30,f16.8)') 'scatt. cross section: ',output_parameters_total%scatt
-      write(10,'(A30,f16.8)') 'ext. cross section: ',output_parameters_total%ext
-      write(10,'(A30,f16.8)') 'back scatt. cross section: ',output_parameters_total%back_scatt
-      write(10,'(A30,f16.8)') 'single scattering albedo: ',output_parameters_total%albedo
-      write(10,'(A30,f16.8)') 'asymmetry parameter: ',output_parameters_total%asymmetry
-      write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs / output_parameters_total%geo_cross_sec
-      write(10,'(A30,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt / output_parameters_total%geo_cross_sec
-      write(10,'(A30,f16.8)') 'ext. efficiency: ',output_parameters_total%ext / output_parameters_total%geo_cross_sec
+      write(10,'(A40,f16.8)') 'geo. cross section: ',output_parameters_total%geo_cross_sec
+      write(10,'(A40,f16.8)') 'abs. cross section: ',output_parameters_total%abs
+      write(10,'(A40,f16.8)') 'scatt. cross section: ',output_parameters_total%scatt
+      write(10,'(A40,f16.8)') 'scatt. cross section (beam): ',output_parameters_total%scatt_beam
+      write(10,'(A40,f16.8)') 'scatt. cross section (ext diff): ',output_parameters_total%scatt_ext_diff
+      write(10,'(A40,f16.8)') 'ext. cross section: ',output_parameters_total%ext
+      write(10,'(A40,f16.8)') 'back scatt. cross section: ',output_parameters_total%back_scatt
+      write(10,'(A40,f16.8)') 'single scattering albedo: ',output_parameters_total%albedo
+      write(10,'(A40,f16.8)') 'asymmetry parameter: ',output_parameters_total%asymmetry
+      write(10,'(A40,f16.8)') 'asymmetry parameter (beam): ',output_parameters_total%asymmetry_beam
+      write(10,'(A40,f16.8)') 'asymmetry parameter (ext diff): ',output_parameters_total%asymmetry_ext_diff
+      write(10,'(A40,f16.8)') 'abs. efficiency: ',output_parameters_total%abs / output_parameters_total%geo_cross_sec
+      write(10,'(A40,f16.8)') 'scatt. efficiency: ',output_parameters_total%scatt / output_parameters_total%geo_cross_sec
+      write(10,'(A40,f16.8)') 'scatt. efficiency (beam): ',output_parameters_total%scatt_beam / output_parameters_total%geo_cross_sec
+      write(10,'(A40,f16.8)') 'scatt. efficiency (ext diff): ',output_parameters_total%scatt_ext_diff / output_parameters_total%geo_cross_sec
+      write(10,'(A40,f16.8)') 'ext. efficiency: ',output_parameters_total%ext / output_parameters_total%geo_cross_sec
       
       ! below is commented because: different orientations have dif. geo. cross sections, so the efficiencies dont add linearly
       ! write(10,'(A30,f16.8)') 'abs. efficiency: ',output_parameters_total%abs_eff
@@ -377,21 +391,28 @@
       ! if its the first call to summation, allocate the total mueller 1d and 2d arrays
       if(.not. allocated(mueller_total)) then
          allocate(mueller_total(1:size(mueller,1),1:size(mueller,2),1:size(mueller,3)))
-         mueller_total = 0 ! init
-         output_parameters_total%abs = 0 ! init
-         output_parameters_total%scatt = 0 ! init
-         output_parameters_total%ext = 0 ! init
-         output_parameters_total%albedo = 0 ! init
-         output_parameters_total%asymmetry = 0 ! init
-         output_parameters_total%abs_eff = 0 ! init
-         output_parameters_total%scatt_eff = 0 ! init
-         output_parameters_total%ext_eff = 0 ! init
-         output_parameters_total%geo_cross_sec = 0 ! init
-         output_parameters_total%back_scatt = 0 ! init
+         mueller_total = 0d0 ! init
+         output_parameters_total%abs = 0d0 ! init
+         output_parameters_total%scatt = 0d0 ! init
+         output_parameters_total%ext = 0d0 ! init
+         output_parameters_total%albedo = 0d0 ! init
+         output_parameters_total%asymmetry = 0d0 ! init
+         output_parameters_total%abs_eff = 0d0 ! init
+         output_parameters_total%scatt_eff = 0d0 ! init
+         output_parameters_total%ext_eff = 0d0 ! init
+         output_parameters_total%geo_cross_sec = 0d0 ! init
+         output_parameters_total%back_scatt = 0d0 ! init
+
+         output_parameters_total%scatt_beam = 0d0 ! init
+         output_parameters_total%scatt_ext_diff = 0d0 ! init
+         output_parameters_total%asymmetry_beam = 0d0 ! init
+         output_parameters_total%asymmetry_ext_diff = 0d0 ! init
+         output_parameters_total%scatt_eff_beam = 0d0 ! init
+         output_parameters_total%scatt_eff_ext_diff = 0d0 ! init
       end if
       if(.not. allocated(mueller_1d_total)) then
          allocate(mueller_1d_total(1:size(mueller_1d,1),1:size(mueller_1d,2)))
-         mueller_1d_total = 0 ! init
+         mueller_1d_total = 0d0 ! init
       end if
       
       ! sum
@@ -407,7 +428,14 @@
       output_parameters_total%scatt_eff = output_parameters_total%scatt_eff + output_parameters%scatt_eff
       output_parameters_total%ext_eff = output_parameters_total%ext_eff + output_parameters%ext_eff
       output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec + output_parameters%geo_cross_sec
-      
+
+      output_parameters_total%scatt_beam = output_parameters_total%scatt_beam + output_parameters%scatt_beam
+      output_parameters_total%scatt_ext_diff = output_parameters_total%scatt_ext_diff + output_parameters%scatt_ext_diff
+      output_parameters_total%asymmetry_beam = output_parameters_total%asymmetry_beam + output_parameters%asymmetry_beam
+      output_parameters_total%asymmetry_ext_diff = output_parameters_total%asymmetry_ext_diff + output_parameters%asymmetry_ext_diff
+      output_parameters_total%scatt_eff_beam = output_parameters_total%scatt_eff_beam + output_parameters%scatt_eff_beam
+      output_parameters_total%scatt_eff_ext_diff = output_parameters_total%scatt_eff_ext_diff + output_parameters%scatt_eff_ext_diff
+
    end subroutine
    
    subroutine ampl_to_mueller(ampl,mueller)

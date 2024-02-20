@@ -42,6 +42,14 @@ type output_parameters_type ! type for hold various output paramters
     real(8) back_scatt ! back-scattering cross section
     real(8) beam_energy_out ! beam energy into far-field
     real(8) ext_energy_out ! external diffraction energy into far-field
+
+    real(8) scatt_beam ! scattering cross section (beam)
+    real(8) scatt_ext_diff ! scattering cross section (ext diff)
+    real(8) asymmetry_beam ! asymmetry parameter (beam)
+    real(8) asymmetry_ext_diff ! asymmetry parameter (ext diff)
+    real(8) scatt_eff_beam ! scattering efficiency (beam)
+    real(8) scatt_eff_ext_diff ! scattering efficiency (ext diff)
+    
 end type output_parameters_type 
 
 type job_parameters_type

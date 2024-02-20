@@ -268,6 +268,14 @@ subroutine mpi_send_sum(ierr,                       & ! mpi parameter
         call MPI_SEND(output_parameters_total%ext_eff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(output_parameters_total%geo_cross_sec,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(output_parameters_total%back_scatt,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+
+        call MPI_SEND(output_parameters_total%scatt_beam,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(output_parameters_total%scatt_ext_diff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(output_parameters_total%asymmetry_beam,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(output_parameters_total%asymmetry_ext_diff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(output_parameters_total%scatt_eff_beam,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(output_parameters_total%scatt_eff_ext_diff,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+
         ! print*,'sent to rank 0. my rank = ',my_rank
     else ! if rank 0 process, receieve from all other ranks
         ! allocate some arrays to hold the received values
@@ -300,6 +308,18 @@ subroutine mpi_send_sum(ierr,                       & ! mpi parameter
             output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec + output_parameters_recv%geo_cross_sec ! sum  
             call MPI_RECV(output_parameters_recv%back_scatt,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
             output_parameters_total%back_scatt = output_parameters_total%back_scatt + output_parameters_recv%back_scatt ! sum  
+            call MPI_RECV(output_parameters_recv%scatt_beam,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            output_parameters_total%scatt_beam = output_parameters_total%scatt_beam + output_parameters_recv%scatt_beam ! sum   
+            call MPI_RECV(output_parameters_recv%scatt_ext_diff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            output_parameters_total%scatt_ext_diff = output_parameters_total%scatt_ext_diff + output_parameters_recv%scatt_ext_diff ! sum   
+            call MPI_RECV(output_parameters_recv%asymmetry_beam,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            output_parameters_total%asymmetry_beam = output_parameters_total%asymmetry_beam + output_parameters_recv%asymmetry_beam ! sum   
+            call MPI_RECV(output_parameters_recv%asymmetry_ext_diff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            output_parameters_total%asymmetry_ext_diff = output_parameters_total%asymmetry_ext_diff + output_parameters_recv%asymmetry_ext_diff ! sum   
+            call MPI_RECV(output_parameters_recv%scatt_eff_beam,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            output_parameters_total%scatt_eff_beam = output_parameters_total%scatt_eff_beam + output_parameters_recv%scatt_eff_beam ! sum   
+            call MPI_RECV(output_parameters_recv%scatt_eff_ext_diff,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            output_parameters_total%scatt_eff_ext_diff = output_parameters_total%scatt_eff_ext_diff + output_parameters_recv%scatt_eff_ext_diff ! sum  
             print*,'received data from rank: ',source
         end do
         print*,'end mpi summation.'
