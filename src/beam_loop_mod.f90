@@ -135,7 +135,7 @@ module beam_loop_mod
             
             ! export beam
             write(unit, *) '    {'
-            call write_beam_json(filename,beam_tree(i),unit)
+            call write_beam_json(beam_tree(i),unit)
             if(i /= end) then
                 write(unit, *) '    },'
             else
@@ -153,17 +153,15 @@ module beam_loop_mod
 
     end subroutine
 
-    subroutine write_beam_json(filename, beam, unit)
+    subroutine write_beam_json(beam, unit)
 
         ! write_beam_json
         ! writes a beam to a file in json format
 
-        character(len=*), intent(in) :: filename
         type(beam_type), intent(in) :: beam 
         integer(8), intent(in) :: unit
 
         integer(8) i
-        integer(8) ierr
 
         ! Write the JSON data to the file
         write(unit, *) '    "beam id": ', beam%id, ','
@@ -388,7 +386,6 @@ module beam_loop_mod
         real(8) an(1:3) ! an aperture normal
         real(8) ran(1:3) ! a rotated aperture normal
         real(8) vk7(1:3) ! a reflected/refracted e-perp vector (at facet)
-        real(8) vk7a(1:3) ! a reflected/refracted e-perp vector (at aperture)
         real(8) e_perp_inc(1:3) ! an incident e-perp vector
         integer(8) bfi ! an beam face id
         complex(8) ampl(1:2,1:2) ! an amplitude matrix
@@ -411,7 +408,6 @@ module beam_loop_mod
         real(8) norm(1:3) ! a facet normal
         real(8) int_intensity ! internal intensitiy
         real(8) ext_intensity ! external intensitiy
-        real(8) proj_area ! a projected area
         
         waveno = 2*pi/job_params%la ! wavenumber
         rbi_int = job_params%rbi ! real part refractive index
@@ -592,7 +588,6 @@ module beam_loop_mod
         real(8) theta_i ! incident angle
         real(8) theta_i_facet ! incident angle with the facet
         real(8) theta_t ! transmitted angle
-        real(8) theta_t_facet ! transmitted angle
         complex(8) fr(1:2,1:2) ! fresnel reflection matrix
         complex(8) ft(1:2,1:2) ! fresnel reflection matrix
         real(8) abs_intensity ! absorbed intensity
@@ -601,7 +596,6 @@ module beam_loop_mod
         real(8) int_intensity ! internal intensitiy
         real(8) ext_intensity ! external intensitiy        
         real(8) norm(1:3) ! a facet normal
-        real(8) proj_area ! a projected area
         
         waveno = 2*pi/job_params%la ! wavenumber
         rbi_int = job_params%rbi ! real part refractive index
@@ -797,9 +791,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         real(8) theta_t_facet ! transmitted angle
         complex(8) fr(1:2,1:2) ! fresnel reflection matrix
         complex(8) ft(1:2,1:2) ! fresnel reflection matrix
-        real(8) abs_intensity ! absorbed intensity
         real(8) in_intensity ! absorbed intensity
-        real(8) out_intensity ! intensity after absorption
         real(8) int_intensity ! internal intensitiy
         real(8) ext_intensity ! external intensitiy        
         real(8) norm(1:3) ! a facet normal
@@ -1299,7 +1291,6 @@ subroutine recursion_ext(beam,geometry,job_params)
         real(8), dimension(:), allocatable :: ap_energies ! the areas of each aperture that were illuminated
         logical, dimension(:), allocatable, intent(out) :: suff_energy ! whether each aperture was sufficiently illuminated
         integer(8) ai ! aperture id
-        integer(8) fi ! face id
         
         allocate(ap_energies(1:geometry%na)) ! allocate
         allocate(suff_energy(1:geometry%na)) ! allocate
@@ -1589,7 +1580,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         type(beam_type), intent(inout) :: beam_inc
         
         real(8) start, finish, start1, finish1 ! cpu timing variables
-        integer(8) i, j, rec
+        integer(8) j, rec
         
         ! new beam tree
         type(beam_type), dimension(:), allocatable :: beam_tree

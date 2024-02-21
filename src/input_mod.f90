@@ -121,8 +121,8 @@ subroutine make_angles(theta_vals,theta_vals_in,theta_splits_in,theta_vals_count
     !   anglesout are the centres of each angular bin - size (1:k)
     !   anglesteps are the sizes of each angular bin - size (1:k)
     real(8), dimension(:), allocatable, intent(out) :: theta_vals
-    real(8), dimension(:), intent(in) :: theta_vals_in(1:10000)
-    real(8), dimension(:), intent(in) :: theta_splits_in(1:10000)
+    real(8), dimension(:), intent(in) :: theta_vals_in(1:100)
+    real(8), dimension(:), intent(in) :: theta_splits_in(1:100)
     integer(8), intent(in) ::  theta_vals_counter
 
     integer(8) nlines, i, j, jmax
@@ -202,8 +202,8 @@ character(len=255) :: arg ! a command line argument
 integer my_status ! success code
 ! integer(8) ierror ! error status
 logical finished
-real(8), dimension(:) :: theta_vals_in(1:10000), phi_vals_in(1:10000)
-real(8), dimension(:) :: theta_splits_in(1:10000), phi_splits_in(1:10000)
+real(8), dimension(:) :: theta_vals_in(1:100), phi_vals_in(1:100)
+real(8), dimension(:) :: theta_splits_in(1:100), phi_splits_in(1:100)
 integer(8) theta_vals_counter, theta_splits_counter
 integer(8) phi_vals_counter, phi_splits_counter
 
@@ -1172,9 +1172,9 @@ subroutine init_loop(   alpha_vals, &
     type(job_parameters_type), intent(in) :: job_params ! job parameters
     real(8), dimension(:), allocatable, intent(out) :: alpha_vals, beta_vals, gamma_vals
     integer(8) num_angles, leftover_angles, num_beta_angles, num_gamma_angles
-    real(8), allocatable, dimension(:) :: intelli_vals, beta_intelli_vals, gamma_intelli_vals
+    real(8), allocatable, dimension(:) :: beta_intelli_vals, gamma_intelli_vals
     integer(8) i, j, k, counter
-    real(8) spacing, rand, beta_spacing, gamma_spacing, h, w
+    real(8) rand, beta_spacing, gamma_spacing, h, w
 
     intellirot = job_params%intellirot
     num_orients = job_params%num_orients

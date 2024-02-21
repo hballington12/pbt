@@ -234,7 +234,7 @@
         REAL(8), DIMENSION(:), INTENT(INOUT) :: vec
         INTEGER, DIMENSION(:), allocatable, INTENT(OUT) :: map ! hb modification: mapping
         INTEGER, INTENT(IN), OPTIONAL :: LOW, HIGH
-        INTEGER :: n, left, right, i
+        INTEGER :: left, right, i
 
         IF(PRESENT(LOW)) THEN
         left = LOW
@@ -908,141 +908,141 @@
             
         end subroutine
         
-        subroutine fix_collinear_vertices(verts, face_ids, num_vert, num_face, num_face_vert, apertures)
+        ! subroutine fix_collinear_vertices(verts, face_ids, num_vert, num_face, num_face_vert, apertures)
             
-            ! removes edges which have vertices that lie along them
-            ! needs fixing to accommodate multiple collinear vertices lying along 1 edge
+        !     ! removes edges which have vertices that lie along them
+        !     ! needs fixing to accommodate multiple collinear vertices lying along 1 edge
             
-            real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
-            integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs
-            integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
-            integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert ! number of vertices in each face
-            integer(8), dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
+        !     real(8), dimension(:,:) ,allocatable, intent(inout) :: verts ! unique vertices
+        !     integer(8), dimension(:,:) ,allocatable, intent(inout) :: face_ids ! face vertex IDs
+        !     integer(8), intent(inout) :: num_vert, num_face ! number of unique vertices, number of faces
+        !     integer(8), dimension(:), allocatable, intent(inout) :: num_face_vert ! number of vertices in each face
+        !     integer(8), dimension(:), allocatable, intent(inout) :: apertures ! apertures asignments for each facet
             
-            integer(8) i, j ,k
-            real(8) edge_vector(1:3), a_vector(1:3) ! some vectors
-            integer(8) next_index, prev_index
-            real(8) edge_vector_length, a_vector_length, a_dot_product, closest_vector_length
-            integer(8) num_collinear_vertices ! number of vertices found along an edge
-            integer(8) collinear_vertex_id ! id of a vertex found to be collinear
-            integer(8) temp_face_ids(1000000,1:10) ! face vertex IDs
-            integer(8) temp_num_face_vert(1000000) ! number of vertices in each face
-            integer(8) temp_apertures(1000000) ! apertures asignments for each facet
-            integer(8) max_verts ! max vertices per face
-            logical success
+        !     integer(8) i, j ,k
+        !     real(8) edge_vector(1:3), a_vector(1:3) ! some vectors
+        !     integer(8) next_index, prev_index
+        !     real(8) edge_vector_length, a_vector_length, a_dot_product, closest_vector_length
+        !     integer(8) num_collinear_vertices ! number of vertices found along an edge
+        !     integer(8) collinear_vertex_id ! id of a vertex found to be collinear
+        !     integer(8) temp_face_ids(1000000,1:10) ! face vertex IDs
+        !     integer(8) temp_num_face_vert(1000000) ! number of vertices in each face
+        !     integer(8) temp_apertures(1000000) ! apertures asignments for each facet
+        !     integer(8) max_verts ! max vertices per face
+        !     logical success
             
-            success = .true.
+        !     success = .true.
             
-            ! save the input face_id and num_face_vert arrays
-            do i = 1, num_face
-                temp_num_face_vert(i) = num_face_vert(i)
-                temp_apertures(i) = apertures(i)
-                do j =1, num_face_vert(i)
-                    temp_face_ids(i,j) = face_ids(i,j)
-                end do
-            end do
+        !     ! save the input face_id and num_face_vert arrays
+        !     do i = 1, num_face
+        !         temp_num_face_vert(i) = num_face_vert(i)
+        !         temp_apertures(i) = apertures(i)
+        !         do j =1, num_face_vert(i)
+        !             temp_face_ids(i,j) = face_ids(i,j)
+        !         end do
+        !     end do
             
-            do i = 1, size(face_ids,1) ! for each face
-                ! print*,'i:',i,'num faces:',num_face_vert(i)
-                do j = 1, num_face_vert(i) ! for each vertex in the face
-                    num_collinear_vertices = 0 ! init counter
-                    closest_vector_length = HUGE(1D0) ! get a large number
-                    ! get the edge vector
-                    if(j .eq. num_face_vert(i)) then
-                        next_index = 1
-                        prev_index = j - 1
-                    else if(j .eq. 1) then
-                        next_index = j + 1
-                        prev_index = num_face_vert(i)
-                    else
-                        prev_index = j - 1
-                        next_index = j + 1
-                    end if
-                    edge_vector(1:3) = verts(face_ids(i,next_index),1:3) - verts(face_ids(i,j),1:3) ! get edge vector
-                    edge_vector_length = sqrt(edge_vector(1)**2 + edge_vector(2)**2 + edge_vector(3)**2) ! get the length of the edge vector
+        !     do i = 1, size(face_ids,1) ! for each face
+        !         ! print*,'i:',i,'num faces:',num_face_vert(i)
+        !         do j = 1, num_face_vert(i) ! for each vertex in the face
+        !             num_collinear_vertices = 0 ! init counter
+        !             closest_vector_length = HUGE(1D0) ! get a large number
+        !             ! get the edge vector
+        !             if(j .eq. num_face_vert(i)) then
+        !                 next_index = 1
+        !                 prev_index = j - 1
+        !             else if(j .eq. 1) then
+        !                 next_index = j + 1
+        !                 prev_index = num_face_vert(i)
+        !             else
+        !                 prev_index = j - 1
+        !                 next_index = j + 1
+        !             end if
+        !             edge_vector(1:3) = verts(face_ids(i,next_index),1:3) - verts(face_ids(i,j),1:3) ! get edge vector
+        !             edge_vector_length = sqrt(edge_vector(1)**2 + edge_vector(2)**2 + edge_vector(3)**2) ! get the length of the edge vector
                     
-                    do k = 1, num_vert ! loop over all other vertices
-                        if(k .ne. face_ids(i,next_index) .and. k .ne. face_ids(i,j)) then ! ignore vertices part of this edge
-                            a_vector(1:3) = verts(k,1:3) - verts(face_ids(i,j),1:3) ! get vector from start of edge to this vertex
-                            a_vector_length = sqrt(a_vector(1)**2 + a_vector(2)**2 + a_vector(3)**2) ! get the length of the edge vector
-                            a_dot_product = dot_product(edge_vector,a_vector)/(a_vector_length*edge_vector_length) ! get normalised dot product of edge vector and vector to vertex
-                            if(a_dot_product .gt. 0.999) then
-                                if(a_vector_length .lt. edge_vector_length) then
-                                    ! print*,'detected that vertex #',k,'lies on the edge between vertex #',face_ids(i,next_index),'and vertex #',face_ids(i,j)
-                                    ! if we pass this point, we have have found a vertex from which we must divide facet
-                                    ! we should take care to ensure that this edge does not contain any other vertices (this would require re-calling this subroutine)
-                                    num_collinear_vertices = num_collinear_vertices + 1
-                                    if(a_vector_length .lt. closest_vector_length) then ! if it was the closest collinear vertex so far
-                                        collinear_vertex_id = k ! update a tracker to hold the vertex id
-                                        closest_vector_length = a_vector_length ! update the distance
-                                    end if
-                                end if
-                            end if
-                        end if
-                    end do
-                    if(num_collinear_vertices .eq. 0) then
-                        ! do nothing
-                    else if(num_collinear_vertices .gt. 1) then
-                        ! print*,'warning: need to recall collinear fix sr'
-                        success = .false.
-                    else ! else, if only 1 collinear vertex along this edge
-                        ! print*,'first vertex of this edge is #',j,'which is vertex ID:',face_ids(i,j)
-                        ! print*,'prev vertex of this edge is #',prev_index,'which is vertex ID:',face_ids(i,prev_index)
-                        ! print*,'the collinear vertex along this edge was vertex ID:',collinear_vertex_id
-                        ! in the old face, replace the first edge vertex with the collinear one we found
-                        temp_face_ids(i,j) = collinear_vertex_id
-                        ! also make a new triangular face to fill the gap
-                        num_face = num_face + 1
-                        temp_apertures(num_face) = apertures(i) ! set as the same aperture assignment
-                        temp_num_face_vert(num_face) = 3 ! triangular face, so has 3 vertices
-                        temp_face_ids(num_face,3) = face_ids(i,j) ! third vertex is the first vertex of the edge
-                        temp_face_ids(num_face,2) = collinear_vertex_id ! second vertex is the collinear vertex we found
-                        temp_face_ids(num_face,1) = face_ids(i,prev_index) ! first vertex is the previous vertex from the original facet
-                        ! stop
-                    end if
-                end do
-            end do
+        !             do k = 1, num_vert ! loop over all other vertices
+        !                 if(k .ne. face_ids(i,next_index) .and. k .ne. face_ids(i,j)) then ! ignore vertices part of this edge
+        !                     a_vector(1:3) = verts(k,1:3) - verts(face_ids(i,j),1:3) ! get vector from start of edge to this vertex
+        !                     a_vector_length = sqrt(a_vector(1)**2 + a_vector(2)**2 + a_vector(3)**2) ! get the length of the edge vector
+        !                     a_dot_product = dot_product(edge_vector,a_vector)/(a_vector_length*edge_vector_length) ! get normalised dot product of edge vector and vector to vertex
+        !                     if(a_dot_product .gt. 0.999) then
+        !                         if(a_vector_length .lt. edge_vector_length) then
+        !                             ! print*,'detected that vertex #',k,'lies on the edge between vertex #',face_ids(i,next_index),'and vertex #',face_ids(i,j)
+        !                             ! if we pass this point, we have have found a vertex from which we must divide facet
+        !                             ! we should take care to ensure that this edge does not contain any other vertices (this would require re-calling this subroutine)
+        !                             num_collinear_vertices = num_collinear_vertices + 1
+        !                             if(a_vector_length .lt. closest_vector_length) then ! if it was the closest collinear vertex so far
+        !                                 collinear_vertex_id = k ! update a tracker to hold the vertex id
+        !                                 closest_vector_length = a_vector_length ! update the distance
+        !                             end if
+        !                         end if
+        !                     end if
+        !                 end if
+        !             end do
+        !             if(num_collinear_vertices .eq. 0) then
+        !                 ! do nothing
+        !             else if(num_collinear_vertices .gt. 1) then
+        !                 ! print*,'warning: need to recall collinear fix sr'
+        !                 success = .false.
+        !             else ! else, if only 1 collinear vertex along this edge
+        !                 ! print*,'first vertex of this edge is #',j,'which is vertex ID:',face_ids(i,j)
+        !                 ! print*,'prev vertex of this edge is #',prev_index,'which is vertex ID:',face_ids(i,prev_index)
+        !                 ! print*,'the collinear vertex along this edge was vertex ID:',collinear_vertex_id
+        !                 ! in the old face, replace the first edge vertex with the collinear one we found
+        !                 temp_face_ids(i,j) = collinear_vertex_id
+        !                 ! also make a new triangular face to fill the gap
+        !                 num_face = num_face + 1
+        !                 temp_apertures(num_face) = apertures(i) ! set as the same aperture assignment
+        !                 temp_num_face_vert(num_face) = 3 ! triangular face, so has 3 vertices
+        !                 temp_face_ids(num_face,3) = face_ids(i,j) ! third vertex is the first vertex of the edge
+        !                 temp_face_ids(num_face,2) = collinear_vertex_id ! second vertex is the collinear vertex we found
+        !                 temp_face_ids(num_face,1) = face_ids(i,prev_index) ! first vertex is the previous vertex from the original facet
+        !                 ! stop
+        !             end if
+        !         end do
+        !     end do
             
-            ! print*,'faces in: ',size(face_ids,1)
-            ! print*,'faces after fix: ',num_face
+        !     ! print*,'faces in: ',size(face_ids,1)
+        !     ! print*,'faces after fix: ',num_face
             
-            if(success) then
-                print*,'sr fix_collinear_vertices: added',num_face - size(face_ids,1),' extra faces to remove some collinear vertices'
+        !     if(success) then
+        !         print*,'sr fix_collinear_vertices: added',num_face - size(face_ids,1),' extra faces to remove some collinear vertices'
                 
-                max_verts = maxval(num_face_vert)
+        !         max_verts = maxval(num_face_vert)
                 
-                ! print*,'max number of vertices per face = ',max_verts
+        !         ! print*,'max number of vertices per face = ',max_verts
                 
-                ! now reassign
-                deallocate(face_ids)
-                deallocate(num_face_vert)
-                deallocate(apertures)
-                ! print*,'deallocated stuff.'
-                allocate(face_ids(1:num_face,1:max_verts))
-                ! print*,'allocated stuff.'
-                allocate(num_face_vert(1:num_face))
-                ! print*,'allocated stuff.'
-                allocate(apertures(1:num_face))
-                ! print*,'allocated stuff.'
+        !         ! now reassign
+        !         deallocate(face_ids)
+        !         deallocate(num_face_vert)
+        !         deallocate(apertures)
+        !         ! print*,'deallocated stuff.'
+        !         allocate(face_ids(1:num_face,1:max_verts))
+        !         ! print*,'allocated stuff.'
+        !         allocate(num_face_vert(1:num_face))
+        !         ! print*,'allocated stuff.'
+        !         allocate(apertures(1:num_face))
+        !         ! print*,'allocated stuff.'
                 
-                do i = 1, num_face
-                    num_face_vert(i) = temp_num_face_vert(i)
-                    apertures(i) = temp_apertures(i)
-                    do j =1, temp_num_face_vert(i)
-                        face_ids(i,j) = temp_face_ids(i,j)
-                    end do
-                end do
-            else
-                print*,'sr fix_collinear_vertices failed because multiple vertices were found to lie along a single edge'
-                print*,'to fix this, please refine triangle settings'
-                ! print*,'results should be ok, expect some small energy losses.'
-            end if
+        !         do i = 1, num_face
+        !             num_face_vert(i) = temp_num_face_vert(i)
+        !             apertures(i) = temp_apertures(i)
+        !             do j =1, temp_num_face_vert(i)
+        !                 face_ids(i,j) = temp_face_ids(i,j)
+        !             end do
+        !         end do
+        !     else
+        !         print*,'sr fix_collinear_vertices failed because multiple vertices were found to lie along a single edge'
+        !         print*,'to fix this, please refine triangle settings'
+        !         ! print*,'results should be ok, expect some small energy losses.'
+        !     end if
             
-            ! stop
+        !     ! stop
             
             
             
-        end subroutine
+        ! end subroutine
         
         ! subroutine merge_vertices(verts, face_ids, distance_threshold, geometry)
             
@@ -1567,8 +1567,7 @@
             type(geometry_type) geometry
             
             integer(8) num_verts, num_faces, i, j, k, num_norms
-            character(100) my_string, my_string2, my_string3
-            logical output_norms
+            character(100) my_string, my_string2
             
             ! print*,'========== start sr PDAS'
             
@@ -2340,7 +2339,7 @@
         real ( kind = 8 ) g(3)
         integer ( kind = 4 ) i
         integer ( kind = 4 ) n
-        real ( kind = 8 ) pi(3)
+        real ( kind = 8 ) pi1(3)
         real ( kind = 8 ) result
         real ( kind = 8 ) sum1
         real ( kind = 8 ) x(ntab)
@@ -2377,14 +2376,14 @@
             g(2) = x1 + x3
             g(3) = x1 + x2
             
-            pi(1) = x2 * x3
-            pi(2) = x1 * x3
-            pi(3) = x1 * x2
+            pi1(1) = x2 * x3
+            pi1(2) = x1 * x3
+            pi1(3) = x1 * x2
             
             sum1 = 0.0D+00
             do i = 1, 3
                 sum1 = sum1 + y(n-1+i) * del(i) &
-                * ( f / 3.0D+00 - g(i) * 0.5D+00 * e + pi(i) * feints )
+                * ( f / 3.0D+00 - g(i) * 0.5D+00 * e + pi1(i) * feints )
             end do
             result = result - sum1 / ( del(1) * del(2) * del(3) )
             
@@ -2416,14 +2415,14 @@
         g(2) = x1 + x3
         g(3) = x1 + x2
         
-        pi(1) = x2 * x3
-        pi(2) = x1 * x3
-        pi(3) = x1 * x2
+        pi1(1) = x2 * x3
+        pi1(2) = x1 * x3
+        pi1(3) = x1 * x2
         
         sum1 = 0.0D+00
         do i = 1, 3
             sum1 = sum1 + y(n-1+i) * del(i) * &
-            ( f / 3.0D+00 - g(i) * 0.5D+00 * e + pi(i) * feints )
+            ( f / 3.0D+00 - g(i) * 0.5D+00 * e + pi1(i) * feints )
         end do
         
         result = result - sum1 / ( del(1) * del(2) * del(3) )
@@ -2478,7 +2477,6 @@
                 !
                     implicit none
                     integer :: iteration, maximum
-                    integer :: counter
                     integer :: step, done
                 
                     step = nint(iteration * 100 / (1.0 * maximum))

@@ -59,15 +59,15 @@ type job_parameters_type
     real(8) la ! wavelength
     real(8) rbi ! real part of the refractive index
     real(8) ibi ! imaginary part of the refractive index
-    integer rec ! max number of internal beam recursions
-    integer refl ! max number of total internal reflections
+    integer(8) rec ! max number of internal beam recursions
+    integer(8) refl ! max number of total internal reflections
     character(100) rot_method ! rotation method
     logical is_multithreaded ! whether or not code should use multithreading
-    integer num_orients ! number of orientations
+    integer(8) num_orients ! number of orientations
     logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
     character(100) c_method ! method of particle file input
     character(100) job_name ! name of job
-    integer  offs(1:2)
+    integer(8)  offs(1:2)
     real(8)  eulers(1:3)
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
     real(8), dimension(:), allocatable :: theta_vals
@@ -78,12 +78,12 @@ type job_parameters_type
     real(8) tri_roughness ! auto triangulation roughness magnitude
     real(8) time_limit ! job time limit in hours
     logical resume ! enable resume of cached data
-    integer cache_id ! cached data to resume from
+    integer(8) cache_id ! cached data to resume from
     logical scaling ! enable energy scaling for diffraction
     real(8) beta_lims(1:2) ! min and max beta values for orientation averaging
     real(8) gamma_lims(1:2) ! min and max gamma values for orientation averaging
     logical output_eulers ! enables an output of the euler angles to a file
-    integer debug ! level of debugging output (0-3)
+    integer(8) debug ! level of debugging output (0-3)
     logical timing ! code timing output
     real(8) thresh_area ! area threshold for new beams
     real(8) thresh_energy ! energy threshold for new beams

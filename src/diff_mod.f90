@@ -460,7 +460,6 @@ module diff_mod
     complex(8) ampl(1:2,1:2) ! amplitude matrix to pass to diffraction sr
     real(8) perp0(1:3) ! perp field direction to pass to diffraction sr
     real(8) prop0(1:3) ! outgoing propagation direction to pass to diffraction sr
-    real(8) v_in(1:3,1:3) ! vertices of facet to pass to diffraction sr
     real(8), dimension(:,:), allocatable, intent(in) :: xfar, yfar, zfar ! far-field bin positions
     real(8), intent(in) :: lambda ! wavelength
     complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: amplC
@@ -688,16 +687,11 @@ module diff_mod
     real(8), dimension(:), allocatable :: theta_vals
     real(8), dimension(:), allocatable :: phi_vals
     real(8), dimension(:,:), allocatable :: xfar, yfar, zfar ! far-field bin positions
-    logical is_multithreaded
     type(job_parameters_type), intent(in) :: job_params
     integer(8) j
     complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_beam
     complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_ext_diff
     complex(8), dimension(:,:,:,:), allocatable :: amplC ! summand
-    complex(8) ampl(1:2,1:2) ! amplitude matrix to pass to diffraction sr
-    real(8) perp0(1:3) ! perp field direction to pass to diffraction sr
-    real(8) prop0(1:3) ! outgoing propagation direction to pass to diffraction sr
-    real(8) v(1:3,1:3) ! vertices of facet to pass to diffraction sr
     complex(8), dimension(:,:), allocatable :: area_facs2
     type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree
     real(8) start, finish, start1, finish1 ! cpu timing variables
@@ -705,7 +699,6 @@ module diff_mod
     real work_done
     integer progressInt
     integer(8) num_threads
-    real(8) fov
     type(outbeamtype) outbeam
     type(geometry_type), intent(in) :: geometry
 
@@ -716,7 +709,6 @@ module diff_mod
     lambda = job_params%la ! wavelength
     theta_vals = job_params%theta_vals ! theta values to evaluate far-field at
     phi_vals = job_params%phi_vals ! phi values to evaluate far-field at
-    is_multithreaded = job_params%is_multithreaded ! whether or not multithreading is enabled
 
     ! get meshgrid-style far-field bins x, y, z
     call make_far_field_bins(xfar,yfar,zfar,theta_vals,phi_vals)
@@ -754,7 +746,7 @@ module diff_mod
         if(omp_get_thread_num() .eq. 0) then
             if(job_params%timing .and. job_params%debug >=1) then
                 work_done = work_done + 1
-                progressReal = work_done*100/beam_outbeam_tree_counter*omp_get_num_threads()          ! my thread percent completion
+                progressReal = work_done*100/int(beam_outbeam_tree_counter,4)*omp_get_num_threads()          ! my thread percent completion
                 if(int(floor(progressReal/dble(10))) .gt. progressInt) then  ! if at least 10% progress has been made
                     progressInt = int(floor(progressReal/dble(10)))
                     call progress_bar(progressInt*10, 100)
