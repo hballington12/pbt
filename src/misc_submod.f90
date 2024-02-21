@@ -2490,15 +2490,15 @@
                 
                     
                     if (done .LE. 1) then
-                        ! write(101,'(a)',advance='no') ' -> In progress... ['
-                        write(*,'(a)',advance='no') ' -> In progress... ['
+                        write(101,'(a)',advance='no') ' -> In progress... ['
+                        ! write(*,'(a)',advance='no') ' -> In progress... ['
                     end if
                     if ((done .GE. 0) .and. (done .LT. 10)) then
-                        ! write(101,'(i2,a2)',advance='no') step,'%|'
-                        write(*,'(i2,a2)',advance='no') step,'%|'
+                        write(101,'(i2,a2)',advance='no') step,'%|'
+                        ! write(*,'(i2,a2)',advance='no') step,'%|'
                     else
-                        ! write(101,'(i3,a2)') step,'%]'
-                        write(*,'(i3,a2)') step,'%]'
+                        write(101,'(i3,a2)') step,'%]'
+                        ! write(*,'(i3,a2)') step,'%]'
                     end if
                 end
 
