@@ -1,8 +1,19 @@
-# Fortran Console Application : PBT Project Overview
+# PBT: Parent Beam Tracer Light Scattering Code
 
-This file contains a summary of the parent beam tracer (PBT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse.
+## Table of Contents
 
-## Compilation
+1. [Overview](#overview)
+2. [Compiling](#compiling)
+3. [Basic Usage](#basic-usage)
+4. [Input Flags](#input-flags)
+5. [Guidelines](#guidelines)
+6. [Examples](#examples)
+
+## Overview
+
+This file contains a summary of the parent beam tracer (PBT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse. The PBT method is designed for the rapid computation of the single scattering properties of particles with size parameter much larger than the wavelength of light. It is an analytical, but approximate method, which combines geometric optics with vector diffraction theory to compute the far-field scattering from any non-spherical particle geometry with much fewer computational resources required than any current exact method. Nonetheless, the user of this code should take care to follow the [guidelines](#guidelines) and verify results where possible with exact theory.
+
+## Compiling
 
 Compile instructions (gcc-13.0.1 & openmpi-4.0.5)
 
@@ -10,6 +21,10 @@ Compile instructions (gcc-13.0.1 & openmpi-4.0.5)
 - `cd src/mpi; make` - compiles mpi code
 
 Example shell scripts and a short summary of command line flags for submitting jobs may be found in `template/`.
+
+## Basic Usage
+
+Once compiled, the pbt code can be run with no input arguments straight from the command line with `./src/seq/abt` (or `./src/mpi/abt` for the mpi version). This will execute the code for a hexagonal column of hexagonal radius `5` and length `10`, with incident wavelength `0.532` and refractive index `1.31+0i`. The mpi version of the code is designed for orientation averaging, and should only be run with fewer mpi processes than the number of orientations. Although the code ships with a built-in method for scattering from hexagonal prisms, an attractive prospect of using this code is that it can be run for arbitrary non-spherical particle geometries. The code reads in particle geometries in wavefront `.obj` format, or in the Macke ray-tracing style `.cry` or `.crystal`. Due to the way in which the near-field is computed, the particle geometry must sufficiently meshed. This can be performed automatically by use of the `-tri`, and `-tri-edge` flags, which make use the wonderful '[Triangle](https://www.cs.cmu.edu/~quake/triangle.html)' code written by Jonathan Richard Shewchuk. Alternatively, the user may choose to input a pre-meshed particle geometry. In this case, the user should also specify an apertures file using the `-afn` flag, which defines the parents used as macroscopic features of the geometry and therefore has a primary role in the accuracy of the near-field compuatation. For more details on how to customise how to run the code, see the sections below on [input flags](#input-flags) and [guidelines](#guidelines).
 
 ## Input Flags
 
@@ -116,7 +131,7 @@ Main source file. It contains the program entry point. The PBT reads input param
 
 - `-fast_diff` - enables an approximate but faster diffraction method. According to Jackson, Classical Electrodynamics Sec 10.5, most of the diffracted energy is confined within the angle $\lambda/d$, where $d$ is a linear dimension of the aperture. If this flag is enabled, any far-field bins outside an angle of $8\lambda/d$ are excluded from the diffraction calculation, for a given outgoing beam. This flag also restricts the external diffraction to the forwards scattering.
 
-- `intellirot` - sets the euler angles for orientation averaging to be uniformly distributed, instead of randomly distrubuted.
+- `intellirot` - sets the euler angles for orientation averaging to be uniformly distributed, instead of randomly distributed.
 
 - `beta_min <value>` - sets the minimum beta angle for orientation averaging, which can be used to take advantage of particle symmetry. Must be in the range `0` to `180`.
 
@@ -128,6 +143,23 @@ Main source file. It contains the program entry point. The PBT reads input param
 
 - `-output_eulers` - outputs the euler angles used for orientation averaging to a file
 
- ## Examples
+## Guidelines
+
+The computation of the PBT code is basically composed of 2 parts: the near field computation, and the far field computation. The accuracy of each of these steps depends on a few factors, which will be discussed below.
+
+### Near Field Computation
+
+- The pbt code uses principles of geometric optics to calculate an approximation for the near-field on the particle surface. In order for geometric optics to be valid, **the particle size must be much larger than the wavelength of light**.
+
+- A crucial principal of the near-field computation to be familiar with, is the concept of a *parent*. A parent is defined as a collection of facets which produce 1 reflected (and possibly one refracted) wave with a single propagation direction in the near-field. Each parent is a collection of similar facets in the particle geometry which represent the macroscopic features of the particle. In this way, the pbt maintains accuracy even when the length scale becomes comparable to, or smaller than the wavelength. If the user inputs a pre-meshed geometry with the `-cfn` flag, then they should also input an apertures file with the `-afn` flag. The pbt is designed to work with a large number of parents, but not huge numbers. The length scale of each parent should be large when compared with the wavelength. The code has been tested with a few hundred parents, but at this point the near-field computation becomes significantly slower.
+
+- In order for the far-field mapping to be accurate, the pbt relies on the Fraunhofer approximation, which approximates the total field at an aperture as that of the incident field. If the near-field approximation is poor, the far-field mapping tends to become less accurate. It is for this reason, that in its current state the pbt code cannot be used for spherical particle geometries, since the propagation of light deviates in this case from a plane wave and therefore the near-field computation loses accuracy. In general, this tends to lead to very large scattering cross sections for the beam diffraction contribution. This can be rescaled with the `-scaling` flag, but this should be used with caution.
+
+### Far Field Computation
+
+- The pbt uses vector diffraction theory at an aperture described by [Karczewski & Wolf](https://doi.org/10.1364/JOSA.56.001207). The integrated scattering parameters, such as asymmetry parameter and various cross sections, are computed by interpolating a 3-point Lagrange polynomial to the data, which is integrated exactly. As particle size increases, the width of diffraction peaks can become extremely narrow. In order to accurately interpolate over the scattered field, the number of far-field bins (specified with flags `-theta` and `-phi`) should have sufficient resolution to resolve these diffraction peaks. If the individual scattering efficiencies deviate significantly from 1, the user should treat the validity of results with caution. In general, if both the beam and external diffraction scattering efficiencies deviate from 1, the user may wish to check that the far-field bins have sufficient resolution. If the external diffraction scattering efficiency is close to 1 but the beam diffraction is not, then this suggests that the near-field computation has poor accuracy. Reasons for this include: particle mesh being too course, parents not representing the macroscopic features of the geometry, or microscopic features of the parents being comparable to the wavelength.
+
+## Examples
 
  `abt -lambda 0.532 -rbi 1.3117 -ibi 0 -rec 10 -rot euler 20 35 2 -cmethod read -cft obj -cfn my_particle.obj -afn my_apertures.dat -mt -theta 0 1 180 -phi 0 2 360` - run `abt` executable with wavelength 0.532, refractive index 1.3117 + 0i, 10 beam recursions, particle rotated with euler angles 20, 35, read the particle with particle file type `.obj`, filename `my_particle.obj`, apertures specified in the file `my_apertures.dat`, with multithreading enabled. Evaluate the far-field at polar angle 0 in 1 degree steps to 180 and at azimuthal angle 0 in 2 degree steps to 360.
+
