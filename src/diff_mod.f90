@@ -888,8 +888,7 @@ module diff_mod
     ! convert 1-d arrays to 2-d arrays
     call meshgrid_real(theta_vals, phi_vals, theta_vals_mesh, phi_vals_mesh)
 
-    ! DO NOT SET THIS TOO BIG - if waveno*r > 1e6, trig function precision fails vs matlab
-    r = 1e4 ! distance to far-field
+    r = 1e6 ! distance to far-field
     
     ! convert to cartesian
     x = r*sin(theta_vals_mesh)*cos(phi_vals_mesh)
