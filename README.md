@@ -28,7 +28,7 @@ Once compiled, the pbt code can be run with no input arguments straight from the
 
 ## Input Flags
 
-Main source file. It contains the program entry point. The PBT reads input parameters from the command line. There are a few required input arguments, as well as a few optional ones. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of most arguments in the command line is not important and the PBT will search through lines from left to right in an attempt to find each argument. A summary of command line arguments is given below:
+Main source file. It contains the program entry point. The PBT reads input parameters from the command line. Each input parameter is defined by a keyphrase, with arguments following a space delimiter. The ordering of most arguments in the command line is not important and the PBT will search through lines from left to right in an attempt to find each argument. A summary of command line arguments is given below:
 
 - `-lambda` `<value>` - Defines the wavelength of incident light. If omitted, the default value is `0.532`.
 
