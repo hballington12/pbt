@@ -2400,8 +2400,8 @@ subroutine recursion_ext(beam,geometry,job_params)
         type(geometry_type), intent(out) :: bb_geometry
         
         real(8) min_x, min_y, max_x, max_y, min_z, max_z
-        integer(8), parameter :: bounding_box_x_dim = 2 ! bounding box x dimension
-        integer(8), parameter :: bounding_box_y_dim = 2 ! bounding box y dimension
+        integer(8), parameter :: bounding_box_x_dim = 4 ! bounding box x dimension
+        integer(8), parameter :: bounding_box_y_dim = 4 ! bounding box y dimension
         real(8), parameter :: fac = 1.1
         real(8), dimension(1:bounding_box_x_dim+1, 1:bounding_box_y_dim+1) :: xvals, yvals ! bounding box x and y vertices
         integer(8) i,j, vert_counter, face_counter
