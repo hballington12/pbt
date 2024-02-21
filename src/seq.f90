@@ -136,6 +136,11 @@ do i = 1, num_remaining_orients
 
     i_loop = remaining_orients(i)
 
+    if(job_params%debug >= 1) then
+        print*,'rotating particle...'
+        write(101,*)'rotating particle...'
+    end if
+
     ! rotate particle
     call PROT_MPI(  alpha_vals, &
                     beta_vals,  &
@@ -156,6 +161,11 @@ do i = 1, num_remaining_orients
     call make_incident_beam(rotated_geometry,          & ! <-  unique vertices
                             beam_geometry, &
                             beam_inc)
+
+    if(job_params%debug >= 1) then
+        print*,'computing near-field...'
+        write(101,*)'computing near-field...'
+    end if
 
     ! beam loop
     call beam_loop( beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
@@ -181,6 +191,11 @@ do i = 1, num_remaining_orients
         end if
     end if
     
+    if(job_params%debug >= 1) then
+        print*,'computing far-field...'
+        write(101,*)'computing far-field...'
+    end if
+
     ! diffraction
     call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & ! <-  counts the current number of beam outbeams
@@ -189,7 +204,12 @@ do i = 1, num_remaining_orients
                     ampl_far_ext_diff,       & !  -> amplitude matrix due to external diffraction
                     job_params, &
                     rotated_geometry)
-    ! stop
+
+    if(job_params%debug >= 1) then
+        print*,'computing mueller matrix and parameters...'
+        write(101,*)'computing mueller matrix and parameters...'
+    end if
+
     call finalise(  ampl_far_beam,     & ! <-  amplitude matrix due to beam diffraction
                     ampl_far_ext_diff, & ! <-  amplitude matrix due to external diffraction
                     mueller,             & !  -> 2d mueller matrix

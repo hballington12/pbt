@@ -197,6 +197,11 @@ do i = mpi%start, mpi%end
 
     i_loop = remaining_orients(i)
 
+    if(job_params%debug >= 1) then
+        if(mpi%rank == 0) print*,'rotating particle...'
+        write(101,*)'rotating particle...'
+    end if
+
     ! rotate particle
     call PROT_MPI(  alpha_vals, &
                     beta_vals,  &
@@ -211,6 +216,11 @@ do i = mpi%start, mpi%end
                             beam_geometry, &
                             beam_inc)      
 
+    if(job_params%debug >= 1) then
+        if(mpi%rank == 0) print*,'computing near-field...'
+        write(101,*)'computing near-field...'
+    end if
+
     ! beam loop
     call beam_loop( beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
                     beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
@@ -220,7 +230,12 @@ do i = mpi%start, mpi%end
                     rotated_geometry, &
                     beam_geometry, &
                     beam_inc)
-    
+
+    if(job_params%debug >= 1) then
+        if(mpi%rank == 0) print*,'computing far-field...'
+        write(101,*)'computing far-field...'
+    end if
+
     ! diffraction
     call diff_main( beam_outbeam_tree,          & ! <-  outgoing beams from the beam tracing
                     beam_outbeam_tree_counter,  & ! <-  counts the current number of beam outbeams
@@ -228,6 +243,11 @@ do i = mpi%start, mpi%end
                     ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
                     ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
                     job_params)
+
+    if(job_params%debug >= 1) then
+        if(mpi%rank == 0) print*,'computing mueller matrix and parameters...'
+        write(101,*)'computing mueller matrix and parameters...'
+    end if
 
     call finalise(  ampl_far_beam,              & ! <-  amplitude matrix due to beam diffraction
                     ampl_far_ext_diff,          & ! <-  amplitude matrix due to external diffraction

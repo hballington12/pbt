@@ -102,11 +102,11 @@ module beam_loop_mod
                     end = i ! set end index, and keep looking until we reach last beam for this recursion
                 end if
             end do
-            if(job_params%debug >= 2) print*,'exporting by recursion, limits:',start,end
+            if(job_params%debug >= 2) write(101,*)'exporting by recursion, limits:',start,end
         else
             start = job_params%export_beam_lims(1)
             end = job_params%export_beam_lims(2)
-            if(job_params%debug >= 2) print*,'exporting by beam number, limits:',start,end
+            if(job_params%debug >= 2) write(101,*)'exporting by beam number, limits:',start,end
         end if
 
         ! Open the file for writing
@@ -1736,8 +1736,9 @@ subroutine recursion_ext(beam,geometry,job_params)
         end if
         
         if(job_params%export_beam) then ! if beam exporting enabled
-            if(job_params%debug >= 2) print*,'exporting beam tree...'
+            if(job_params%debug >= 2) write(101,*)'exporting beam tree...'
             call open_beam_json(beam_tree(1:num_beams), job_params) ! write beam tree or individual beam to json file
+            if(job_params%debug >= 2) write(101,*)'finished exporting beam tree.'
         end if
         
     end subroutine

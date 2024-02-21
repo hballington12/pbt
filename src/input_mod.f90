@@ -1079,13 +1079,13 @@ job_params%theta_vals = theta_vals
 job_params%phi_vals = phi_vals
 
 if(job_params%export_beam) then ! if beam exporting enabled, check values
-    print*,'beam exporting enabled'
+    write(101,*)'beam exporting enabled'
     if(job_params%export_beam_lims(1) > job_params%export_beam_lims(2)) then 
         error stop "beam export limits must be equal or increasing values"
         stop
     end if
     if(job_params%export_beam_rec) then
-        print*,'exporting by recursion number:',job_params%export_beam_lims(1:2)
+        write(101,*)'exporting by recursion number:',job_params%export_beam_lims(1:2)
         ! if(job_params%export_beam_lims(2) > job_params%rec) then 
         !     job_params%export_beam_lims(2) = job_params%rec        
         !     print*,'changed'

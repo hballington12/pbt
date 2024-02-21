@@ -1570,7 +1570,7 @@
             character(100) my_string, my_string2, my_string3
             logical output_norms
             
-            print*,'========== start sr PDAS'
+            ! print*,'========== start sr PDAS'
             
             num_verts = geometry%nv
             num_norms = geometry%nn
@@ -1622,7 +1622,7 @@
             ! also write the apertures file
             call save_apertures(geometry, output_dir)
 
-            print*,'========== end sr PDAS'
+            ! print*,'========== end sr PDAS'
             
         end subroutine
         
