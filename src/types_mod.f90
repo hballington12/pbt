@@ -11,7 +11,7 @@ type outbeamtype ! type for outbeam trees (used for diffraction)
     real(8) verts(1:3,1:3) ! x, y, and z components of each vertex
     real(8) prop_out(1:3) ! outgoing propagation vector
     real(8) prop_in(1:3) ! incoming propagation vector
-    integer(8) FOut ! face ID from which the beam was emitted
+    integer(8) fi ! face ID from which the beam was emitted
     integer interactionOut ! interaction counter
     real(8) fov ! field of view for this diffraction interaction
 end type outbeamtype

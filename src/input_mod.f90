@@ -2647,7 +2647,6 @@ subroutine PDAL2(   job_params,     &
                 ! if(job_params%debug >= 1) print*,'validating vertex ordering...'
                 ! call validate_vertices(verts,norms,face_ids,num_face_vert,norm_ids)
             end if
-
             ! stop
 
         else if (trim(cft) .eq. 'mrt') then ! if macke ray-tracing style geometry file
@@ -2762,15 +2761,6 @@ subroutine PDAL2(   job_params,     &
     else
         print*,'error: ',c_method(1:len(trim(c_method))),' is not a valid method of particle file input'
         stop
-    end if
-
-
-    if (num_face_vert_max .gt. 3) then
-        if(job_params%debug >= 1) then
-            write(101,*)'warning: max vertices per facet greater than 3 detected. particle must be triangulated to proceed.'
-            write(101,*)' attempting automatic triangulation...'
-        end if
-        job_params%tri = .true.        
     end if
 
     call midPointsAndAreas(face_ids, verts, Midpoints, faceAreas, num_face_vert) ! calculate particle facet areas (for doing some checks in the following sr)

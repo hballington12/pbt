@@ -201,7 +201,7 @@ module diff_mod
     
         ! computes a rotation matrix for rotating into an aperture located in the xy plane
     
-    real(8), intent(in) :: v0(1:3,1:3) ! vertices of facet
+    real(8), dimension(:,:), allocatable, intent(in) :: v0 ! vertices of facet
     real(8), intent(out) :: rot(1:3,1:3) ! rotation matrix
     
     real(8) a1(1:3) ! vector from com to vertex 1
@@ -288,7 +288,7 @@ module diff_mod
     
     end subroutine
     
-    subroutine contour_integral(lambda,area_facs2,rot1,rot2,v0,prop2,x3,y3,z3,mapping,mapping2)
+    subroutine contour_integral(lambda,area_facs2,rot1,rot2,v0,prop2,x3,y3,z3,mapping,mapping2,nv)
     
         ! computes the area factor aka scalar fraunhofer diffraction pattern using contour integral method
     
@@ -299,26 +299,32 @@ module diff_mod
     real(8) bin_vec_size_k ! distance to far-field bins - important for accurate phase
     real(8) kxx, kyy
     real(8) waveno ! wave number
-    real(8), intent(in) :: v0(1:3,1:3) ! vertices of facet after translating to com system
+    real(8), dimension(:,:), allocatable, intent(in) :: v0 ! vertices of facet after translating to com system
     real(8), intent(in) :: rot1(1:3,1:3) ! rotation matrix #1
     real(8), intent(in) :: rot2(1:3,1:3) ! rotation matrix (about x-axis)
     real(8) rot(1:3,1:3) ! update to new rotation matrix which aligns with incidence
-    real(8) v1(1:3,1:3) ! vertices of facet after rotating
+    real(8), dimension(:,:), allocatable :: v1 ! vertices of facet after rotating
     integer(8) j, i1, i2, ii
     real(8), dimension(:,:), allocatable, intent(in) :: x3, y3, z3
     real(8), dimension(:,:), allocatable :: kxxs, kyys, bin_vec_size_ks
     real(8), intent(in) :: prop2(1:3)
     real(8) kInc(1:3) ! incoming propagation vector * wavenumber
-    real(8) x(1:3), y(1:3) ! x and y coordinates of aperture after rotating into x-y plane
-    real(8) m(1:3), n(1:3) ! gradient and inverse gradient between vertex j and j + 1
+    real(8), dimension(:), allocatable :: x, y ! x and y coordinates of aperture after rotating into x-y plane
+    real(8), dimension(:), allocatable :: m, n ! gradient and inverse gradient between vertex j and j + 1
     real(8) mj, nj, xj, yj, xj_plus1, yj_plus1
     real(8) dx, dy
     real(8) alpha, beta, delta, omega1, omega2
     real(8) sumre, sumim
     real(8) delta1, delta2
+    integer(8), intent(in) :: nv
     ! real(8) nf
 
     ! allocate
+    allocate(x(1:nv))
+    allocate(y(1:nv))
+    allocate(m(1:nv))
+    allocate(n(1:nv))
+    allocate(v1(1:3,1:nv))
     allocate(kxxs(1:size(x3,2),1:size(x3,1)))
     allocate(kyys(1:size(x3,2),1:size(x3,1)))
     allocate(bin_vec_size_ks(1:size(x3,2),1:size(x3,1)))
@@ -326,8 +332,7 @@ module diff_mod
     waveno = 2.0*pi/lambda
     
     rot = matmul(rot2,rot1) ! rotate vertices
-    v1 = matmul(rot,v0) ! translate vertices to new com
-    
+    v1 = matmul(rot,v0) ! translate vertices to new com 
     kInc = prop2*waveno ! kincrot in matlab
     
     ! ===========================
@@ -335,20 +340,20 @@ module diff_mod
     ! now do contour integral
     ! ===========================
     
-    x(1:3) = v1(1,1:3)
-    y(1:3) = v1(2,1:3)
-    
-    do j = 1, 3 ! loop over vertices, compute gradient
-        if(j .eq. 3) then
+    x(1:nv) = v1(1,1:nv)
+    y(1:nv) = v1(2,1:nv)
+
+    do j = 1, nv ! loop over vertices, compute gradient
+        if(j .eq. nv) then
             m(j) = (y(1) - y(j)) / (x(1) - x(j))
         else
             m(j) = (y(j+1) - y(j)) / (x(j+1) - x(j))
         end if
     end do
     
-    n = 1/m ! get  inverse gradient
+    n(:) = 1/m(:) ! get  inverse gradient
     area_facs2 = 0
-    
+
     do i2 = 1, size(x3,2)
         do ii = 1, mapping2(i2) ! looping over the number of phi values to evaluate at, for this theta
             i1 = mapping(ii,i2)
@@ -365,7 +370,7 @@ module diff_mod
     !!$OMP PARALLEL DEFAULT(private) num_threads(1) SHARED(xfar,x3,y3,z3,kinc,waveno,m,n,area_facs2,x,y)
     !!$OMP DO
     ! contour summation
-    do j = 1, 3
+    do j = 1, nv
         mj = m(j)
         nj = n(j)
         xj = x(j)
@@ -376,7 +381,7 @@ module diff_mod
         if(abs(mj) .lt. 1d-9) nj = 1e6 ! fix infinite 1/gradient
         if(abs(nj) .lt. 1d-9) mj = 1e6 ! fix infinite 1/gradient
 
-        if(j .eq. 3) then
+        if(j .eq. nv) then
             xj_plus1 = x(1)
             yj_plus1 = y(1)
         else
@@ -450,7 +455,9 @@ module diff_mod
                             phi_vals,   & ! phi values
                             theta_vals, & ! theta values
                             fov,        &
-                            job_params)
+                            job_params, &
+                            outbeam, &
+                            geometry)
     
         ! main diffraction subroutine
         ! takes in a few arguments and outputs the far-field scattering pattern
@@ -466,6 +473,8 @@ module diff_mod
     real(8), dimension(:), allocatable, intent(in) :: theta_vals
     real(8), intent(in) :: fov
     type(job_parameters_type), intent(in) :: job_params
+    type(outbeamtype), intent(in) :: outbeam
+    type(geometry_type), intent(in) :: geometry
 
     complex(8), dimension(:,:), allocatable :: area_facs2
     real(8) diff_ampl(1:2,1:2)
@@ -474,7 +483,7 @@ module diff_mod
     real(8) k(1:3)
     logical anti_parallel
     real(8) incidence(1:3), incidence2(1:3)
-    real(8) v(1:3,1:3) ! vertices of facet (after lr flip)
+    real(8), dimension(:,:), allocatable :: v2 ! vertices of facet
     real(8) hc(1:3)
     real(8) evo2(1:3)
     real(8) rot4(1:2,1:2)
@@ -482,7 +491,7 @@ module diff_mod
     real(8) temp_rot1(1:2,1:2) 
     real(8) temp_vec3(1:3)
     complex(8) ampl_temp2(1:2,1:2)
-    real(8) v0(1:3,1:3) ! vertices of facet after translating to com system
+    real(8), dimension(:,:), allocatable :: v20 ! vertices of facet after translating to com system
     real(8) com(1:3) ! aperture centre of mass
     real(8) prop1(1:3), perp1(1:3)
     real(8) angle
@@ -502,6 +511,7 @@ module diff_mod
     integer(8), dimension(:,:), allocatable :: mapping ! maps theta and phi index
     integer(8), dimension(:), allocatable :: mapping2 ! number of phi values at each theta value
     real(8), dimension(:,:), allocatable :: r1 ! far-field bin distances
+    integer(8) nv ! number of vertices in outbeam face
 
     allocate(my_phi_vals(1:size(phi_vals,1)))
     allocate(area_facs2(1:size(xfar,1),1:size(xfar,2)))
@@ -516,17 +526,23 @@ module diff_mod
     mapping2(:) = 0 ! init
     cos_fov = cos(fov)
 
-    ! flip vertex order to make normals face the other way (bit of a bodge) to do: find a way to remove this
-    call flip_vert_lr(v)
+    nv = geometry%f(outbeam%fi)%nv ! get number of vertices in face
 
-    v(1:3,1:3) = v_in(1:3,1:3) ! store vertices
-    
-    com = sum(v,2)/3 ! get centre of mass
-    v0(1,1:3) = v(1,1:3) - com(1) ! translate aperture to centre of mass system
-    v0(2,1:3) = v(2,1:3) - com(2)
-    v0(3,1:3) = v(3,1:3) - com(3)
-    
-    call get_rotation_matrix2(v0,rot)
+    allocate(v2(1:3,1:nv)) ! allocate arrays to hold vertex information
+    allocate(v20(1:3,1:nv))
+
+    do i = 1, nv ! for each vertex in face
+        v2(:,i) = geometry%v(geometry%f(outbeam%fi)%vi(i),:) ! get information about vertices
+    end do
+
+    com = sum(v2,2)/nv ! get centre of mass
+    do i = 1, nv
+        v20(1,i) = v2(1,i) - com(1) ! translate aperture to centre of mass system
+        v20(2,i) = v2(2,i) - com(2) ! translate aperture to centre of mass system
+        v20(3,i) = v2(3,i) - com(3) ! translate aperture to centre of mass system
+    end do
+
+    call get_rotation_matrix2(v20,rot) ! get rotation matrix using first 2 vertices in face
 
     prop1 = matmul(rot,prop0)
     perp1 = matmul(rot,perp0)
@@ -649,7 +665,8 @@ module diff_mod
     end do
 
     ! scalar fraunhofer integral, output contained in area_facs2
-    call contour_integral(lambda,area_facs2,rot,rot2,v0,prop2,x3,y3,z3,mapping,mapping2)
+    call contour_integral(lambda,area_facs2,rot,rot2,v20,prop2,x3,y3,z3,mapping,mapping2,nv)
+
     do j = 1, size(xfar,2) ! looping over theta
         do ii = 1, mapping2(j) ! looping over the number of phi values to evaluate at, for this theta
             i = mapping(ii,j) ! get the position of this phi value in the main arrays, and continue as normal
@@ -667,7 +684,8 @@ module diff_mod
                             ampl_far_beam,            & ! far-field diffracted beam amplitude matrix
                             ext_diff_outbeam_tree,      & ! tree of outgoing external diffraction beams
                             ampl_far_ext_diff,        & ! far-field external diffraction amplitude matrix
-                            job_params)
+                            job_params, &
+                            geometry)
     
         ! sr diff_main is the main shell for diffraction of all beams + external diffraction at a fixed orientation
 
@@ -695,6 +713,8 @@ module diff_mod
     integer progressInt
     integer(8) num_threads
     real(8) fov
+    type(outbeamtype) outbeam
+    type(geometry_type), intent(in) :: geometry
 
     if(job_params%timing) then
         start = omp_get_wtime()
@@ -730,7 +750,7 @@ module diff_mod
         num_threads = 1
     end if
 
-    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC,ampl,perp0,prop0,v,start1,finish1,fov)
+    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC,ampl,perp0,prop0,v,start1,finish1,fov,outbeam)
     if(job_params%timing) then
         start1 = omp_get_wtime()
     end if
@@ -753,9 +773,10 @@ module diff_mod
         prop0(1:3) = beam_outbeam_tree(j)%prop_out(1:3)
         v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
         fov = beam_outbeam_tree(j)%fov
+        outbeam = beam_outbeam_tree(j)
     
         ! get far-field contribution from this outbeam
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params)                                 
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params,outbeam,geometry)                                 
 
         !$OMP CRITICAL
         ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) + amplC(:,:,:,:)
@@ -796,8 +817,9 @@ module diff_mod
         prop0(1:3) = ext_diff_outbeam_tree(j)%prop_out(1:3)
         v(1:3,1:3) = ext_diff_outbeam_tree(j)%verts(1:3,1:3)
         fov = pi/2
+        outbeam = ext_diff_outbeam_tree(j)
     
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params)
+        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params,outbeam,geometry)
 
         !$OMP CRITICAL
         ampl_far_ext_diff(:,:,:,:) = ampl_far_ext_diff(:,:,:,:) + amplC(:,:,:,:)

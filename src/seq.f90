@@ -187,7 +187,8 @@ do i = 1, num_remaining_orients
                     ampl_far_beam,           & !  -> amplitude matrix due to beam diffraction
                     ext_diff_outbeam_tree,     & ! <-  outgoing beams from external diffraction
                     ampl_far_ext_diff,       & !  -> amplitude matrix due to external diffraction
-                    job_params)
+                    job_params, &
+                    rotated_geometry)
     ! stop
     call finalise(  ampl_far_beam,     & ! <-  amplitude matrix due to beam diffraction
                     ampl_far_ext_diff, & ! <-  amplitude matrix due to external diffraction

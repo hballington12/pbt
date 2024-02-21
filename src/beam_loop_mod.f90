@@ -542,7 +542,7 @@ module beam_loop_mod
                 ext_diff_outbeam_tree(n)%vk7(:) = vk7(:)
                 ext_diff_outbeam_tree(n)%prop_out(:) = prop(:)
                 ext_diff_outbeam_tree(n)%prop_in(:) = prop(:)
-                ext_diff_outbeam_tree(n)%fout = i ! face id from which the beam was emitted
+                ext_diff_outbeam_tree(n)%fi = i ! face id from which the beam was emitted
                 ext_diff_outbeam_tree(n)%verts(:,:) = transpose(geometry%v(geometry%f(i)%vi(:),:)) ! verts needs readjusting for arbitrary number of vertices
             end if
         end do
@@ -1501,7 +1501,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         
         do i = 1, beam_outbeam_tree_counter
             prop = beam_outbeam_tree(i)%prop_out
-            face_id = beam_outbeam_tree(i)%fout
+            face_id = beam_outbeam_tree(i)%fi
             ampl = beam_outbeam_tree(i)%ampl
             normal = geometry%n(geometry%f(face_id)%ni,:)
             area = geometry%f(face_id)%area
@@ -1525,7 +1525,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         
         do i = 1, size(ext_diff_outbeam_tree,1)
             prop = ext_diff_outbeam_tree(i)%prop_out
-            face_id = ext_diff_outbeam_tree(i)%fout
+            face_id = ext_diff_outbeam_tree(i)%fi
             ampl = ext_diff_outbeam_tree(i)%ampl
             normal = geometry%n(geometry%f(face_id)%ni,:)
             area = geometry%f(face_id)%area
@@ -1755,7 +1755,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         integer(8) i, fi
         
         do i = 1, beam_outbeam_tree_counter ! for each beam
-            fi = beam_outbeam_tree(i)%fout ! get the face id
+            fi = beam_outbeam_tree(i)%fi ! get the face id
             beam_outbeam_tree(i)%verts = transpose(geometry%v(geometry%f(fi)%vi(:),:))
         end do
         
@@ -2502,8 +2502,9 @@ subroutine recursion_ext(beam,geometry,job_params)
                 ! beam_outbeam_tree(beam_outbeam_tree_counter)%prop_in(:) = beam%field_in(i)%prop_int(:) ! incident propagation direction ! probably unused
                 beam_outbeam_tree(beam_outbeam_tree_counter)%prop_out(:) = beam%prop(:) ! outgoing propagation direction
                 beam_outbeam_tree(beam_outbeam_tree_counter)%vk7(:) = beam%field_in(i)%e_perp(:) ! perpendicular field vector
-                beam_outbeam_tree(beam_outbeam_tree_counter)%fout = beam%field_in(i)%fi ! facet id
+                beam_outbeam_tree(beam_outbeam_tree_counter)%fi = beam%field_in(i)%fi ! facet id
                 beam_outbeam_tree(beam_outbeam_tree_counter)%fov = fov ! save total area of this interaction
+                beam_outbeam_tree(beam_outbeam_tree_counter)%verts = transpose(geometry%v(geometry%f(beam%field_in(i)%fi)%vi(:),:))
             end if
         end do
         
