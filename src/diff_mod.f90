@@ -443,18 +443,13 @@ module diff_mod
 
     end subroutine
     
-    subroutine diffraction( ampl,       & ! the outgoing amplitude matrix on the particle surface
-                            v_in,       & ! the vertices of the aperture
-                            prop0,      & ! the outgoing beam propagation direction (in lab system)
-                            perp0,      & ! the outgoing beam perpendicular field direction (in lab system)
-                            xfar,       & ! the x coordinate of each far-field bin (meshgrid style)
+    subroutine diffraction( xfar,       & ! the x coordinate of each far-field bin (meshgrid style)
                             yfar,       & ! the y coordinate of each far-field bin (meshgrid style)
                             zfar,       & ! the z coordinate of each far-field bin (meshgrid style)
                             lambda,     & ! wavelength
                             amplC,      & ! the far-field diffraction amplitude matrix to be calculated
                             phi_vals,   & ! phi values
                             theta_vals, & ! theta values
-                            fov,        &
                             job_params, &
                             outbeam, &
                             geometry)
@@ -462,16 +457,16 @@ module diff_mod
         ! main diffraction subroutine
         ! takes in a few arguments and outputs the far-field scattering pattern
     
-    complex(8), intent(inout) :: ampl(1:2,1:2) ! amplitude matrix to pass to diffraction sr
-    real(8), intent(in) :: perp0(1:3) ! perp field direction to pass to diffraction sr
-    real(8), intent(in) :: prop0(1:3) ! outgoing propagation direction to pass to diffraction sr
-    real(8), intent(in) :: v_in(1:3,1:3) ! vertices of facet to pass to diffraction sr
+    complex(8) ampl(1:2,1:2) ! amplitude matrix to pass to diffraction sr
+    real(8) perp0(1:3) ! perp field direction to pass to diffraction sr
+    real(8) prop0(1:3) ! outgoing propagation direction to pass to diffraction sr
+    real(8) v_in(1:3,1:3) ! vertices of facet to pass to diffraction sr
     real(8), dimension(:,:), allocatable, intent(in) :: xfar, yfar, zfar ! far-field bin positions
     real(8), intent(in) :: lambda ! wavelength
     complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: amplC
     real(8), dimension(:), allocatable, intent(in) :: phi_vals
     real(8), dimension(:), allocatable, intent(in) :: theta_vals
-    real(8), intent(in) :: fov
+    real(8) fov
     type(job_parameters_type), intent(in) :: job_params
     type(outbeamtype), intent(in) :: outbeam
     type(geometry_type), intent(in) :: geometry
@@ -502,7 +497,6 @@ module diff_mod
     ! real(8) bin_vec_size ! distance to far-field bins - important for accurate phase
     real(8) phi
     real(8) my_k(1:3)
-    real(8), dimension(:), allocatable :: my_phi_vals ! phi values in aperture system for this aperture only
     logical success
     integer(8) theta_i
     logical, dimension(:,:), allocatable :: is_in_fov ! whether or not each far-field bin is inside the field of view
@@ -513,19 +507,21 @@ module diff_mod
     real(8), dimension(:,:), allocatable :: r1 ! far-field bin distances
     integer(8) nv ! number of vertices in outbeam face
 
-    allocate(my_phi_vals(1:size(phi_vals,1)))
     allocate(area_facs2(1:size(xfar,1),1:size(xfar,2)))
     allocate(is_in_fov(1:size(xfar,1),1:size(xfar,2)))
     allocate(mapping(1:size(xfar,1),1:size(xfar,2)))
     allocate(mapping2(1:size(xfar,2)))
     allocate(r1(1:size(xfar,1),1:size(xfar,2)))
 
+    ampl(:,:) = outbeam%ampl(:,:) ! get amplitude matrix of outbeam
+    perp0(:) = outbeam%vk7(:) ! get e-perp vector of outbeam
+    prop0(:) = outbeam%prop_out(:) ! get propagation vector of outbeam
+    fov = outbeam%fov ! get field-of-view of outbeam
     is_in_fov(:,:) = .true. ! init
     amplC(:,:,:,:) = 0d0 ! init
     mapping(:,:) = 0 ! init
     mapping2(:) = 0 ! init
-    cos_fov = cos(fov)
-
+    cos_fov = cos(fov) ! cosine of field of view
     nv = geometry%f(outbeam%fi)%nv ! get number of vertices in face
 
     allocate(v2(1:3,1:nv)) ! allocate arrays to hold vertex information
@@ -575,7 +571,7 @@ module diff_mod
     ! this bodge reverses the amplitude matrix components if this is the case
     if(anti_parallel) ampl = -ampl
 
-    incidence = (/0, 0, -1/) ! incident illumination)
+    incidence = (/0d0, 0d0, -1d0/) ! incident illumination)
     incidence2 = matmul(rot2,matmul(rot,incidence))
 
     call translate_far_field_bins(xfar,yfar,zfar,com,x1,y1,z1)
@@ -635,7 +631,7 @@ module diff_mod
                 if(abs(dot_product(incidence2,k)) .lt. 0.999) then ! if bin is not in direct forwards
                     call cross(incidence2,k,hc)
                 else ! rotate vector perp to scattering plane (y-z) into aperture system
-                    my_k = (/x3(i,theta_i),y3(i,theta_i),z3(i,theta_i)/)/sqrt(x3(i,theta_i)**2 + y3(i,theta_i)**2 + z3(i,theta_i)**2)
+                    my_k = (/x3(i,theta_i),y3(i,theta_i),z3(i,theta_i)/)/r1(i,theta_i)
                     call cross(incidence2,my_k,hc)
                 end if
 
@@ -670,10 +666,7 @@ module diff_mod
     do j = 1, size(xfar,2) ! looping over theta
         do ii = 1, mapping2(j) ! looping over the number of phi values to evaluate at, for this theta
             i = mapping(ii,j) ! get the position of this phi value in the main arrays, and continue as normal
-            amplC(i,j,1,1) = amplC(i,j,1,1) * area_facs2(i,j)
-            amplC(i,j,1,2) = amplC(i,j,1,2) * area_facs2(i,j)
-            amplC(i,j,2,1) = amplC(i,j,2,1) * area_facs2(i,j)
-            amplC(i,j,2,2) = amplC(i,j,2,2) * area_facs2(i,j)
+            amplC(i,j,:,:) = amplC(i,j,:,:) * area_facs2(i,j)
         end do
     end do
 
@@ -716,16 +709,17 @@ module diff_mod
     type(outbeamtype) outbeam
     type(geometry_type), intent(in) :: geometry
 
-    if(job_params%timing) then
-        start = omp_get_wtime()
+    if(job_params%timing) then ! if timing enabled
+        start = omp_get_wtime() ! start timer
     end if
 
-    lambda = job_params%la
-    theta_vals = job_params%theta_vals
-    phi_vals = job_params%phi_vals
-    is_multithreaded = job_params%is_multithreaded
+    lambda = job_params%la ! wavelength
+    theta_vals = job_params%theta_vals ! theta values to evaluate far-field at
+    phi_vals = job_params%phi_vals ! phi values to evaluate far-field at
+    is_multithreaded = job_params%is_multithreaded ! whether or not multithreading is enabled
 
-    call make_far_field_bins(xfar,yfar,zfar,theta_vals,phi_vals) ! get meshgrid-style far-field bins x, y, z
+    ! get meshgrid-style far-field bins x, y, z
+    call make_far_field_bins(xfar,yfar,zfar,theta_vals,phi_vals)
 
     ! allocate some far-field bins and init
     allocate(ampl_far_beam(1:size(xfar,1),1:size(xfar,2),1:2,1:2))
@@ -750,7 +744,7 @@ module diff_mod
         num_threads = 1
     end if
 
-    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC,ampl,perp0,prop0,v,start1,finish1,fov,outbeam)
+    !$OMP PARALLEL num_threads(num_threads) PRIVATE(amplC,start1,finish1,outbeam)
     if(job_params%timing) then
         start1 = omp_get_wtime()
     end if
@@ -761,22 +755,17 @@ module diff_mod
             if(job_params%timing .and. job_params%debug >=1) then
                 work_done = work_done + 1
                 progressReal = work_done*100/beam_outbeam_tree_counter*omp_get_num_threads()          ! my thread percent completion
-                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
-                    progressInt = int(progressReal)           ! update progress counter
-                    call progress_bar(progressInt, 100)
+                if(int(floor(progressReal/dble(10))) .gt. progressInt) then  ! if at least 10% progress has been made
+                    progressInt = int(floor(progressReal/dble(10)))
+                    call progress_bar(progressInt*10, 100)
                 end if
             end if
         end if
 
-        ampl(1:2,1:2) = beam_outbeam_tree(j)%ampl(1:2,1:2)
-        perp0(1:3) = beam_outbeam_tree(j)%vk7(1:3)
-        prop0(1:3) = beam_outbeam_tree(j)%prop_out(1:3)
-        v(1:3,1:3) = beam_outbeam_tree(j)%verts(1:3,1:3)
-        fov = beam_outbeam_tree(j)%fov
-        outbeam = beam_outbeam_tree(j)
+        outbeam = beam_outbeam_tree(j) ! get outbeam from tree
     
         ! get far-field contribution from this outbeam
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params,outbeam,geometry)                                 
+        call diffraction(xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,job_params,outbeam,geometry)                                 
 
         !$OMP CRITICAL
         ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) + amplC(:,:,:,:)
@@ -805,21 +794,16 @@ module diff_mod
             if(job_params%timing .and. job_params%debug >=1) then
                 work_done = work_done + 1
                 progressReal = work_done*100/size(ext_diff_outbeam_tree,1)*omp_get_num_threads()          ! my thread percent completion
-                if(int(progressReal) .gt. progressInt .and. mod(int(floor(progressReal)),10) .eq. 0) then  ! if at least 10% progress has been made
-                    progressInt = int(progressReal)           ! update progress counter
-                    call progress_bar(progressInt, 100)
+                if(int(floor(progressReal/dble(10))) .gt. progressInt) then
+                    progressInt = int(floor(progressReal/dble(10))) ! update progress counter
+                    call progress_bar(progressInt*10, 100)
                 end if
             end if
         end if
 
-        ampl(1:2,1:2) = ext_diff_outbeam_tree(j)%ampl(1:2,1:2)
-        perp0(1:3) = ext_diff_outbeam_tree(j)%vk7(1:3)
-        prop0(1:3) = ext_diff_outbeam_tree(j)%prop_out(1:3)
-        v(1:3,1:3) = ext_diff_outbeam_tree(j)%verts(1:3,1:3)
-        fov = pi/2
-        outbeam = ext_diff_outbeam_tree(j)
+        outbeam = ext_diff_outbeam_tree(j) ! get outbeam from tree
     
-        call diffraction(ampl,v,prop0,perp0,xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,fov,job_params,outbeam,geometry)
+        call diffraction(xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,job_params,outbeam,geometry)
 
         !$OMP CRITICAL
         ampl_far_ext_diff(:,:,:,:) = ampl_far_ext_diff(:,:,:,:) + amplC(:,:,:,:)
@@ -858,33 +842,13 @@ module diff_mod
     real(8), dimension(:), allocatable, intent(in) :: phi_vals
     real(8), dimension(:,:), allocatable :: theta_vals_mesh, phi_vals_mesh
 
-    ! call read_theta_vals(theta_vals)
-
-    ! call read_phi_vals(phi_vals)
-
     phi_dim = size(phi_vals,1)
     theta_dim = size(theta_vals,1)
 
-    ! allocate
-    ! allocate(theta_vals(1:theta_dim))
-    ! allocate(phi_vals(1:phi_dim))
     allocate(x(1:phi_dim,1:theta_dim))
     allocate(y(1:phi_dim,1:theta_dim))
     allocate(z(1:phi_dim,1:theta_dim))
 
-    ! stop
-    
-    ! stop
-
-
-    ! numerical fixes due to divide by 0 in contour integral
-    ! do i = 1, size(phi_vals)
-    !     if(abs(phi_vals(i)*180/pi) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180
-    !     if(abs(phi_vals(i)*180/pi - 360.0) .lt. 0.000001) phi_vals(i) = phi_vals(i) + 0.00001*pi/180
-    ! end do
-
-    ! stop
-    
     ! convert 1-d arrays to 2-d arrays
     call meshgrid_real(theta_vals, phi_vals, theta_vals_mesh, phi_vals_mesh)
 
@@ -894,20 +858,6 @@ module diff_mod
     x = r*sin(theta_vals_mesh)*cos(phi_vals_mesh)
     y = r*sin(theta_vals_mesh)*sin(phi_vals_mesh)
     z = -r*cos(theta_vals_mesh) ! to do: check that this is ok to do (swaps forwards -> backwards)
-    
-    ! print*,'x(1,66)',x(1,66)
-    ! print*,'x(181,66)',x(181,66)
-    ! print*,'y(1,66)',y(1,66)
-    ! print*,'y(181,66)',y(181,66)
-    ! print*,'z(1,66)',z(1,66)
-    ! print*,'z(181,66)',z(181,66)
-    ! print*,'theta_vals_mesh(1,66)',theta_vals_mesh(1,66)
-    ! print*,'theta_vals_mesh(181,66)',theta_vals_mesh(181,66)    
-    ! print*,'phi_vals_mesh(1,66)',phi_vals_mesh(1,66)
-    ! print*,'phi_vals_mesh(181,66)',phi_vals_mesh(181,66)
-    ! print*,'phi_vals(1)',phi_vals(1)
-    ! print*,'phi_vals(181)',phi_vals(181)
-    ! stop
 
     end subroutine
         

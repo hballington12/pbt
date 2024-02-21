@@ -2490,25 +2490,16 @@
                 
                     
                     if (done .LE. 1) then
-                        write(101,'(a)',advance='no') ' -> In progress... ['
+                        ! write(101,'(a)',advance='no') ' -> In progress... ['
+                        write(*,'(a)',advance='no') ' -> In progress... ['
                     end if
-                        ! do counter = 1, 10
-                        !     write(6,'(a)',advance='no') '='
-                        ! end do
                     if ((done .GE. 0) .and. (done .LT. 10)) then
-                        ! do counter = 1, done
-                            write(101,'(i2,a2)',advance='no') step,'%|'
-                        ! end do
-                        ! do counter = done+1, 10
-                        !     write(6,'(a)',advance='no') '='
-                        ! end do 
+                        ! write(101,'(i2,a2)',advance='no') step,'%|'
+                        write(*,'(i2,a2)',advance='no') step,'%|'
                     else
-                        ! do counter = 1, 10
-                            write(101,'(i3,a2)') step,'%]'
-                        ! end do
+                        ! write(101,'(i3,a2)') step,'%]'
+                        write(*,'(i3,a2)') step,'%]'
                     end if
-                    ! write(6,'(I3.1)',advance='no') step
-                    ! write(6,'(a)',advance='no') '%'
                 end
 
         end module misc_submod
