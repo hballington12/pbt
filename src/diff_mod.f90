@@ -794,6 +794,7 @@ module diff_mod
         end if
 
         outbeam = ext_diff_outbeam_tree(j) ! get outbeam from tree
+        outbeam%fov = pi/2d0
     
         call diffraction(xfar,yfar,zfar,lambda,amplC,phi_vals,theta_vals,job_params,outbeam,geometry)
 
