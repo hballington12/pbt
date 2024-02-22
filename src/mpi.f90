@@ -242,7 +242,8 @@ do i = mpi%start, mpi%end
                     ampl_far_beam,              & !  -> amplitude matrix due to beam diffraction
                     ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
                     ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
-                    job_params)
+                    job_params, &
+                    rotated_geometry)
 
     if(job_params%debug >= 1) then
         if(mpi%rank == 0) print*,'computing mueller matrix and parameters...'
