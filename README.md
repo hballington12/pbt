@@ -13,7 +13,7 @@
 
 ## Overview
 
-This file contains a summary of the parent beam tracer (PBT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse. The PBT method is designed for the rapid computation of the single scattering properties of particles with size parameter much larger than the wavelength of light. It is an analytical, but approximate method, which combines geometric optics with vector diffraction theory to compute the far-field scattering from any non-spherical particle geometry with much fewer computational resources required than any current exact method. Nonetheless, the user of this code should take care to follow the [guidelines](#guidelines) and verify results where possible with exact theory.
+This file contains a summary of the parent beam tracer (PBT), a physical optics hybrid code developed by Harry Ballington and Evelyn Hesse. The PBT method is designed for the rapid computation of the single scattering properties of particles with size parameter much larger than the wavelength of light. It is an analytical, but approximate method, which combines geometric optics with vector diffraction theory to compute the far-field scattering from any non-spherical particle geometry with much fewer computational resources required than any currently known exact method. Nonetheless, the user of this code should take care to follow the [guidelines](#guidelines) and verify results where possible with exact theory.
 
 ## Compiling
 
