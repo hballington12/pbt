@@ -2424,6 +2424,7 @@ subroutine PDAL2(   job_params,     &
     real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
     logical auto_apertures ! whether or noth automatic aperture asignment should be used
     character(len=32) cache_id_string
+    integer seed(1:8)
 
     c_method = job_params%c_method
     cc_hex_params = job_params%cc_hex_params
@@ -2750,6 +2751,8 @@ subroutine PDAL2(   job_params,     &
 
     else if(c_method(1:len(trim(c_method))) .eq. "cc_hex") then ! if particle is to be generated according to Chris Collier hex method
         write(101,*)'attempting to make cc crystal'
+        seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
+        call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
         call CC_HEX_MAIN(cc_hex_params,face_ids,verts,apertures)
         call PROT_CC(verts) ! align prism axis with z axis
         num_vert = size(verts,1)
