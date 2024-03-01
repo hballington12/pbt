@@ -18,14 +18,13 @@ use mpi_mod
 implicit none
 
 ! to do:
-! add quad support
 ! add support to avoid crash if nan detected
 
-! ############################################################################################################
+! ########## variable declaration ##########
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i, j, k, i_loop
+integer(8) i, j, k, i_loop ! counters
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -42,8 +41,8 @@ type(geometry_type) geometry ! particle geometry data structure
 type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 
 ! sr makeIncidentBeam
-type(geometry_type) beam_geometry
-type(beam_type) beam_inc
+type(geometry_type) beam_geometry ! geometry of the incident beam
+type(beam_type) beam_inc ! the incident beam
 
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
@@ -59,17 +58,14 @@ complex(8), dimension(:,:,:,:), allocatable :: ampl_far_ext_diff ! total
 real(8), dimension(:,:,:), allocatable :: mueller, mueller_total, mueller_recv ! mueller matrices
 real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d_recv ! phi-integrated mueller matrices
 
-! mpi
+! mpi (some of this is unused)
 integer source, dest
 integer status(MPI_STATUS_SIZE)
 integer my_start, my_end, my_rank
-! integer n1, n2
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
 logical i_finished_early, other_finished_early
 logical is_job_cached
 integer my_iter, total_iter, recv_iter, iter_done, iter_to_collect
-! integer, dimension(:), allocatable :: request
-! integer request
 integer send_request, recv_request
 logical sent_request, cont
 type(mpi_params) mpi
@@ -85,15 +81,15 @@ character(len=255) cache_dir ! cached files directory (if job stops early)
 integer(8), dimension(:), allocatable :: remaining_orients
 integer(8) num_remaining_orients
 
-! ############################################################################################################
+! ########## start ##########
 
-! initialise some mpi stuff
+! init mpi
 call MPI_INIT(mpi%ierr)
 call MPI_COMM_RANK(MPI_COMM_WORLD, mpi%rank, mpi%ierr)
 call MPI_COMM_SIZE(MPI_COMM_WORLD, mpi%p, mpi%ierr)
 
 if(mpi%rank == 0) print*,'========== start pbt: mpi'
-start = omp_get_wtime()
+start = omp_get_wtime() ! get start time
 
 ! initialise some other stuff
 mpi%tag = 1
@@ -105,26 +101,29 @@ is_job_cached = .false.
 iter_done = 0
 seed = [0, 0, 0, 0, 0, 0, 0, 0] ! set the seed values
 
-if(mpi%rank == 0) call print_command() ! print the command used to execute the program
+! print the command used to execute the program
+if(mpi%rank == 0) call print_command()
 
-call parse_command_line(job_params) 
+! parse command line
+call parse_command_line(job_params)
 
-if(job_params%resume) then
+if(job_params%resume) then ! if resuming a cached job
     if(mpi%rank == 0) print*,'attempting to resume job using cache #',job_params%cache_id
+    ! get cached data and continue
     call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
     if(mpi%rank /= 0) then ! only rank 0 should keep summed parameters from the cache, reset vals for all other processes
         deallocate(mueller_total)
         deallocate(mueller_1d_total)
     end if
-end if
+end if ! end if resuming a cached job
 
-! setting up job directory
-if (mpi%rank .eq. 0) then
+! set up job directory
+if (mpi%rank .eq. 0) then ! if rank 0 process
     call make_dir(job_params%job_name,job_params%output_dir) ! get an appropriate name for the job directory
     print*,'output directory is "',trim(job_params%output_dir),'"'
     call system("mkdir "//trim(job_params%output_dir)//"/logs")
     call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for temp files
-end if
+end if ! end if rank 0 process
 
 ! synchronise the job directory across all processes
 call mpi_send_output_dir(mpi,job_params)
@@ -139,40 +138,43 @@ my_log_dir = adjustl(my_log_dir)
 open(101,file=trim(my_log_dir),status="new") ! open global non-standard log file for important records
 
 ! get input particle information
-call PDAL2( job_params,     & ! <-  job parameters
-            geometry)         !  -> particle geometry   
+call PDAL2( job_params, & ! <-  job parameters
+            geometry)     !  -> particle geometry   
 
-if (job_params%tri) then
-    call triangulate(   job_params%tri_edge_length, &
-                        '-Q -q', &
-                        job_params%tri_roughness, &
-                        mpi%rank, &
-                        job_params%output_dir, &
-                        geometry) ! triangulate the particle
+if (job_params%tri) then ! if triangulation enabled
+    ! triangulate the particle
+    call triangulate(   job_params%tri_edge_length, & ! <-  max triangle edge length
+                        '-Q -q',                    & ! <-  extra flag inputs to triangle program
+                        job_params%tri_roughness,   & ! <-  standard deviation for triangle roughness
+                        mpi%rank,                   & ! <-  process rank, so the subroutine knows where to write temporary files to
+                        job_params%output_dir,      & ! <-  output directory
+                        geometry)                     !  -> triangulated geometry
     ! call merge_vertices(vert_in, face_ids, num_vert, 1D-1) ! merge vertices that are close enough
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
-    ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than 10*lambda
 end if
 
-call write_geometry_info(geometry) ! write geometry info to log file
+! write geometry info to log file
+call write_geometry_info(geometry)
 
-if (mpi%rank .eq. 0) then
+if (mpi%rank .eq. 0) then ! if rank 0 process
     ! write unrotated particle to file (optional)            
-    call PDAS(  job_params%output_dir,     & ! <-  output directory
-                "unrotated",    & ! <-  filename
-                geometry)
-end if
+    call PDAS(  job_params%output_dir,  & ! <-  output directory
+                "unrotated",            & ! <-  filename
+                geometry)                 ! <-  geometry
+end if ! end if rank 0 process
 
-if (mpi%rank .eq. 0) then
+if (mpi%rank .eq. 0) then ! if rank 0 process
     call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
-    call init_loop( alpha_vals, &
-                    beta_vals, &
-                    gamma_vals, &
-                    job_params)
-    if(job_params%output_eulers) then
+    ! initialise the euler angles to be used
+    call init_loop( alpha_vals, & !  -> alpha eulers (set to 0 unless single orientation)
+                    beta_vals,  & !  -> beta eulers
+                    gamma_vals, & !  -> gamma eulers
+                    job_params)   ! <-  job parameters
+    if(job_params%output_eulers) then ! if euler angle enabled with flag -output_eulers
+        ! output euler angles to file
         call output_eulers(alpha_vals,beta_vals,gamma_vals,job_params%output_dir,job_params)
     end if
-end if
+end if ! end if rank 0 process
 
 ! synchronise the euler angles across all processes
 call mpi_send_euler_vals(mpi,job_params,alpha_vals,beta_vals,gamma_vals)
@@ -184,18 +186,18 @@ else ! if we are not resuming a cached job
     num_remaining_orients = job_params%num_orients ! number of remaining orientations is the total overall
     allocate(remaining_orients(1:num_remaining_orients)) ! allocate array to hold orientation numbers
     do i = 1, num_remaining_orients
-        remaining_orients(i) = i
+        remaining_orients(i) = i ! get the indices of the remaining orientations
     end do
-end if
+end if ! end if we are resuming a cached job
 
 ! distribute the workload of the orientation loop across processes
 call mpi_get_start_end(mpi,num_remaining_orients)
 
 if (mpi%rank .eq. 0) print*,'starting orientation loop...'
 
-do i = mpi%start, mpi%end
+do i = mpi%start, mpi%end ! start orientation loop
 
-    i_loop = remaining_orients(i)
+    i_loop = remaining_orients(i) ! get loop index
 
     if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'rotating particle...'
@@ -212,9 +214,9 @@ do i = mpi%start, mpi%end
                     rotated_geometry)
 
     ! fast implementation of the incident beam
-    call make_incident_beam(rotated_geometry,          & ! <-  unique vertices
-                            beam_geometry, &
-                            beam_inc)      
+    call make_incident_beam(rotated_geometry,   & ! <-  geometry
+                            beam_geometry,      & !  -> beam geometry
+                            beam_inc)             !  -> incident beam
 
     if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing near-field...'
@@ -222,14 +224,14 @@ do i = mpi%start, mpi%end
     end if
 
     ! beam loop
-    call beam_loop( beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
-                    beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
-                    ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
-                    output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
-                    job_params,                 &
-                    rotated_geometry, &
-                    beam_geometry, &
-                    beam_inc)
+    call beam_loop( beam_outbeam_tree,          & !  -> outgoing beams from the beam tracing
+                    beam_outbeam_tree_counter,  & !  -> counts the current number of beam outbeams
+                    ext_diff_outbeam_tree,      & !  -> outgoing beams from external diffraction
+                    output_parameters,          & !  -> adds illuminated geometric cross section to output parameters
+                    job_params,                 & ! <-  job parameters
+                    rotated_geometry,           & ! <-  rotated particle geometry
+                    beam_geometry,              & ! <-  incident beam geometry
+                    beam_inc)                     ! <-  incident beam
 
     if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing far-field...'
@@ -242,25 +244,26 @@ do i = mpi%start, mpi%end
                     ampl_far_beam,              & !  -> amplitude matrix due to beam diffraction
                     ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
                     ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
-                    job_params, &
-                    rotated_geometry)
+                    job_params,                 & ! <-  job parameters
+                    rotated_geometry)             ! <-  rotated particle geometry
 
     if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing mueller matrix and parameters...'
         write(101,*)'computing mueller matrix and parameters...'
     end if
 
-    call finalise(  ampl_far_beam,              & ! <-  amplitude matrix due to beam diffraction
-                    ampl_far_ext_diff,          & ! <-  amplitude matrix due to external diffraction
-                    mueller,                    & !  -> 2d mueller matrix
-                    mueller_1d,                 & !  -> 1d mueller matrix
-                    output_parameters,          & !  -> some output parameters
-                    job_params)
+    call finalise(  ampl_far_beam,      & ! <-  amplitude matrix due to beam diffraction
+                    ampl_far_ext_diff,  & ! <-  amplitude matrix due to external diffraction
+                    mueller,            & !  -> 2d mueller matrix
+                    mueller_1d,         & !  -> 1d mueller matrix
+                    output_parameters,  & !  -> some output parameters
+                    job_params)           ! <-  job parameters
 
+    ! sum the total mueller and output parameters
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .and. i /= mpi%end) then
-        i_finished_early = .true.
+        i_finished_early = .true. ! set logical which exits loop and starts caching routine
         if(mpi%rank == 0) print*,'time limit reached. caching job...'
     end if
 
@@ -289,7 +292,7 @@ do i = mpi%start, mpi%end
 
     if(i_finished_early) exit
 
-end do
+end do ! end orientation loop
 
 ! wait for and collect progress from other processes
 ! call mpi_track_progress_cleanup(mpi,iter_done,total_iter,num_remaining_orients,sent_request,my_iter,recv_request,recv_iter,job_params, start)

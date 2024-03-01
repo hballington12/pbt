@@ -17,14 +17,13 @@ use outputs_mod
 implicit none
 
 ! to do:
-! add quad support
 ! add support to avoid crash if nan detected
 
-! ############################################################################################################
+! ########## variable declaration ##########
 
 ! shared
 real(8) start, finish ! cpu timing variables
-integer(8) i_loop, loop_start, i
+integer(8) i_loop, loop_start, i ! counters
 
 ! input
 character(len=*), parameter :: ifn = 'input.txt' ! input filename
@@ -35,8 +34,8 @@ type(geometry_type) geometry ! particle geometry data structure
 type(geometry_type) rotated_geometry ! rotated particle geometry data structure
 
 ! sr makeIncidentBeam
-type(geometry_type) beam_geometry
-type(beam_type) beam_inc
+type(geometry_type) beam_geometry ! geometry of the incident beam
+type(beam_type) beam_inc ! the incident beam
 
 ! sr beam_loop
 type(outbeamtype), dimension(:), allocatable :: beam_outbeam_tree ! outgoing beams from the beam tracing
@@ -44,8 +43,8 @@ type(outbeamtype), dimension(:), allocatable :: ext_diff_outbeam_tree ! outgoing
 integer(8) beam_outbeam_tree_counter ! counts the current number of beam outbeams
 
 ! sr diff_main
-complex(8), dimension(:,:,:,:), allocatable:: ampl_far_beam
-complex(8), dimension(:,:,:,:), allocatable :: ampl_far_ext_diff
+complex(8), dimension(:,:,:,:), allocatable:: ampl_far_beam ! far-field amplitude matrix due to outgoing beams
+complex(8), dimension(:,:,:,:), allocatable :: ampl_far_ext_diff ! far-field amplitude matrix due to external diffraction
 
 ! sr make_mueller
 real(8), dimension(:,:,:), allocatable :: mueller, mueller_total ! mueller matrices
@@ -55,29 +54,34 @@ real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total ! phi-integ
 type(output_parameters_type) output_parameters 
 type(output_parameters_type) output_parameters_total
 
+! other
 real(8), dimension(:), allocatable :: alpha_vals, beta_vals, gamma_vals
-! real(8) max_area, max_edge_length
 integer my_rank
 integer seed(1:8)
 character(len=255) cache_dir ! cached files directory (if job stops early)
 integer(8), dimension(:), allocatable :: remaining_orients
 integer(8) num_remaining_orients
 
-! ############################################################################################################
-! start main
+! ########## start ##########
+
 print*,'========== start pbt: seq'
-start = omp_get_wtime()
+start = omp_get_wtime() ! get start time
 my_rank = 0
 loop_start = 1
-seed = [0, 0, 0, 0, 0, 0, 0, 0] ! Set the seed values
+seed = [0, 0, 0, 0, 0, 0, 0, 0] ! set the seed values
 
-call print_command() ! print the command used to execute the program
+! print the command used to execute the program
+call print_command()
 
+! parse command line
 call parse_command_line(job_params)
 
-if(job_params%resume) then
+if(job_params%resume) then ! if resuming a cached job
+    print*,'attempting to resume job using cache #',job_params%cache_id
+    ! get cached data and continue
     call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
-end if
+end if ! end if resuming a cached job
+
 
 call make_dir(job_params%job_name,job_params%output_dir)
 print*,'output directory is "',trim(job_params%output_dir),'"'
@@ -87,34 +91,37 @@ open(101,file=trim(job_params%output_dir)//"/"//"log") ! open global non-standar
 call write_job_params(job_params,job_params%output_dir) ! write job parameters to file
 
 ! get input particle geometry
-call PDAL2( job_params,     & ! <-  job parameters
+call PDAL2( job_params, &     ! <-  job parameters
             geometry)         !  -> particle geometry            
 
-if (job_params%tri) then
-    call triangulate(   job_params%tri_edge_length, &
-                        '-Q -q', &
-                        job_params%tri_roughness, &
-                        my_rank, &
-                        job_params%output_dir, &
-                        geometry) ! triangulate the particle
+if (job_params%tri) then ! if triangulation enabled
+    ! triangulate the particle
+    call triangulate(   job_params%tri_edge_length, & ! <-  max triangle edge length
+                        '-Q -q',                    & ! <-  extra flag inputs to triangle program
+                        job_params%tri_roughness,   & ! <-  standard deviation for triangle roughness
+                        my_rank,                    & ! <-  process rank, so the subroutine knows where to write temporary files to
+                        job_params%output_dir,      & ! <-  output directory
+                        geometry)                     !  -> triangulated geometry 
     ! call merge_vertices(vert_in, face_ids, 1D-1, geometry) ! merge vertices that are close enough
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
-    ! call triangulate(vert_in,face_ids,num_vert,num_face,num_face_vert,max_area,'-Q -q',apertures,0D0) ! retriangulate the particle to have no area greater than threshold
 end if
 
-call write_geometry_info(geometry) ! write geometry info to log file
+! write geometry info to log file
+call write_geometry_info(geometry)
 
 ! write unrotated particle to file (optional)            
-call PDAS(  job_params%output_dir,     & ! <-  output directory
-            "unrotated",    & ! <-  filename
-            geometry)
+call PDAS(  job_params%output_dir,  & ! <-  output directory
+            "unrotated",            & ! <-  filename
+            geometry)                 ! <-  geometry
 
 call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
+! initialise the euler angles to be used
 call init_loop( alpha_vals, &
                 beta_vals, &
                 gamma_vals, &
                 job_params)
-if(job_params%output_eulers) then
+if(job_params%output_eulers) then ! if euler angle enabled with flag -output_eulers
+    ! output euler angles to file
     call output_eulers(alpha_vals,beta_vals,gamma_vals,job_params%output_dir,job_params)
 end if
 
@@ -125,16 +132,16 @@ else ! if we are not resuming a cached job
     num_remaining_orients = job_params%num_orients ! number of remaining orientations is the total overall
     allocate(remaining_orients(1:num_remaining_orients)) ! allocate array to hold orientation numbers
     do i = 1, num_remaining_orients
-        remaining_orients(i) = i
+        remaining_orients(i) = i ! get the indices of the remaining orientations
     end do
-end if
+end if ! end if we are resuming a cached job
 
 print*,'starting orientation loop...'
 write(101,*)'starting orientation loop... start: ',1,'end: ',num_remaining_orients
 
-do i = 1, num_remaining_orients
+do i = 1, num_remaining_orients ! start orientation loop
 
-    i_loop = remaining_orients(i)
+    i_loop = remaining_orients(i) ! get loop index
 
     if(job_params%debug >= 3) then
         print*,'rotating particle...'
@@ -152,15 +159,15 @@ do i = 1, num_remaining_orients
 
     ! write rotated particle to file (optional)
     if (job_params%num_orients .eq. 1) then
-        call PDAS(  job_params%output_dir,     & ! <-  output directory
-                    "rotated",    & ! <-  filename
-                    rotated_geometry)
+        call PDAS(  job_params%output_dir,  & ! <-  output directory
+                    "rotated",              & ! <-  filename
+                    rotated_geometry)         ! <-  geometry
     end if
 
     ! fast implementation of the incident beam
-    call make_incident_beam(rotated_geometry,          & ! <-  unique vertices
-                            beam_geometry, &
-                            beam_inc)
+    call make_incident_beam(rotated_geometry,   & ! <-  geometry
+                            beam_geometry,      & !  -> beam geometry
+                            beam_inc)             !  -> incident beam
 
     if(job_params%debug >= 3) then
         print*,'computing near-field...'
@@ -168,14 +175,14 @@ do i = 1, num_remaining_orients
     end if
 
     ! beam loop
-    call beam_loop( beam_outbeam_tree,         & !  -> outgoing beams from the beam tracing
-                    beam_outbeam_tree_counter, & !  -> counts the current number of beam outbeams
-                    ext_diff_outbeam_tree,     & !  -> outgoing beams from external diffraction
-                    output_parameters,         & !  -> adds illuminated geometric cross section to output parameters
-                    job_params,                 &
-                    rotated_geometry, &
-                    beam_geometry, &
-                    beam_inc)
+    call beam_loop( beam_outbeam_tree,          & !  -> outgoing beams from the beam tracing
+                    beam_outbeam_tree_counter,  & !  -> counts the current number of beam outbeams
+                    ext_diff_outbeam_tree,      & !  -> outgoing beams from external diffraction
+                    output_parameters,          & !  -> adds illuminated geometric cross section to output parameters
+                    job_params,                 & ! <-  job parameters
+                    rotated_geometry,           & ! <-  rotated particle geometry
+                    beam_geometry,              & ! <-  incident beam geometry
+                    beam_inc)                     ! <-  incident beam
 
     if(num_remaining_orients > 1 .and. mod(i-1,10) == 0) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
@@ -197,50 +204,55 @@ do i = 1, num_remaining_orients
     end if
 
     ! diffraction
-    call diff_main( beam_outbeam_tree,         & ! <-  outgoing beams from the beam tracing
-                    beam_outbeam_tree_counter, & ! <-  counts the current number of beam outbeams
-                    ampl_far_beam,           & !  -> amplitude matrix due to beam diffraction
-                    ext_diff_outbeam_tree,     & ! <-  outgoing beams from external diffraction
-                    ampl_far_ext_diff,       & !  -> amplitude matrix due to external diffraction
-                    job_params, &
-                    rotated_geometry)
+    call diff_main( beam_outbeam_tree,          & ! <-  outgoing beams from the beam tracing
+                    beam_outbeam_tree_counter,  & ! <-  counts the current number of beam outbeams
+                    ampl_far_beam,              & !  -> amplitude matrix due to beam diffraction
+                    ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
+                    ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
+                    job_params,                 & ! <-  job parameters
+                    rotated_geometry)             ! <-  rotated particle geometry
 
     if(job_params%debug >= 3) then
         print*,'computing mueller matrix and parameters...'
         write(101,*)'computing mueller matrix and parameters...'
     end if
 
-    call finalise(  ampl_far_beam,     & ! <-  amplitude matrix due to beam diffraction
-                    ampl_far_ext_diff, & ! <-  amplitude matrix due to external diffraction
-                    mueller,             & !  -> 2d mueller matrix
-                    mueller_1d,          & !  -> 1d mueller matrix
-                    output_parameters,   & !  -> some output parameters
-                    job_params)
+    call finalise(  ampl_far_beam,      & ! <-  amplitude matrix due to beam diffraction
+                    ampl_far_ext_diff,  & ! <-  amplitude matrix due to external diffraction
+                    mueller,            & !  -> 2d mueller matrix
+                    mueller_1d,         & !  -> 1d mueller matrix
+                    output_parameters,  & !  -> some output parameters
+                    job_params)           ! <-  job parameters
                     
     ! call writeup(mueller, mueller_1d, theta_vals, phi_vals) ! write current mueller to file
 
+    ! sum the total mueller and output parameters
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
-    if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then
+    if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then ! if job time limit exceeded
+        ! make cache directory
         call make_cache_dir("cache/",cache_dir)
+        ! cache remaining orientations
         call cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients)
-        call cache_job( job_params,                 & ! job parameters
-                        i_loop,                     & ! current loop index
-                        output_parameters_total,    & ! total output parameters
-                        mueller_total,              & ! total 2d mueller
-                        mueller_1d_total,           & ! total 1d mueller
-                        cache_dir,                  &
-                        geometry)
+        ! cache everything else
+        call cache_job( job_params,                 & ! <-  job parameters
+                        i_loop,                     & ! <-  current loop index
+                        output_parameters_total,    & ! <-  total output parameters
+                        mueller_total,              & ! <-  total 2d mueller
+                        mueller_1d_total,           & ! <-  total 1d mueller
+                        cache_dir,                  & ! <-  cache directory
+                        geometry)                     ! <-  unrotated particle geometry
         stop
-    end if
+    end if ! end if job time limit exceeded
 
-end do
+end do ! end orientation loop
 
 print*,'end orientation loop.'
 
 ! divide by no. of orientations
 call divide_by_num_orientations(mueller_total,mueller_1d_total,output_parameters_total,job_params)
 
+! print final output parameters to std out
 call print_output_params(output_parameters_total)
 
 ! writing to file
