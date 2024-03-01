@@ -197,7 +197,7 @@ do i = mpi%start, mpi%end
 
     i_loop = remaining_orients(i)
 
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'rotating particle...'
         write(101,*)'rotating particle...'
     end if
@@ -216,7 +216,7 @@ do i = mpi%start, mpi%end
                             beam_geometry, &
                             beam_inc)      
 
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing near-field...'
         write(101,*)'computing near-field...'
     end if
@@ -231,7 +231,7 @@ do i = mpi%start, mpi%end
                     beam_geometry, &
                     beam_inc)
 
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing far-field...'
         write(101,*)'computing far-field...'
     end if
@@ -245,7 +245,7 @@ do i = mpi%start, mpi%end
                     job_params, &
                     rotated_geometry)
 
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing mueller matrix and parameters...'
         write(101,*)'computing mueller matrix and parameters...'
     end if
@@ -257,8 +257,6 @@ do i = mpi%start, mpi%end
                     output_parameters,          & !  -> some output parameters
                     job_params)
 
-    ! call writeup(mueller, mueller_1d, theta_vals, phi_vals) ! write current mueller to file
-
     call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
 
     if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .and. i /= mpi%end) then
@@ -268,13 +266,14 @@ do i = mpi%start, mpi%end
 
     my_iter = int(i,kind=4) - mpi%start + 1 ! save progress for this rank
     total_iter = total_iter + 1 ! sum total progress
+    num_remaining_orients = mpi%end - mpi%start + 1
 
     ! keep track of the progress across all mpi processes
-    call mpi_track_progress(mpi,iter_done,total_iter,num_remaining_orients,sent_request,my_iter,recv_request,recv_iter)
+    ! call mpi_track_progress(mpi,iter_done,total_iter,num_remaining_orients,sent_request,my_iter,recv_request,recv_iter)
 
     if(mpi%rank == 0) then
-        if(num_remaining_orients > 1) then
-            print'(A15,I8,A3,I8,A20,f8.4,A3)','orientation: ',total_iter,' / ',num_remaining_orients,' (total progress: ',dble(total_iter)/dble(num_remaining_orients)*100,' %)'
+        if(num_remaining_orients > 1 .and. mod(total_iter,10) == 0) then
+            print'(A,I8,A3,I8,A20,f8.4,A3)','orientation (rank 0): ',total_iter,' / ',num_remaining_orients,' (total progress: ',dble(total_iter)/dble(num_remaining_orients)*100,' %)'
             if(job_params%debug >= 2) then
                 write(*,'(A,f10.2,A)') 'total time elapsed: ',omp_get_wtime()-start,' secs'
                 write(*,'(A,f10.2,A)') 'average time per rotation: ',(omp_get_wtime()-start) / dble(total_iter+1),' secs'
@@ -293,7 +292,7 @@ do i = mpi%start, mpi%end
 end do
 
 ! wait for and collect progress from other processes
-call mpi_track_progress_cleanup(mpi,iter_done,total_iter,num_remaining_orients,sent_request,my_iter,recv_request,recv_iter,job_params, start)
+! call mpi_track_progress_cleanup(mpi,iter_done,total_iter,num_remaining_orients,sent_request,my_iter,recv_request,recv_iter,job_params, start)
 
 call MPI_BARRIER(MPI_COMM_WORLD,mpi%ierr)
 
@@ -386,26 +385,8 @@ else ! else, if the job is not to be cached
 
     if (mpi%rank .eq. 0) then
 
-        mueller_total = mueller_total / job_params%num_orients
-        mueller_1d_total = mueller_1d_total / job_params%num_orients
-        output_parameters_total%abs = output_parameters_total%abs / job_params%num_orients
-        output_parameters_total%scatt = output_parameters_total%scatt / job_params%num_orients
-        output_parameters_total%ext = output_parameters_total%ext / job_params%num_orients
-        output_parameters_total%albedo = output_parameters_total%albedo / job_params%num_orients
-        output_parameters_total%asymmetry = output_parameters_total%asymmetry / job_params%num_orients
-        output_parameters_total%abs_eff = output_parameters_total%abs_eff / job_params%num_orients
-        output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / job_params%num_orients
-        output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%num_orients
-        output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients
-        output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
-
-        output_parameters_total%scatt_beam = output_parameters_total%scatt_beam / job_params%num_orients 
-        output_parameters_total%scatt_ext_diff = output_parameters_total%scatt_ext_diff / job_params%num_orients 
-        output_parameters_total%asymmetry_beam = output_parameters_total%asymmetry_beam / job_params%num_orients 
-        output_parameters_total%asymmetry_ext_diff = output_parameters_total%asymmetry_ext_diff / job_params%num_orients 
-        output_parameters_total%scatt_eff_beam = output_parameters_total%scatt_eff_beam / job_params%num_orients 
-        output_parameters_total%scatt_eff_ext_diff = output_parameters_total%scatt_eff_ext_diff / job_params%num_orients 
-
+        call divide_by_num_orientations(mueller_total,mueller_1d_total,output_parameters_total,job_params)
+        
         call print_output_params(output_parameters_total)
 
         ! writing to file

@@ -136,7 +136,7 @@ do i = 1, num_remaining_orients
 
     i_loop = remaining_orients(i)
 
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         print*,'rotating particle...'
         write(101,*)'rotating particle...'
     end if
@@ -162,7 +162,7 @@ do i = 1, num_remaining_orients
                             beam_geometry, &
                             beam_inc)
 
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         print*,'computing near-field...'
         write(101,*)'computing near-field...'
     end if
@@ -177,7 +177,7 @@ do i = 1, num_remaining_orients
                     beam_geometry, &
                     beam_inc)
 
-    if(num_remaining_orients > 1) then ! print progress for this job
+    if(num_remaining_orients > 1 .and. mod(i-1,10) == 0) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
         if(job_params%debug >= 2) then
             write(*,'(A,f10.2,A)') 'total time elapsed: ',omp_get_wtime()-start,' secs'
@@ -191,7 +191,7 @@ do i = 1, num_remaining_orients
         end if
     end if
     
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         print*,'computing far-field...'
         write(101,*)'computing far-field...'
     end if
@@ -205,7 +205,7 @@ do i = 1, num_remaining_orients
                     job_params, &
                     rotated_geometry)
 
-    if(job_params%debug >= 1) then
+    if(job_params%debug >= 3) then
         print*,'computing mueller matrix and parameters...'
         write(101,*)'computing mueller matrix and parameters...'
     end if
@@ -239,25 +239,7 @@ end do
 print*,'end orientation loop.'
 
 ! divide by no. of orientations
-mueller_total = mueller_total / job_params%num_orients 
-mueller_1d_total = mueller_1d_total / job_params%num_orients 
-output_parameters_total%abs = output_parameters_total%abs / job_params%num_orients 
-output_parameters_total%scatt = output_parameters_total%scatt / job_params%num_orients 
-output_parameters_total%ext = output_parameters_total%ext / job_params%num_orients 
-output_parameters_total%albedo = output_parameters_total%albedo / job_params%num_orients 
-output_parameters_total%asymmetry = output_parameters_total%asymmetry / job_params%num_orients 
-output_parameters_total%abs_eff = output_parameters_total%abs_eff / job_params%num_orients 
-output_parameters_total%scatt_eff = output_parameters_total%scatt_eff / job_params%num_orients 
-output_parameters_total%ext_eff = output_parameters_total%ext_eff / job_params%num_orients 
-output_parameters_total%geo_cross_sec = output_parameters_total%geo_cross_sec / job_params%num_orients 
-output_parameters_total%back_scatt = output_parameters_total%back_scatt / job_params%num_orients 
-
-output_parameters_total%scatt_beam = output_parameters_total%scatt_beam / job_params%num_orients 
-output_parameters_total%scatt_ext_diff = output_parameters_total%scatt_ext_diff / job_params%num_orients 
-output_parameters_total%asymmetry_beam = output_parameters_total%asymmetry_beam / job_params%num_orients 
-output_parameters_total%asymmetry_ext_diff = output_parameters_total%asymmetry_ext_diff / job_params%num_orients 
-output_parameters_total%scatt_eff_beam = output_parameters_total%scatt_eff_beam / job_params%num_orients 
-output_parameters_total%scatt_eff_ext_diff = output_parameters_total%scatt_eff_ext_diff / job_params%num_orients 
+call divide_by_num_orientations(mueller_total,mueller_1d_total,output_parameters_total,job_params)
 
 call print_output_params(output_parameters_total)
 

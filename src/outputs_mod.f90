@@ -10,6 +10,38 @@
    
    contains
    
+   subroutine divide_by_num_orientations(mueller,mueller_1d,output_parameters,job_params)
+
+      ! sr divide_by_num_orientations
+      ! divides the mueller matrix and output parameters by the total number of orientations
+
+      real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller
+      real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d
+      type(output_parameters_type), intent(inout) :: output_parameters
+      type(job_parameters_type), intent(in) :: job_params
+
+      mueller = mueller / job_params%num_orients 
+      mueller_1d = mueller_1d / job_params%num_orients 
+      output_parameters%abs = output_parameters%abs / job_params%num_orients 
+      output_parameters%scatt = output_parameters%scatt / job_params%num_orients 
+      output_parameters%ext = output_parameters%ext / job_params%num_orients 
+      output_parameters%albedo = output_parameters%albedo / job_params%num_orients 
+      output_parameters%asymmetry = output_parameters%asymmetry / job_params%num_orients 
+      output_parameters%abs_eff = output_parameters%abs_eff / job_params%num_orients 
+      output_parameters%scatt_eff = output_parameters%scatt_eff / job_params%num_orients 
+      output_parameters%ext_eff = output_parameters%ext_eff / job_params%num_orients 
+      output_parameters%geo_cross_sec = output_parameters%geo_cross_sec / job_params%num_orients 
+      output_parameters%back_scatt = output_parameters%back_scatt / job_params%num_orients 
+      
+      output_parameters%scatt_beam = output_parameters%scatt_beam / job_params%num_orients 
+      output_parameters%scatt_ext_diff = output_parameters%scatt_ext_diff / job_params%num_orients 
+      output_parameters%asymmetry_beam = output_parameters%asymmetry_beam / job_params%num_orients 
+      output_parameters%asymmetry_ext_diff = output_parameters%asymmetry_ext_diff / job_params%num_orients 
+      output_parameters%scatt_eff_beam = output_parameters%scatt_eff_beam / job_params%num_orients 
+      output_parameters%scatt_eff_ext_diff = output_parameters%scatt_eff_ext_diff / job_params%num_orients 
+
+   end subroutine
+
    subroutine cache_remaining_orients_seq(cache_dir,i,num_remaining_orients,remaining_orients)
 
       ! saves the remaining orientation numbers to cached file
