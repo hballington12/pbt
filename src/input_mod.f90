@@ -208,9 +208,9 @@ integer(8) theta_vals_counter, theta_splits_counter
 integer(8) phi_vals_counter, phi_splits_counter
 
 ! output variables
-character(100) cfn ! crystal filename
-character(100) cft ! crystal file type
-character(100) afn ! apertures filename
+character(255) cfn ! crystal filename
+character(255) cft ! crystal file type
+character(255) afn ! apertures filename
 real(8) la ! wavelength
 real(8) rbi ! real part of the refractive index
 real(8) ibi ! imaginary part of the refractive index
@@ -628,8 +628,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 print*,'error: no option found for "cfn"'
                 stop
             else ! else, parse the specifier
-                read(arg,*) cfn
-                ! print*,'cfn: ', trim(cfn)
+                ! read(arg,*) cfn
+                write(cfn,'(A)') arg
+                print*,'cfn: ', trim(cfn)
+                print*,'arg:',arg
                 found_cfn = .true.
 
 
@@ -645,7 +647,8 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 print*,'error: no option found for "afn"'
                 stop
             else ! else, parse the specifier
-                read(arg,*) afn
+                ! read(arg,*) afn
+                write(afn,'(A)') arg
                 ! print*,'afn: ', trim(afn)
                 found_afn = .true.
             end if

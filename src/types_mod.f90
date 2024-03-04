@@ -53,9 +53,9 @@ type output_parameters_type ! type for hold various output paramters
 end type output_parameters_type 
 
 type job_parameters_type
-    character(100) cfn ! crystal filename
-    character(100) cft ! crystal file type
-    character(100) afn ! apertures filename
+    character(255) cfn ! crystal filename
+    character(255) cft ! crystal file type
+    character(255) afn ! apertures filename
     real(8) la ! wavelength
     real(8) rbi ! real part of the refractive index
     real(8) ibi ! imaginary part of the refractive index
