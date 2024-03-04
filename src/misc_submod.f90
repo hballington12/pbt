@@ -1581,7 +1581,7 @@
             ! write to wavefront file
             open(10,file=trim(output_dir)//"/"//trim(filename)//".obj") ! wavefront format
             do i = 1, num_verts
-                write(10,'(A3,f16.8,f16.8,f16.8)') "v ", geometry%v(i,1), geometry%v(i,2), geometry%v(i,3)
+                write(10,'(A2,f16.8,f16.8,f16.8)') "v ", geometry%v(i,1), geometry%v(i,2), geometry%v(i,3)
             end do
             do i = 1, num_norms
                 write(10,'(A3,f16.8,f16.8,f16.8)') "vn ", geometry%n(i,1), geometry%n(i,2), geometry%n(i,3)
