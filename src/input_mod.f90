@@ -630,8 +630,8 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             else ! else, parse the specifier
                 ! read(arg,*) cfn
                 write(cfn,'(A)') arg
-                print*,'cfn: ', trim(cfn)
-                print*,'arg:',arg
+                ! print*,'cfn: ', trim(cfn)
+                ! print*,'arg:',arg
                 found_cfn = .true.
 
 
