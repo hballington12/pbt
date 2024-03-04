@@ -82,7 +82,6 @@ if(job_params%resume) then ! if resuming a cached job
     call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
 end if ! end if resuming a cached job
 
-
 call make_dir(job_params%job_name,job_params%output_dir)
 print*,'output directory is "',trim(job_params%output_dir),'"'
 call system("mkdir "//trim(job_params%output_dir)//"/tmp") ! make directory for temp files

@@ -66,7 +66,7 @@ type job_parameters_type
     integer(8) num_orients ! number of orientations
     logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
     character(100) c_method ! method of particle file input
-    character(100) job_name ! name of job
+    character(255) job_name ! name of job
     integer(8)  offs(1:2)
     real(8)  eulers(1:3)
     type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates

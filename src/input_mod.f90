@@ -220,7 +220,7 @@ logical is_multithreaded ! whether or not code should use multithreading
 integer(8) num_orients ! number of orientations
 logical intellirot ! whether or not to use intelligent euler angle choices for orientation avergaing
 character(100) c_method ! method of particle file input
-character(100) job_name ! name of job
+character(255) job_name ! name of job
 integer(8)  offs(1:2)
 real(8)  eulers(1:3)
 type(cc_hex_params_type) cc_hex_params ! parameters for C. Collier Gaussian Random hexagonal columns/plates
@@ -1226,26 +1226,16 @@ subroutine init_loop(   alpha_vals, &
         ! print*,'job_params%beta_lims',job_params%beta_lims
         ! print*,'job_params%gamma_lims',job_params%gamma_lims
 
-
-
-        ! stop
-
-
-
-        ! num_beta_angles = floor(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
-        num_gamma_angles = floor((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w))
-        ! num_gamma_angles = floor(sqrt(real(num_orients)))
-        ! print*,'num_beta_angles=',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)
-        ! print*,'num_beta_angles=',num_beta_angles,'(',sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h),')'
-        ! print*,'num_gamma_angles=',num_gamma_angles,'(',(-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w),')'
-
-        ! num_gamma_angles = floor(num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)))
-        num_beta_angles = floor(num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)))
-        ! num_beta_angles = floor(sqrt(real(num_orients)))
-        ! print*,'num_gamma_angles=',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h))
-        ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/(sqrt((w/h)*num_orients + (w-h)**2/(4*h**2)) - (w-h)/(2*h)),')'
-        ! print*,'num_beta_angles=',num_beta_angles,'(',num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)),')'
-
+        if(w < 1d-5) then
+            num_beta_angles = num_orients
+            num_gamma_angles = 1
+        else if(h < 1d-5) then
+            num_beta_angles = 1
+            num_gamma_angles = num_orients
+        else
+            num_gamma_angles = floor((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w))
+            num_beta_angles = floor(num_orients/((-1D0+sqrt(1D0+(4D0*h*num_orients/w)))/(2D0*h/w)))
+        end if
 
         leftover_angles = num_orients - num_beta_angles*num_gamma_angles
         ! print*,'number of (leftover) random euler angles: ',leftover_angles
