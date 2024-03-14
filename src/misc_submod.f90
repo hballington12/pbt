@@ -1179,6 +1179,7 @@
             ! integer, dimension(:), allocatable :: my_array ! points some numbers to some other numbers
             real(8) com(1:3) ! facet centre of mass
             real(8) rot(1:3,1:3) ! rotation matrix
+            real(8) rot2(1:3,1:3) ! rotation matrix
             ! integer, dimension(:), allocatable :: num_face_vert_out
             integer(8), dimension(:), allocatable :: apertures_temp ! apertures asignments for each facet
             
@@ -1201,6 +1202,7 @@
             integer(8), dimension(:), allocatable :: norm_ids ! face normal ID of each face
             real(8), dimension(:), allocatable :: faceAreas ! area of each facet
             real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
+            real(8) rotated_normal(1:3)
     
             write(101,*)'calling triangulate with max edge length: ',max_edge_length
 
@@ -1247,8 +1249,33 @@
                 
                 call get_rotation_matrix3(v0,rot)
                 
+                rotated_normal(:) = matmul(rot,geometry%n(geometry%f(i)%ni,:))
+
+                ! print*,'rotated_normal(:)',rotated_normal(:)
+
+                if(rotated_normal(3) < -0.99) then ! if we happened to select a concave part of the facet, flip so that the facet faces the right way
+                    rot2(:,:) = 0d0
+                    rot2(1,1) = 1d0
+                    rot2(2,2) = -1d0
+                    rot2(3,3) = -1d0
+                    rot = matmul(rot2,rot)
+                end if
+
+                rotated_normal(:) = matmul(rot,geometry%n(geometry%f(i)%ni,:))
+
+                ! print*,'rotated_normal(:)',rotated_normal(:)
+
                 v1 = matmul(rot,v0) ! rotate vertices
                 
+                ! print*,'v1',v1(1,1:num_verts)
+                ! print*,'v1',v1(2,1:num_verts)
+                ! print*,'v1',v1(3,1:num_verts)
+
+                ! print*,'unrotated normal:',geometry%n(geometry%f(i)%ni,:)
+                ! print*,'rotated normal:',matmul(rot,geometry%n(geometry%f(i)%ni,:))
+
+                ! stop
+
                 ! print*,'rot:',rot
                 
                 ! print*,'rank: ',rank

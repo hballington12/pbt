@@ -1897,7 +1897,7 @@ subroutine recursion_ext(beam,geometry,job_params)
                             ! if(any(f4(j,1:3)) .eq. bb) then ! if blocker was in fuzzy bounding box
                             if(j .ne. m) then ! ignore self-block
                                 if (rot_geometry%f(m)%mid(3) .gt. rot_geometry%f(j)%mid(3)) then ! if potential blocker was behind facet m
-                                    ! do nothing
+                                        ! do nothing
                                 else ! if potential blocker was in front of facet m
                                     ! do bounded surface edge check
                                     within_bounds = .true. ! assume centroid of facet m is within the bounded surface of potentially blocking facet j
@@ -1944,10 +1944,12 @@ subroutine recursion_ext(beam,geometry,job_params)
                                                     else
                                                         is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                         in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                        exit ! exit the do loop over j
                                                     end if
                                                 else ! else, if a blocking had not yet been found
                                                     is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                     in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet 
+                                                    exit ! exit the do loop over j
                                                 end if
                                             end if
                                         end if
@@ -2154,10 +2156,12 @@ subroutine recursion_ext(beam,geometry,job_params)
                                                     else
                                                         is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                         in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
+                                                        exit ! exit do loop over j
                                                     end if
                                                 else ! else, if a blocking had not yet been found
                                                     is_vis(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet
                                                     in_beam(m) = .false. ! set m as not in the shadow and has been blocked by non-illuminating facet 
+                                                    exit ! exit do loop over j
                                                 end if
                                             end if
                                         end if
