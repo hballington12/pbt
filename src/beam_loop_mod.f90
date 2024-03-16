@@ -1413,7 +1413,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         real(8) theta_1, theta_2
         real(8) rot1(1:3,1:3), rot2(1:3,1:3)
         real(8) temp_vector(1:3)
-        integer(8) i
+        integer(8) i, j
         
         rot1 = 0 ! initialise
         rot2 = 0 ! initialise
@@ -1450,6 +1450,11 @@ subroutine recursion_ext(beam,geometry,job_params)
         do i = 1, geometry%na
             rot_geometry%ap(i)%mid(:) = matmul(rot,geometry%ap(i)%mid(:)) ! rotate aperture midpoints
             rot_geometry%ap(i)%n(:) = matmul(rot,geometry%ap(i)%n(:)) ! rotate aperture normals
+        end do
+        do i = 1, geometry%nf
+            do j = 1, geometry%f(i)%nv
+                rot_geometry%f(i)%evec(j,:) = matmul(rot,geometry%f(i)%evec(j,:)) ! rotate edge vectors
+            end do
         end do
         
     end subroutine

@@ -143,7 +143,7 @@ call PDAL2( job_params, & ! <-  job parameters
 
 if (job_params%tri) then ! if triangulation enabled
     ! triangulate the particle
-    call triangulate(   job_params%tri_edge_length, & ! <-  max triangle edge length
+    call triangulate(   job_params,                 &
                         '-Q -q',                    & ! <-  extra flag inputs to triangle program
                         job_params%tri_roughness,   & ! <-  standard deviation for triangle roughness
                         mpi%rank,                   & ! <-  process rank, so the subroutine knows where to write temporary files to

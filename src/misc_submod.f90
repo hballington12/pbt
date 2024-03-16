@@ -79,6 +79,39 @@
 
         end subroutine
 
+        subroutine compute_geometry_edge_vectors(geometry)
+
+        type(geometry_type), intent(inout) :: geometry
+
+        integer(8) i, j
+        integer(8) nv, vi1, vi2
+        real(8) v1(1:3) ! a vertex
+        real(8) v2(1:3) ! the next vertex
+        real(8) vec(1:3) ! edge vector
+
+        do i = 1, geometry%nf ! for each face
+            nv = geometry%f(i)%nv ! get number of vertices in face
+            if(allocated(geometry%f(i)%evec)) deallocate(geometry%f(i)%evec) ! if allocated, deallocate
+            allocate(geometry%f(i)%evec(1:nv,1:3)) ! allocate array to hold evec vectors
+            if(allocated(geometry%f(i)%elen)) deallocate(geometry%f(i)%elen) ! if allocated, deallocate
+            allocate(geometry%f(i)%elen(1:nv)) ! allocate array to hold evec vector length
+            do j = 1, nv ! for each vertex
+                vi1 = geometry%f(i)%vi(j) ! get vertex id
+                if(j /= nv) then ! if not last vertex
+                    vi2 = geometry%f(i)%vi(j+1) ! get the next vertex id
+                else ! if last vertex
+                    vi2 = geometry%f(i)%vi(1) ! get the next vertex id
+                end if
+                v1(:) = geometry%v(vi1,:) ! get the first vertex
+                v2(:) = geometry%v(vi2,:) ! get the next vertex
+                vec(:) = v2(:) - v1(:) ! compute edge vector
+                geometry%f(i)%evec(j,:) = vec(:) ! save edge vector
+                geometry%f(i)%elen(j) = sqrt(vec(1)**2 + vec(2)**2 + vec(3)**2)
+            end do
+        end do
+
+        end subroutine
+
         subroutine compute_geometry_com(geometry)
 
         ! sr compute_geometry_com
@@ -719,6 +752,7 @@
                 write(10,*)'automatic triangulation: enabled'
                 write(10,*)'triangulation max edge length: ',job_params%tri_edge_length
                 write(10,*)'triangulation roughness: ',job_params%tri_roughness
+                write(10,*)'triangulation minimum divides per smallest parent length dimension: ',job_params%tri_div
             else
                 write(10,*)'automatic triangulation: disabled'
             end if
@@ -1153,7 +1187,7 @@
             
         ! end subroutine
         
-        subroutine triangulate( max_edge_length, &
+        subroutine triangulate( job_params, &
                                 flags, &
                                 roughness, &
                                 rank, &
@@ -1168,7 +1202,8 @@
             integer(8) :: num_vert, num_face ! number of unique vertices, number of faces
             integer(8), dimension(:), allocatable :: num_face_vert
             character(len=*) flags
-            real(8), intent(in) :: max_edge_length
+            type(job_parameters_type), intent(in) :: job_params
+            real(8) max_edge_length
             integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
             real(8), intent(in) :: roughness
             character(len=255), intent(in) :: output_dir ! output directory
@@ -1204,6 +1239,8 @@
             real(8), dimension(:,:), allocatable :: Midpoints ! face midpoints
             real(8) rotated_normal(1:3)
     
+            max_edge_length = job_params%tri_edge_length
+
             write(101,*)'calling triangulate with max edge length: ',max_edge_length
 
             ! allocate(apertures_temp(1:size(apertures,1))) ! make an array to hold the input apertures
@@ -1291,8 +1328,15 @@
                 ! print*,'===================================='
                 
                 ! max_edge_length = 0.25
-                
+
+                ! print*,'tri default edge',max_edge_length
+                ! print*,'tri div edge:',minval(geometry%f(i)%elen(:))/job_params%tri_div
+
+                ! get whichever edge length was smallest
+                max_edge_length = min(max_edge_length,minval(geometry%f(i)%elen(:))/job_params%tri_div)
+
                 write(a_string,'(f12.6)') max_edge_length**2*sqrt(3D0)/4D0 ! based on area -> length of equilateral triangle
+                ! write(a_string,'(f12.6)') (minval(geometry%f(i)%elen(:))/4)**2*sqrt(3D0)/4D0 ! based on area -> length of equilateral triangle
                 
                 ! print*,'extra flags: ',trim(adjustl(flags))
                 
@@ -1438,6 +1482,7 @@
 
             ! recompute a load of geometry stuff
             call compute_geometry_areas(geometry)
+            call compute_geometry_edge_vectors(geometry)
 
         end subroutine
         

@@ -287,8 +287,9 @@ phi_vals = phi_vals*pi/180d0
 
 job_params%suppress_2d = .false.
 job_params%tri = .false.
-job_params%tri_edge_length = 1
+job_params%tri_edge_length = huge(1d0)
 job_params%tri_roughness = 0D0
+job_params%tri_div = 4
 job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
@@ -861,6 +862,17 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%tri_roughness
+                ! print*,'job_params%tri_roughness: ', job_params%tri_roughness
+            end if 
+
+        case ('-tri_div')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "tri_div"'
+                stop
+            else
+                read(arg,*) job_params%tri_div
                 ! print*,'job_params%tri_roughness: ', job_params%tri_roughness
             end if 
 
@@ -1868,7 +1880,8 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
     call compute_geometry_normals(rot_geometry)
     ! recompute aperture parameters
     call compute_geometry_apertures(rot_geometry)
-
+    ! recompute aperture parameters
+    call compute_geometry_edge_vectors(rot_geometry)
     ! stop
     ! if(job_params%debug >= 1) then 
     !     print*,'========== end sr PROT_MPI'
@@ -2799,6 +2812,7 @@ subroutine PDAL2(   job_params,     &
     call compute_geometry_midpoints(geometry) ! recompute after translating to origin
     call compute_geometry_normals(geometry)
     call compute_geometry_apertures(geometry)
+    call compute_geometry_edge_vectors(geometry)
 
     ! write(101,*)'number of parents: ',geometry%na
     ! write(101,*)'number of vertices: ',geometry%nv

@@ -41,7 +41,8 @@ This directory contains various template files you may wish to use for running t
 -no2d # disable 2d mueller output
 -tri # enable automatic triangulation (triangle must be compiled in ./src/tri)
 -tri_edge 0.25 # set maximum triangle edge length
--tri_rough 0.05 # set standard devitation for roughness
+-tri_rough 0.05 # set standard deviation for roughness
+-tri_div 1 # set minimum divides per smallest parent length dimension
 -time_limit 22 # set time limit to 22 hours
 -resume 10 # resume job from directory "10" in cache directory
 -scaling # scale beam and ext diffraction to have equal contribution
