@@ -289,7 +289,7 @@ job_params%suppress_2d = .false.
 job_params%tri = .false.
 job_params%tri_edge_length = huge(1d0)
 job_params%tri_roughness = 0D0
-job_params%tri_div = 4
+job_params%tri_div = 1
 job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
@@ -2417,7 +2417,7 @@ subroutine PDAL2(   job_params,     &
     type(geometry_type), intent(out) :: geometry ! the particle geometry data structure
 
     integer(8), parameter :: num_face_vert_max_in = 24 ! max number of vertices per face
-    integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
+    integer(8), parameter :: max_line_length = 1000 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
     integer(8) face_string_length
     integer(8) entry_count, delim_count, digits_to_read
@@ -2606,7 +2606,7 @@ subroutine PDAL2(   job_params,     &
             ! print*,'max vertices per face: ',num_face_vert_max
 
             
-            !! print the number of vertices in each face
+            ! ! print the number of vertices in each face
             ! print*,'num_face_vert array:'
             ! do i = 1, num_face 
             !     print*,num_face_vert(i)

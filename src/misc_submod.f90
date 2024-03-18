@@ -1196,7 +1196,10 @@
             
             ! calls triangle to triangulate and subdivide a surface
             ! returns the subdivided surface
-            
+
+            integer(8), parameter :: max_verts = 5000000
+            integer(8), parameter :: max_faces = 5000000
+
             real(8), dimension(:,:) ,allocatable :: verts ! unique vertices
             integer(8), dimension(:,:) ,allocatable :: face_ids ! face vertex IDs (for after excess columns have been truncated)
             integer(8) :: num_vert, num_face ! number of unique vertices, number of faces
@@ -1220,9 +1223,9 @@
             
             integer(8) num_verts
             integer(8) num_nodes, num_faces
-            real(8) verts_out(1:1000000,1:3) ! vertices after triangulation
-            integer(8) face_ids_out(1:1000000,1:3) ! face_ids after triangulation
-            integer(8) apertures_out(1:1000000) ! apertures after triangulation
+            real(8) verts_out(1:max_verts,1:3) ! vertices after triangulation
+            integer(8) face_ids_out(1:max_faces,1:3) ! face_ids after triangulation
+            integer(8) apertures_out(1:max_faces) ! apertures after triangulation
             
             ! real(8), dimension(:,:), allocatable :: verts_out_final
             ! integer, dimension(:,:), allocatable :: face_ids_out_final
@@ -1240,6 +1243,8 @@
             real(8) rotated_normal(1:3)
     
             max_edge_length = job_params%tri_edge_length
+            
+            ! print*,'max_edge_length',max_edge_length
 
             write(101,*)'calling triangulate with max edge length: ',max_edge_length
 
@@ -1333,7 +1338,16 @@
                 ! print*,'tri div edge:',minval(geometry%f(i)%elen(:))/job_params%tri_div
 
                 ! get whichever edge length was smallest
-                max_edge_length = min(max_edge_length,minval(geometry%f(i)%elen(:))/job_params%tri_div)
+                max_edge_length = min(job_params%tri_edge_length,(sum(geometry%f(i)%elen(:))/geometry%f(i)%nv)/job_params%tri_div)
+
+                ! print*,'mean edge length:',sum(geometry%f(i)%elen(:))/geometry%f(i)%nv
+
+                ! stop
+
+                ! print*,'smallest edge length',minval(geometry%f(i)%elen(:))
+                ! print*,'max_edge_length',max_edge_length
+
+                ! print*,'max edge length:',max_edge_length
 
                 write(a_string,'(f12.6)') max_edge_length**2*sqrt(3D0)/4D0 ! based on area -> length of equilateral triangle
                 ! write(a_string,'(f12.6)') (minval(geometry%f(i)%elen(:))/4)**2*sqrt(3D0)/4D0 ! based on area -> length of equilateral triangle
@@ -1348,6 +1362,8 @@
                 
                 ! print*,'triangle command: "',trim(adjustl(triangle_cmd)),'"'
                 
+                ! stop
+
                 ! check that triangle has been compiled by the user...
                 inquire(file="./src/tri/triangle", exist=exists)
                 
@@ -1373,6 +1389,9 @@
                 ! print*,'number of vertices after triangulation: ',num_nodes
                 do j = 1, num_nodes ! read in each node
                     vert_counter = vert_counter + 1 ! update new vertex counter
+
+                    if(vert_counter + vert_counter_total > max_verts) error stop "please increase max_verts parameter in sr triangulate"
+                    
                     read(10,*) junk, verts_out(vert_counter + vert_counter_total,1), verts_out(vert_counter + vert_counter_total,2), junk, is_vertex_on_boundary
                     ! print*,'is_vertex_on_boundary:',is_vertex_on_boundary
                     verts_out(vert_counter + vert_counter_total,3) = 0 ! always 0 because triangle works in 2D
@@ -1390,12 +1409,14 @@
                     ! print*,verts_out(vert_counter + vert_counter_total,1), verts_out(vert_counter + vert_counter_total,2), verts_out(vert_counter + vert_counter_total,3)
                 end do
                 close(10)
-                
+
                 open(unit=10,file=trim(output_dir)//'/tmp/face'//trim(adjustl(rank_string))//'.1.ele',status="old") ! open the triangulated ele file
                 read(10,*) num_faces
                 ! print*,'number of faces after triangulation: ',num_faces
                 do j = 1, num_faces ! read in each face
                     face_counter = face_counter + 1 ! update new vertex counter
+                    if(face_counter + face_counter_total > max_faces) error stop "please increase max_faces parameter in sr triangulate"
+
                     read(10,*) junk, face_ids_out(face_counter + face_counter_total,1), face_ids_out(face_counter + face_counter_total,2), face_ids_out(face_counter + face_counter_total,3)
                     face_ids_out(face_counter + face_counter_total,1) = face_ids_out(face_counter + face_counter_total,1) + vert_counter_total
                     face_ids_out(face_counter + face_counter_total,2) = face_ids_out(face_counter + face_counter_total,2) + vert_counter_total
@@ -1483,6 +1504,8 @@
             ! recompute a load of geometry stuff
             call compute_geometry_areas(geometry)
             call compute_geometry_edge_vectors(geometry)
+
+            ! stop
 
         end subroutine
         
@@ -1639,7 +1662,7 @@
             type(geometry_type) geometry
             
             integer(8) num_verts, num_faces, i, j, k, num_norms
-            character(100) my_string, my_string2
+            character(1000) my_string, my_string2
             
             ! print*,'========== start sr PDAS'
             
@@ -1670,7 +1693,7 @@
                     call StripSpaces(my_string2)
                     my_string = trim(my_string)//"/0/"//trim(my_string2)
                 end do
-                write(10,'(A100)') adjustl(my_string)
+                write(10,'(A)') trim(adjustl(my_string))
             end do
             close(10)
             

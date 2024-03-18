@@ -107,7 +107,7 @@ Main source file. It contains the program entry point. The PBT reads input param
 
 - `-tri_rough <value>` - Sets the standard deviation for roughness derived from the triangulation. If omitted, the default value is `0`.
 
-- `-tri_div <value>` - Sets the minimum divides per smallest parent length dimension from the triangulation. If omitted, the default value is `4`.
+- `-tri_div <value>` - Sets the minimum divides per smallest parent length dimension from the triangulation. If omitted, the default value is `1`.
 
 - `-time_limit <value>` - Sets a time limit (in hours). The PBT will save at an intermediate point if this time is surpassed. Use `-resume <value>` to resume the job (see below).
 
