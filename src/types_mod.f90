@@ -171,6 +171,34 @@ type aperture_type
     integer(8) nf ! number of faces in this aperture
 end type aperture_type
 
+type bvh_cell_type
+    ! bvh cell type: contains information about a bounding volume hierarchy cell
+    integer(8) id ! cell id
+    integer(8) pid ! parent cell id
+    integer(8) nv ! number of vertices in cell
+    integer(8), dimension(:), allocatable :: vi ! vertices in cell ids
+    integer(8) nf ! number of facets in cell
+    integer(8), dimension(:), allocatable :: fi ! indices facets with vertices in cell ids
+    integer(8) nch ! number of children
+    integer(8), dimension(:), allocatable :: chid ! children cell ids
+    real(8) xmin ! cell min x coordinate
+    real(8) xmax ! cell max x coordinate
+    real(8) ymin ! cell min y coordinate
+    real(8) ymax ! cell max y coordinate
+    real(8) zmin ! cell min z coordinate
+    real(8) zmax ! cell max z coordinate   
+end type bvh_cell_type
+
+type bvh_depth_type
+    ! bvh depth type: contains information about a bounding volume hierarchy depth
+    type(bvh_cell_type), dimension(:), allocatable :: cell
+end type bvh_depth_type
+
+type bvh_type
+    ! bvh type: contains information about the bounding volume hierarchy
+    type(bvh_depth_type), dimension(:), allocatable :: depth
+end type bvh_type 
+
 type geometry_type
     ! geometry type: contains information about a particle geometry
     ! a particle geometry is defined by its vertices and facets
@@ -182,9 +210,10 @@ type geometry_type
     integer(8) nf ! number of faces in the geometry
     integer(8) nn ! number of unique normals
     integer(8) na ! number of apertures
-    type(aperture_type), dimension(:), allocatable :: ap ! data structure with information about each aperture in the geometry
+    type(aperture_type), dimension(:), allocatable :: ap ! data structure with information about each aperture in the geometry+
     real(8) area ! the total surface area
     real(8) com(1:3) ! centre of mass
+    type(bvh_type) bvh ! bounding volume hierarchy
 end type geometry_type
 
 ! format specifiers

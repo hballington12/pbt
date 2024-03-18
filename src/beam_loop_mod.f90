@@ -1453,7 +1453,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         end do
         do i = 1, geometry%nf
             do j = 1, geometry%f(i)%nv
-                rot_geometry%f(i)%evec(j,:) = matmul(rot,geometry%f(i)%evec(j,:)) ! rotate edge vectors
+            rot_geometry%f(i)%evec(j,:) = matmul(rot,geometry%f(i)%evec(j,:)) ! rotate edge vectors
             end do
         end do
         

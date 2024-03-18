@@ -101,9 +101,13 @@ if (job_params%tri) then ! if triangulation enabled
                         my_rank,                    & ! <-  process rank, so the subroutine knows where to write temporary files to
                         job_params%output_dir,      & ! <-  output directory
                         geometry)                     !  -> triangulated geometry 
-    ! call merge_vertices(vert_in, face_ids, 1D-1, geometry) ! merge vertices that are close enough
+    ! call merge_vertices(vert_in, face_ids, 1D-3, geometry) ! merge vertices that are close enough
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
 end if
+
+call make_bvh(geometry) ! make bounding volume hierarchy
+
+call export_bvh(geometry%bvh,job_params%output_dir) ! export bounding bolume hierarchy
 
 ! write geometry info to log file
 call write_geometry_info(geometry)

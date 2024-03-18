@@ -6,6 +6,7 @@ module input_mod
 use misc_submod
 use types_mod
 use cc_hex_mod
+use bvh_mod
 
 implicit none
 

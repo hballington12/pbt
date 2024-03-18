@@ -13,7 +13,7 @@ use types_mod
 use diff_mod
 use omp_lib
 use outputs_mod
-use mpi_mod
+use mpi_pbt_mod
 
 implicit none
 
