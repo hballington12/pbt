@@ -105,7 +105,7 @@ if (job_params%tri) then ! if triangulation enabled
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
 end if
 
-call make_bvh(geometry) ! make bounding volume hierarchy
+call make_bvh(job_params,geometry) ! make bounding volume hierarchy
 
 call export_bvh(geometry%bvh,job_params%output_dir) ! export bounding bolume hierarchy
 
@@ -116,7 +116,7 @@ call write_geometry_info(geometry)
 call PDAS(  job_params%output_dir,  & ! <-  output directory
             "unrotated",            & ! <-  filename
             geometry)                 ! <-  geometry
-
+stop
 call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 ! initialise the euler angles to be used
 call init_loop( alpha_vals, &

@@ -2207,7 +2207,7 @@
             integer(8), dimension(:), allocatable, intent(in) :: array_in
             integer(8), dimension(:), allocatable :: unique
             integer(8), dimension(:), allocatable, intent(out) :: array_unique
-            integer min_val, max_val, i
+            integer(8) min_val, max_val, i
             
             ! allocate unique array
             allocate(unique(1:size(array_in,1)))
