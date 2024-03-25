@@ -49,7 +49,7 @@ outputs_mod$(O_EXT) : $(SRC)outputs_mod.f90 misc_submod$(O_EXT)
 diff_mod$(O_EXT) : $(SRC)diff_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT)
 	$(FC) $(FSWITCHES) -c $(SRC)diff_mod.f90
 
-beam_loop_mod$(O_EXT) : $(SRC)beam_loop_mod.f90 input_mod$(O_EXT) misc_submod$(O_EXT) types_mod$(O_EXT)
+beam_loop_mod$(O_EXT) : $(SRC)beam_loop_mod.f90 input_mod$(O_EXT) misc_submod$(O_EXT) types_mod$(O_EXT) diff_mod$(O_EXT)
 	$(FC) $(FSWITCHES) -c $(SRC)beam_loop_mod.f90
 
 input_mod$(O_EXT) : $(SRC)input_mod.f90 misc_submod$(O_EXT) types_mod$(O_EXT) cc_hex_mod$(O_EXT)

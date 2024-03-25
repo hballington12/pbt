@@ -231,7 +231,9 @@ do i = mpi%start, mpi%end ! start orientation loop
                     job_params,                 & ! <-  job parameters
                     rotated_geometry,           & ! <-  rotated particle geometry
                     beam_geometry,              & ! <-  incident beam geometry
-                    beam_inc)                     ! <-  incident beam
+                    beam_inc, &
+                    ampl_far_beam, &
+                    ampl_far_ext_diff)
 
     if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing far-field...'
@@ -239,13 +241,13 @@ do i = mpi%start, mpi%end ! start orientation loop
     end if
 
     ! diffraction
-    call diff_main( beam_outbeam_tree,          & ! <-  outgoing beams from the beam tracing
-                    beam_outbeam_tree_counter,  & ! <-  counts the current number of beam outbeams
-                    ampl_far_beam,              & !  -> amplitude matrix due to beam diffraction
-                    ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
-                    ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
-                    job_params,                 & ! <-  job parameters
-                    rotated_geometry)             ! <-  rotated particle geometry
+    ! call diff_main( beam_outbeam_tree,          & ! <-  outgoing beams from the beam tracing
+    !                 beam_outbeam_tree_counter,  & ! <-  counts the current number of beam outbeams
+    !                 ampl_far_beam,              & !  -> amplitude matrix due to beam diffraction
+    !                 ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
+    !                 ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
+    !                 job_params,                 & ! <-  job parameters
+    !                 rotated_geometry)             ! <-  rotated particle geometry
 
     if(job_params%debug >= 3) then
         if(mpi%rank == 0) print*,'computing mueller matrix and parameters...'

@@ -6,11 +6,77 @@ module beam_loop_mod
     use misc_submod
     use types_mod
     use omp_lib
+    use diff_mod
     
     implicit none
     
     contains
     
+    subroutine external_diffraction(ext_diff_outbeam_tree,ampl_far_ext_diff,job_params,geometry,xfar,yfar,zfar,ampl)
+
+        type(outbeamtype), dimension(:), allocatable, intent(in) :: ext_diff_outbeam_tree ! outgoing beams from the beam tracing
+        type(job_parameters_type), intent(in) :: job_params
+        type(geometry_type), intent(in) :: geometry
+        real(8), dimension(:,:), allocatable, intent(in) :: xfar, yfar, zfar ! far-field bin positions
+        complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: ampl ! summand
+        complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: ampl_far_ext_diff ! summand
+
+        integer(8) j
+        type(outbeamtype) outbeam
+        integer(8) num_threads
+
+        ampl_far_ext_diff = 0d0 ! init
+        ampl = 0d0
+
+        if(job_params%is_multithreaded) then
+            num_threads = omp_get_max_threads()
+        else
+            num_threads = 1
+        end if
+
+        !$omp parallel num_threads(num_threads) private(ampl,outbeam)
+        !$omp do
+        do j = 1, size(ext_diff_outbeam_tree,1)
+
+            outbeam = ext_diff_outbeam_tree(j) ! get outbeam from tree
+            outbeam%fov = pi/2d0
+        
+            call diffraction(xfar,yfar,zfar,job_params%la,ampl,job_params%phi_vals,job_params%theta_vals,job_params,outbeam,geometry)
+
+            !$omp critical
+            ampl_far_ext_diff(:,:,:,:) = ampl_far_ext_diff(:,:,:,:) + ampl(:,:,:,:)
+            !$omp end critical
+                
+        end do
+        !$omp end parallel
+
+    end subroutine
+
+    subroutine outbeam_diffraction(beam_outbeam_tree,job_params,ampl_far_beam_summand,beam_outbeam_tree_counter,geometry,xfar,yfar,zfar,ampl)
+
+        type(outbeamtype), dimension(:), allocatable, intent(in) :: beam_outbeam_tree ! outgoing beams from the beam tracing
+        type(job_parameters_type), intent(in) :: job_params
+        complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: ampl_far_beam_summand ! far-field amplitude matrix due to outgoing beams
+        integer(8), intent(in) :: beam_outbeam_tree_counter
+        type(geometry_type), intent(in) :: geometry
+        real(8), dimension(:,:), allocatable, intent(in) :: xfar, yfar, zfar ! far-field bin positions
+        complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: ampl ! summand
+
+        integer(8) i
+
+        ampl_far_beam_summand = 0d0 ! init
+        ampl = 0d0
+
+        do i = 1, beam_outbeam_tree_counter
+            call diffraction(xfar,yfar,zfar,job_params%la,ampl,job_params%phi_vals,job_params%theta_vals,job_params,beam_outbeam_tree(i),geometry)      
+            ! returns ampl, which is the far field amplitude matrix
+            ! sum total                           
+            ampl_far_beam_summand(:,:,:,:) = ampl_far_beam_summand(:,:,:,:) + ampl(:,:,:,:)
+        end do
+
+
+    end subroutine
+
     subroutine print_recursion_info(beam_tree_part,job_params)
 
         ! print_recursion_info
@@ -1564,7 +1630,9 @@ subroutine recursion_ext(beam,geometry,job_params)
         job_params, &
         geometry, &
         beam_geometry, &
-        beam_inc)
+        beam_inc, &
+        ampl_far_beam, &
+        ampl_far_ext_diff)
         
         ! beam_loop
         ! performs the main beam loop
@@ -1583,7 +1651,13 @@ subroutine recursion_ext(beam,geometry,job_params)
         type(geometry_type), intent(in) :: geometry
         type(geometry_type), intent(in) :: beam_geometry
         type(beam_type), intent(inout) :: beam_inc
-        
+        complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_beam ! far-field amplitude matrix due to outgoing beams
+        complex(8), dimension(:,:,:,:), allocatable :: ampl_far_beam_summand ! far-field amplitude matrix due to outgoing beams
+        complex(8), dimension(:,:,:,:), allocatable, intent(out) :: ampl_far_ext_diff ! far-field amplitude matrix due to external diffraction
+        complex(8), dimension(:,:,:,:), allocatable :: ampl ! summand
+
+        real(8), dimension(:,:), allocatable :: xfar, yfar, zfar ! far-field bin positions
+
         real(8) start, finish, start1, finish1 ! cpu timing variables
         integer(8) j, rec
         
@@ -1603,7 +1677,19 @@ subroutine recursion_ext(beam,geometry,job_params)
         finish1 = 0d0
         done = .false.
         output_parameters%abs = 0d0 ! init absorption cross section for this orientation
-        
+
+        ! initialise the far-field bins, for diffraction
+        ! get meshgrid-style far-field bins x, y, z
+        call make_far_field_bins(xfar,yfar,zfar,job_params%theta_vals,job_params%phi_vals)
+
+        ! allocate some far-field bins and init
+        allocate(ampl_far_beam(1:size(xfar,1),1:size(xfar,2),1:2,1:2)) ! far-field beam total
+        allocate(ampl_far_beam_summand(1:size(xfar,1),1:size(xfar,2),1:2,1:2)) ! far-field beam summand
+        allocate(ampl_far_ext_diff(1:size(xfar,1),1:size(xfar,2),1:2,1:2)) ! far-field ext diff total
+        allocate(ampl(1:size(xfar,1),1:size(xfar,2),1:2,1:2)) ! far-field summand variable
+        ampl_far_beam = 0
+        ampl_far_ext_diff = 0
+
         if(job_params%timing) then
             start = omp_get_wtime()
         endif
@@ -1613,7 +1699,7 @@ subroutine recursion_ext(beam,geometry,job_params)
         end if
         
         beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
-        allocate(beam_outbeam_tree(1:1000000)) ! set to 1000000 as guess for max outbeams
+        allocate(beam_outbeam_tree(1:geometry%nf)) ! set to 1000000 as guess for max outbeams
         
         num_beams = 0 ! total number of beams in the beam tree
         allocate(beam_tree(1:50000)) ! allocate some space to hold beams to be traced (might need to add more space later)
@@ -1664,9 +1750,10 @@ subroutine recursion_ext(beam,geometry,job_params)
             end if
 
             ! loop over each beam for this recursion
-            !$omp parallel num_threads(num_threads) private(beam)
+            !$omp parallel num_threads(num_threads) private(beam,beam_outbeam_tree_counter,beam_outbeam_tree,ampl_far_beam_summand,ampl)
             !$omp do
             do j = i_start, i_end ! for each entry in the beam tree that belongs to this recursion
+                beam_outbeam_tree_counter = 0 ! reset counter
                 beam = beam_tree(j) ! get a beam from the beam_tree
                 ! propagate this beam
                 if(beam%is_int) then ! if the beam is internally propagating
@@ -1680,7 +1767,14 @@ subroutine recursion_ext(beam,geometry,job_params)
                     call recursion_ext(beam,geometry,job_params) ! propagate the beam and populate the beam structure
                     !$omp critical
                     if(beam%rec < job_params%rec) call add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree (if max recursions hasnt been reached)
+                    !$omp end critical
                     call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params,geometry) ! add outgoing beams to the diffraction tree
+                    call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter,geometry) ! get outbeam vertex information
+                    ! now actually do the diffraction inside this loop
+                    call outbeam_diffraction(beam_outbeam_tree,job_params,ampl_far_beam_summand,beam_outbeam_tree_counter,geometry,xfar,yfar,zfar,ampl)
+                    !$omp critical
+                    ! now add it to the total
+                    ampl_far_beam(:,:,:,:) = ampl_far_beam(:,:,:,:) + ampl_far_beam_summand(:,:,:,:)
                     !$omp end critical
                 end if ! end: if the beam is internally propagating
                 !$omp critical     
@@ -1711,16 +1805,16 @@ subroutine recursion_ext(beam,geometry,job_params)
                 write(101,'(a,f16.8,a)')"end beam loop - time elapsed: ",finish-start," secs"   
             end if
         end if
-        
-        call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter,geometry)    
-        
-        call energy_checks( beam_outbeam_tree, &
-        beam_outbeam_tree_counter, &
-        output_parameters, &
-        ext_diff_outbeam_tree, &
-        job_params, &
-        geometry)
-        
+                
+        ! call energy_checks( beam_outbeam_tree, &
+        ! beam_outbeam_tree_counter, &
+        ! output_parameters, &
+        ! ext_diff_outbeam_tree, &
+        ! job_params, &
+        ! geometry)
+
+        call external_diffraction(ext_diff_outbeam_tree,ampl_far_ext_diff,job_params,geometry,xfar,yfar,zfar,ampl)
+
         if(job_params%debug >= 2) then
             write(101,'(a)')'memory usage breakdown (per mpi process):'
             write(101,'(a,f8.2,a)')'particle geometry: ',real(sizeof(geometry))/1048576d0,' mb'
