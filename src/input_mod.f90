@@ -287,8 +287,9 @@ phi_vals = phi_vals*pi/180d0
 
 job_params%suppress_2d = .false.
 job_params%tri = .false.
-job_params%tri_edge_length = 1
+job_params%tri_edge_length = huge(1d0)
 job_params%tri_roughness = 0D0
+job_params%tri_div = 1
 job_params%time_limit = 1e6
 job_params%resume = .false.
 job_params%cache_id = -1
@@ -861,6 +862,17 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 stop
             else
                 read(arg,*) job_params%tri_roughness
+                ! print*,'job_params%tri_roughness: ', job_params%tri_roughness
+            end if 
+
+        case ('-tri_div')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "tri_div"'
+                stop
+            else
+                read(arg,*) job_params%tri_div
                 ! print*,'job_params%tri_roughness: ', job_params%tri_roughness
             end if 
 
@@ -1868,7 +1880,8 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
     call compute_geometry_normals(rot_geometry)
     ! recompute aperture parameters
     call compute_geometry_apertures(rot_geometry)
-
+    ! recompute aperture parameters
+    call compute_geometry_edge_vectors(rot_geometry)
     ! stop
     ! if(job_params%debug >= 1) then 
     !     print*,'========== end sr PROT_MPI'
@@ -2404,7 +2417,7 @@ subroutine PDAL2(   job_params,     &
     type(geometry_type), intent(out) :: geometry ! the particle geometry data structure
 
     integer(8), parameter :: num_face_vert_max_in = 24 ! max number of vertices per face
-    integer(8), parameter :: max_line_length = 150 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
+    integer(8), parameter :: max_line_length = 1000 ! max number of characters in a line of thecrystal file (might need increasing if faces have many vertices)
     character(max_line_length) line ! a line in a file
     integer(8) face_string_length
     integer(8) entry_count, delim_count, digits_to_read
@@ -2593,7 +2606,7 @@ subroutine PDAL2(   job_params,     &
             ! print*,'max vertices per face: ',num_face_vert_max
 
             
-            !! print the number of vertices in each face
+            ! ! print the number of vertices in each face
             ! print*,'num_face_vert array:'
             ! do i = 1, num_face 
             !     print*,num_face_vert(i)
@@ -2799,6 +2812,7 @@ subroutine PDAL2(   job_params,     &
     call compute_geometry_midpoints(geometry) ! recompute after translating to origin
     call compute_geometry_normals(geometry)
     call compute_geometry_apertures(geometry)
+    call compute_geometry_edge_vectors(geometry)
 
     ! write(101,*)'number of parents: ',geometry%na
     ! write(101,*)'number of vertices: ',geometry%nv

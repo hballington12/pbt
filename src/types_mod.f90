@@ -76,6 +76,7 @@ type job_parameters_type
     logical tri ! enable auto triangulation
     real(8) tri_edge_length ! auto triangulation max edge length
     real(8) tri_roughness ! auto triangulation roughness magnitude
+    integer(8) tri_div ! minimum number of subdivisions per smallest parent dimension
     real(8) time_limit ! job time limit in hours
     logical resume ! enable resume of cached data
     integer(8) cache_id ! cached data to resume from
@@ -158,6 +159,8 @@ type facet_type
     real(8) area ! area
     integer(8) nv ! number of vertices on this face
     integer(8) ap ! the aperture to which this face belongs
+    real(8), dimension(:,:), allocatable :: evec ! "edge" vector from vertex i to i+1: dimension nv x 3
+    real(8), dimension(:), allocatable :: elen ! edge vector length
 end type facet_type
 
 type aperture_type
