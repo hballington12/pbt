@@ -151,7 +151,7 @@ Main source file. It contains the program entry point. The PBT reads input param
 
 - `-output_eulers` - outputs the euler angles used for orientation averaging to a file
 
-- `-fast` - prioritises speed over memory use. This flag is enabled by default.
+- `-speed` - prioritises speed over memory use. This flag is enabled by default.
 
 - `-memory` - prioritises memory use over speed.
 

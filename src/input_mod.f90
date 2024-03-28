@@ -821,7 +821,7 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             ! print*,'fast diffraction: enabled'
             job_params%is_fast_diff = .true.
 
-        case ('-fast')
+        case ('-speed')
             ! print*,'prioritising for speed or memory: speed'
             job_params%is_fast = .true.
 

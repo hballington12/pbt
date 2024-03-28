@@ -56,6 +56,6 @@ This directory contains various template files you may wish to use for running t
 -beta_max # set the maximum beta angle, to account for particle symmetry
 -gamma_min # set the minimum gamma angle, to account for particle symmetry
 -gamma_max # set the maximum gamma angle, to account for particle symmetry
--fast # prioritse speed over memory use
+-speed # prioritse speed over memory use
 -memory # prioritise memory use over speed
 ```
