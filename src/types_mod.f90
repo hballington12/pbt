@@ -93,6 +93,7 @@ type job_parameters_type
     integer(8) export_beam_lims(1:2) ! the start at end indices of beam number (or recursion) to be exported
     character(len=255) output_dir ! output directory
     logical is_fast_diff ! whether or not to use fast, approximate diffraction
+    logical is_fast ! whether to prioritise speed (true) or memory use (false)
 end type job_parameters_type
 
 type field_in_type
