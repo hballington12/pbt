@@ -22,7 +22,8 @@ objects = 	types_mod$(O_EXT) \
 			beam_loop_mod$(O_EXT) \
 			diff_mod$(O_EXT) \
 			outputs_mod$(O_EXT) \
-			cc_hex_mod$(O_EXT)
+			cc_hex_mod$(O_EXT) \
+			pbt_mpi_mod$(O_EXT)
 
 # all modules
 modules = 	types_mod$(MOD_EXT) \
@@ -32,13 +33,17 @@ modules = 	types_mod$(MOD_EXT) \
 			diff_mod$(MOD_EXT) \
 			outputs_mod$(MOD_EXT) \
 			cc_hex_mod$(MOD_EXT) \
-			mpi_mod$(MOD_EXT)
+			mpi_mod$(MOD_EXT) \
+			pbt_mpi_mod$(MOD_EXT)
 
 .PHONY: mpi # mpi target
 .PHONY: triangle # triangle target
 
-mpi: $(SRC)mpi.f90 $(objects) mpi_mod$(O_EXT)
-	mpifort $(FSWITCHES) $(objects) mpi_mod$(O_EXT) $(SRC)mpi.f90 -o $(MPI_DIR)abt
+mpi: $(SRC)main_mpi.f90 $(objects) mpi_mod$(O_EXT) $(TRI_BIN)triangle # note that mpi_mod points to openmpi module
+	mpifort $(FSWITCHES) $(objects) mpi_mod$(O_EXT) $(SRC)main_mpi.f90 -o $(MPI_DIR)pbt
+
+pbt_mpi_mod$(O_EXT) : $(SRC)pbt_mpi_mod.f90 input_mod$(O_EXT) misc_submod$(O_EXT) beam_loop_mod$(O_EXT) types_mod$(O_EXT) diff_mod$(O_EXT) outputs_mod$(O_EXT) mpi_mod$(O_EXT)
+	$(FC) $(FSWITCHES) -c $(SRC)pbt_mpi_mod.f90
 
 outputs_mod$(O_EXT) : $(SRC)outputs_mod.f90 misc_submod$(O_EXT)
 	$(FC) $(FSWITCHES) -c $(SRC)outputs_mod.f90
@@ -68,4 +73,4 @@ mpi_mod$(O_EXT) : $(SRC)mpi_mod.f90 types_mod$(O_EXT)
 	$(CC) $(CSWITCHES) ./tri/triangle.c -lm -o ./tri/triangle
 
 clean :
-	rm $(objects) $(modules) $(MPI_DIR)abt $(MPI_DIR)mpi_mod$(O_EXT)
+	rm $(objects) $(modules) $(MPI_DIR)pbt $(MPI_DIR)mpi_mod$(O_EXT)
