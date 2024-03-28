@@ -14,6 +14,12 @@ CC = cc # c compiler
 # O_EXT = .obj # windows
 O_EXT = .o # linux
 MOD_EXT = .mod
+# FSWITCHES = -traceback -debug:full -openmp # debug - windows
+# FSWITCHES = -traceback -g -O -qopenmp # debug - linux
+# FSWITCHES = -O3 -fopenmp -ffree-line-length-512 -I 'C:\MinGW\lib\gcc\mingw32\6.3.0\include\' # release - windows
+FSWITCHES = -O3 -fopenmp -fbackslash -ffree-line-length-512 -frecursive -fallow-argument-mismatch # release - linux (cluster)
+# FSWITCHES = -O3 -fopenmp -march=alderlake -ffree-line-length-512 -frecursive -fallow-argument-mismatch # release - linux (Harry's PC)
+# FSWITCHES = -O -Wall -Wtabs -g -fopenmp -ffree-line-length-512 -fallow-argument-mismatch # debug - linux
 
 # objects for sequential code
 objects = 	types_mod$(O_EXT) \

@@ -2,12 +2,16 @@
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Compiling](#compiling)
-3. [Basic Usage](#basic-usage)
-4. [Input Flags](#input-flags)
-5. [Guidelines](#guidelines)
-6. [Examples](#examples)
+- [PBT: Parent Beam Tracer Light Scattering Code](#pbt-parent-beam-tracer-light-scattering-code)
+  - [Table of Contents](#table-of-contents)
+  - [Overview](#overview)
+  - [Compiling](#compiling)
+  - [Basic Usage](#basic-usage)
+  - [Input Flags](#input-flags)
+  - [Guidelines](#guidelines)
+    - [Near Field Computation](#near-field-computation)
+    - [Far Field Computation](#far-field-computation)
+  - [Examples](#examples)
 
 ![image](https://github.com/hballington12/pbt/assets/71540450/b00baa1b-3069-4521-9249-29a457035cd5)
 
@@ -147,13 +151,17 @@ Main source file. It contains the program entry point. The PBT reads input param
 
 - `-output_eulers` - outputs the euler angles used for orientation averaging to a file
 
+- `-fast` - prioritises speed over memory use. This flag is enabled by default.
+
+- `-memory` - prioritises memory use over speed.
+
 ## Guidelines
 
 The computation of the PBT code is basically composed of 2 parts: the near field computation, and the far field computation. The accuracy of each of these steps depends on a few factors, which will be discussed below.
 
 ### Near Field Computation
 
-- The pbt code uses principles of geometric optics to calculate an approximation for the near-field on the particle surface. In order for geometric optics to be valid, **the particle size must be much larger than the wavelength of light**.
+- The pbt code uses principles of geometric optics to calculate an approximation for the near-field on the particle surface. In order for geometric optics to be valid, the particle size must be much larger than the wavelength of light.
 
 - A crucial principal of the near-field computation to be familiar with, is the concept of a *parent*. A parent is defined as a collection of facets which produce 1 reflected (and possibly one refracted) wave with a single propagation direction in the near-field. Each parent is a collection of similar facets in the particle geometry which represent the macroscopic features of the particle. In this way, the pbt maintains accuracy even when the length scale of the local surface becomes comparable to, or smaller than the wavelength. If the user inputs a pre-meshed geometry with the `-cfn` flag, then they should also input an apertures file with the `-afn` flag. The pbt is designed to work with a large number of parents, but not huge numbers. The length scale of each parent should be large when compared with the wavelength. The code has been tested with a few hundred parents, but at this point the near-field computation becomes significantly slower.
 

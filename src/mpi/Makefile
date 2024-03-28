@@ -3,11 +3,7 @@ SRC = ../
 SEQ_DIR =./
 MPI_DIR =./
 
-# FSWITCHES = -traceback -debug:full -openmp # debug - windows
-# FSWITCHES = -traceback -g -O -qopenmp # debug - linux
-# FSWITCHES = -O3 -fopenmp -ffree-line-length-512 -I 'C:\MinGW\lib\gcc\mingw32\6.3.0\include\' # release - windows
-FSWITCHES = -O3 -fopenmp -fbackslash -ffree-line-length-512 -frecursive -fallow-argument-mismatch # release - linux (cluster)
-# FSWITCHES = -O3 -fopenmp -march=alderlake -ffree-line-length-512 -frecursive -fallow-argument-mismatch # release - linux (Harry's PC)
+FSWITCHES = -Ofast -fopenmp -fbackslash -ffree-line-length-512 -fallow-argument-mismatch # release - linux (cluster)
 # FSWITCHES = -O -Wall -Wtabs -g -fopenmp -ffree-line-length-512 -fallow-argument-mismatch # debug - linux
 
 CSWITCHES = -O -DLINUX -I/usr/X11R6/include -L/usr/X11R6/lib

@@ -797,6 +797,11 @@
             else
                 write(10,*)'fast diffraction: disabled'
             end if
+            if(job_params%is_fast) then
+                write(10,*)'speed/memory priority: speed'
+            else
+                write(10,*)'speed/memory priority: memory'
+            end if
             write(10,*)'output directory: "',trim(job_params%output_dir),'/"'
             write(10,*)'temporary files directory: "',trim(job_params%output_dir)//"/tmp/",'"'
 

@@ -168,23 +168,6 @@ do i = 1, num_remaining_orients ! start orientation loop
                             beam_geometry,      & !  -> beam geometry
                             beam_inc)             !  -> incident beam
 
-    if(job_params%debug >= 3) then
-        print*,'computing near-field...'
-        write(101,*)'computing near-field...'
-    end if
-
-    ! beam loop
-    call beam_loop( beam_outbeam_tree,          & !  -> outgoing beams from the beam tracing
-                    beam_outbeam_tree_counter,  & !  -> counts the current number of beam outbeams
-                    ext_diff_outbeam_tree,      & !  -> outgoing beams from external diffraction
-                    output_parameters,          & !  -> adds illuminated geometric cross section to output parameters
-                    job_params,                 & ! <-  job parameters
-                    rotated_geometry,           & ! <-  rotated particle geometry
-                    beam_geometry,              & ! <-  incident beam geometry
-                    beam_inc, &
-                    ampl_far_beam, &
-                    ampl_far_ext_diff)
-
     if(num_remaining_orients > 1 .and. mod(i-1,10) == 0) then ! print progress for this job
         print'(A25,I8,A3,I8,A20,f8.4,A3)','orientations completed: ',i-1,' / ',num_remaining_orients,' (total progress: ',dble(i-1)/dble(num_remaining_orients)*100,' %)'
         if(job_params%debug >= 2) then
@@ -199,10 +182,51 @@ do i = 1, num_remaining_orients ! start orientation loop
         end if
     end if
     
-    if(job_params%debug >= 3) then
-        print*,'computing far-field...'
-        write(101,*)'computing far-field...'
-    end if
+    if(job_params%is_fast) then ! if priority is speed
+
+        if(job_params%debug >= 3) then
+            print*,'computing near-field...'
+            write(101,*)'computing near-field...'
+        end if
+
+        call beam_loop_for_speed( beam_outbeam_tree,          & !  -> outgoing beams from the beam tracing
+        beam_outbeam_tree_counter,  & !  -> counts the current number of beam outbeams
+        ext_diff_outbeam_tree,      & !  -> outgoing beams from external diffraction
+        output_parameters,          & !  -> adds illuminated geometric cross section to output parameters
+        job_params,                 & ! <-  job parameters
+        rotated_geometry,           & ! <-  rotated particle geometry
+        beam_geometry,              & ! <-  incident beam geometry
+        beam_inc)                     ! <-  incident beam
+
+        if(job_params%debug >= 3) then
+            print*,'computing far-field...'
+            write(101,*)'computing far-field...'
+        end if
+
+        ! diffraction
+        call diff_main( beam_outbeam_tree,          & ! <-  outgoing beams from the beam tracing
+                        beam_outbeam_tree_counter,  & ! <-  counts the current number of beam outbeams
+                        ampl_far_beam,              & !  -> amplitude matrix due to beam diffraction
+                        ext_diff_outbeam_tree,      & ! <-  outgoing beams from external diffraction
+                        ampl_far_ext_diff,          & !  -> amplitude matrix due to external diffraction
+                        job_params,                 & ! <-  job parameters
+                        rotated_geometry)             ! <-  rotated particle geometry
+
+    else ! else, if priority is memory
+
+        ! beam loop
+        call beam_loop_for_memory( beam_outbeam_tree,          & !  -> outgoing beams from the beam tracing
+                        beam_outbeam_tree_counter,  & !  -> counts the current number of beam outbeams
+                        ext_diff_outbeam_tree,      & !  -> outgoing beams from external diffraction
+                        output_parameters,          & !  -> adds illuminated geometric cross section to output parameters
+                        job_params,                 & ! <-  job parameters
+                        rotated_geometry,           & ! <-  rotated particle geometry
+                        beam_geometry,              & ! <-  incident beam geometry
+                        beam_inc, &
+                        ampl_far_beam, &
+                        ampl_far_ext_diff)
+
+    end if ! end priority for speed or memory
 
     if(job_params%debug >= 3) then
         print*,'computing mueller matrix and parameters...'

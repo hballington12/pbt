@@ -1623,7 +1623,189 @@ subroutine recursion_ext(beam,geometry,job_params)
         
     end subroutine
     
-    subroutine beam_loop(   beam_outbeam_tree, &
+    subroutine beam_loop_for_speed(   beam_outbeam_tree, &
+        beam_outbeam_tree_counter, &
+        ext_diff_outbeam_tree, &
+        output_parameters, &
+        job_params, &
+        geometry, &
+        beam_geometry, &
+        beam_inc)
+        
+        ! beam_loop
+        ! performs the main beam loop
+        ! to be called from the main program
+        ! for an incident beam and a geometry, this returns the near field
+        !   in the form of the beam_outbeam_tree, as well as the externally
+        !   diffracted near field, in the form of the ext_diff_outbeam_tree
+        
+        ! inputs
+        ! character(100), intent(in) :: afn ! apertures filename
+        type(outbeamtype), dimension(:), allocatable, intent(out) :: beam_outbeam_tree ! outgoing beams from the beam tracing
+        type(outbeamtype), dimension(:), allocatable, intent(out) :: ext_diff_outbeam_tree
+        integer(8), intent(out) :: beam_outbeam_tree_counter ! counts the current number of beam outbeams
+        type(output_parameters_type), intent(inout) :: output_parameters 
+        type(job_parameters_type), intent(in) :: job_params
+        type(geometry_type), intent(in) :: geometry
+        type(geometry_type), intent(in) :: beam_geometry
+        type(beam_type), intent(inout) :: beam_inc
+        
+        real(8) start, finish, start1, finish1 ! cpu timing variables
+        integer(8) j, rec
+        
+        ! new beam tree
+        type(beam_type), dimension(:), allocatable :: beam_tree
+        integer(8) num_beams
+        integer(8) i_start, i_end
+        type(beam_type) beam ! current beam to be traced
+        integer(8) num_threads
+
+        logical done
+        
+        ! init
+        start = 0d0
+        start1 = 0d0
+        finish = 0d0
+        finish1 = 0d0
+        done = .false.
+        output_parameters%abs = 0d0 ! init absorption cross section for this orientation
+        
+        if(job_params%timing) then
+            start = omp_get_wtime()
+        endif
+        
+        if(job_params%debug >= 1) then
+            write(101,*)'start beam loop...'
+        end if
+        
+        beam_outbeam_tree_counter = 0 ! counts the current number of beam outbeams
+        allocate(beam_outbeam_tree(1:1000000)) ! set to 1000000 as guess for max outbeams
+        
+        num_beams = 0 ! total number of beams in the beam tree
+        allocate(beam_tree(1:50000)) ! allocate some space to hold beams to be traced (might need to add more space later)
+        
+        if(job_params%debug >= 2) then
+            write(101,*)'incidence:'
+            if(job_params%timing) then
+                start1 = omp_get_wtime()
+            end if
+        end if
+        
+        call recursion_inc(beam_inc,geometry,job_params,beam_geometry,ext_diff_outbeam_tree) ! do the initial incidence
+
+        if(job_params%debug >= 2) call print_beam_info(beam_inc,job_params) ! print some info about the beam
+
+        call add_to_beam_tree_external(beam_tree,beam_inc,num_beams,geometry,job_params) ! add beams to be propagated to the tree
+
+        call get_geo_cross_section(geometry,beam_inc,output_parameters) ! for the first recursion, get the illuminated geometric cross section
+        
+        if(job_params%timing) then
+            if(job_params%debug >= 2) then
+                finish1 = omp_get_wtime()
+                write(101,*)'======================================'
+                write(101,'(a,f16.8,a)')"incidence - time taken: ",finish1-start1," secs"
+                write(101,*)'======================================'
+            end if
+        end if
+        
+        ! main loop
+        i_start = 1 ! entry in beam tree to start at
+        rec = 0 ! recursion to start at
+        do while (.not. done)
+            rec = rec + 1 ! update the recursion number
+            i_end = num_beams ! entry in beam tree to stop at
+            
+            if(job_params%debug >= 2) then
+                write(101,*)'internal recursion: ',rec
+                if(job_params%timing) then
+                    start1 = omp_get_wtime()
+                end if
+            end if
+            
+            ! get number of threads required
+            if(job_params%is_multithreaded) then ! if multithreading enabled
+                num_threads = min(omp_get_max_threads(),i_end-i_start+1) ! set threads
+            else ! if multithreading disabled
+                num_threads = 1
+            end if
+
+            ! loop over each beam for this recursion
+            !$omp parallel num_threads(num_threads) private(beam)
+            !$omp do
+            do j = i_start, i_end ! for each entry in the beam tree that belongs to this recursion
+                beam = beam_tree(j) ! get a beam from the beam_tree
+                ! propagate this beam
+                if(beam%is_int) then ! if the beam is internally propagating
+                    call recursion_int(beam,geometry,job_params) ! propagate the beam and populate the beam structure
+                    !$omp critical
+                    if(job_params%ibi > 0d0) output_parameters%abs = output_parameters%abs + beam%abs ! udpate absorption cross section for this orientation
+                    if( beam%rec < job_params%rec .or. &
+                    (beam%is_tir .and. beam%refl < job_params%refl)) call add_to_beam_tree_internal(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree (if max recursions hasnt been reached, or if beam was total internal reflection and max total internal reflections hasnt been reached)
+                    !$omp end critical
+                else ! if the beam is externally propagating
+                    call recursion_ext(beam,geometry,job_params) ! propagate the beam and populate the beam structure
+                    !$omp critical
+                    if(beam%rec < job_params%rec) call add_to_beam_tree_external(beam_tree,beam,num_beams,geometry,job_params) ! add beams to be propagated to the tree (if max recursions hasnt been reached)
+                    call add_to_outbeam_tree(beam_outbeam_tree,beam_outbeam_tree_counter,beam,job_params,geometry) ! add outgoing beams to the diffraction tree
+                    !$omp end critical
+                end if ! end: if the beam is internally propagating
+                !$omp critical     
+                beam_tree(beam%id) = beam ! update the information about the propagated beam in the beam tree
+                if(job_params%debug >= 3) call print_beam_info(beam,job_params) ! print some info about the beam
+                !$omp end critical
+            end do ! end: for each entry in the beam tree that belongs to this recursion
+            !$omp end parallel
+            
+            if(job_params%timing) then
+                if(job_params%debug >= 2) then
+                    finish1 = omp_get_wtime()
+                    write(101,*)'======================================'
+                    call print_recursion_info(beam_tree(i_start:i_end),job_params)
+                    write(101,'(a,i3,a,f16.8,a)')"recursion",rec," - time taken: ",finish1-start1," secs"
+                    write(101,*)'======================================'
+                end if
+            end if
+
+            if(i_end == num_beams) done = .true. ! if no beams to be traced are remaining, we are done
+            i_start = i_end + 1 ! update the starting index for the next recursion
+        end do ! end: for each recursion
+        
+        if(job_params%debug >= 1) then
+            if(job_params%timing) then
+                finish = omp_get_wtime()
+                write(101,*)'=========='
+                write(101,'(a,f16.8,a)')"end beam loop - time elapsed: ",finish-start," secs"   
+            end if
+        end if
+        
+        call get_beamtree_vert(beam_outbeam_tree, beam_outbeam_tree_counter,geometry)    
+        
+        call energy_checks( beam_outbeam_tree, &
+        beam_outbeam_tree_counter, &
+        output_parameters, &
+        ext_diff_outbeam_tree, &
+        job_params, &
+        geometry)
+        
+        if(job_params%debug >= 2) then
+            write(101,'(a)')'memory usage breakdown (per mpi process):'
+            write(101,'(a,f8.2,a)')'particle geometry: ',real(sizeof(geometry))/1048576d0,' mb'
+            write(101,'(a,f8.2,a)')'beam tree: ',real(sizeof(beam_tree))/1048576d0,' mb'
+            write(101,'(a,f8.2,a)')'ext. diffraction tree: ',real(sizeof(ext_diff_outbeam_tree))/1048576d0,' mb'
+            write(101,'(a,f8.2,a)')'outbeam tree: ',real(sizeof(beam_outbeam_tree))/1048576d0,' mb'
+            ! write(101,'(a)')'note: this is an underestimate of the total memory usage.'
+            write(101,'(a)')' =========='
+        end if
+        
+        if(job_params%export_beam) then ! if beam exporting enabled
+            if(job_params%debug >= 2) write(101,*)'exporting beam tree...'
+            call open_beam_json(beam_tree(1:num_beams), job_params) ! write beam tree or individual beam to json file
+            if(job_params%debug >= 2) write(101,*)'finished exporting beam tree.'
+        end if
+        
+    end subroutine
+
+    subroutine beam_loop_for_memory(   beam_outbeam_tree, &
         beam_outbeam_tree_counter, &
         ext_diff_outbeam_tree, &
         output_parameters, &
