@@ -304,6 +304,7 @@ job_params%thresh_energy = 1d-4 ! default energy threshold 1d-4
 job_params%export_beam = .false. ! default is do not export the beam
 job_params%refl = 10 ! default is max 10 total internal reflections
 job_params%is_fast_diff = .false. ! default is no fast diffraction
+job_params%is_fast = .true. ! default is to prioritise speed
 
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'
@@ -819,6 +820,14 @@ do while (i .lt. command_argument_count()) ! looping over command line args
         case ('-fast_diff')
             ! print*,'fast diffraction: enabled'
             job_params%is_fast_diff = .true.
+
+        case ('-fast')
+            ! print*,'prioritising for speed or memory: speed'
+            job_params%is_fast = .true.
+
+        case ('-memory')
+            ! print*,'prioritising for speed or memory: memory'
+            job_params%is_fast = .false.
 
         case ('-tri')
             ! print*,'found command line specifier "mt"'
