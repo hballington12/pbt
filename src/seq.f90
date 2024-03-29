@@ -105,12 +105,6 @@ if (job_params%tri) then ! if triangulation enabled
     ! call fix_collinear_vertices(vert_in, face_ids, num_vert, num_face, num_face_vert, apertures)
 end if
 
-call make_bvh(job_params,geometry) ! make bounding volume hierarchy
-
-! call test_bvh(job_params,geometry)
-
-call export_bvh(geometry%bvh,job_params%output_dir) ! export bounding bolume hierarchy
-
 ! write geometry info to log file
 call write_geometry_info(geometry)
 
@@ -169,6 +163,12 @@ do i = 1, num_remaining_orients ! start orientation loop
                     rotated_geometry)         ! <-  geometry
     end if
 
+    call make_bvh(job_params,rotated_geometry) ! make bounding volume hierarchy (should probably move this to the unrotated particle later)
+
+    ! call test_bvh(job_params,rotated_geometry)
+    
+    call export_bvh(rotated_geometry%bvh,job_params%output_dir) ! export bounding bolume hierarchy
+    
     ! fast implementation of the incident beam
     call make_incident_beam(rotated_geometry,   & ! <-  geometry
                             beam_geometry,      & !  -> beam geometry

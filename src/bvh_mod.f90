@@ -10,7 +10,7 @@ module bvh_mod
 
     contains 
 
-    subroutine cast_ray(r,o,cid_start,geometry,intsct,fi)
+    subroutine cast_ray(r,o,cid_start,geometry,intsct,fi,mask)
 
         ! sr cast_ray
         ! overview:
@@ -19,6 +19,7 @@ module bvh_mod
         ! geometry is the geometry data strucure, which contains the bvh
         ! intsct returns true if an intersection is found, and false if the ray is outgoing
         ! fi returns the face index of the intersection if an intersection is found, otherwise returns 0
+        ! mask is an optional logical array - if mask(i) is false, then facet i is excluded from the intersection check
         ! provides several times speedup over searching all facets
         ! this is done by utilising the bvh to reduce the number of facets that need to be looked at        
 
@@ -28,6 +29,7 @@ module bvh_mod
         integer(8), intent(in) :: cid_start ! starting cell id
         logical, intent(out) :: intsct ! whether or not an intersection was found
         integer(8), intent(out) :: fi ! intersected facet id
+        logical, dimension(:), allocatable, intent(in), optional :: mask ! logical array of facets to ignore
 
         logical done ! whether or not we are done
         integer(8) i, j ! counters
@@ -61,7 +63,7 @@ module bvh_mod
             cell = geometry%bvh%depth(di)%cell(ci) ! get cell from bvh
             cid = cell%id ! get cell id
             intsct = .false. ! reset
-            ! print*,'cell:',cell%id,'parent=',cell%pid
+            ! print*,'cell:',cell%id,'parent=',cell%pid,'nch',cell%nch
             if(cell%nch > 0) then ! if cell has childeren
                 do i = 1, cell%nch ! for each child cell
                     chid = cell%chid(i) ! get child cell id
@@ -101,14 +103,30 @@ module bvh_mod
                     j = 0 ! init counter for number of intersections found
                     do i = 1, size(cell%fi(:),1) ! for each face inside this cell
                         ! look for intersection with this facet
-                        call ray_polygon_intersection_check(geometry%v(geometry%f(cell%fi(i))%vi(:),:), &
-                                                            geometry%f(cell%fi(i))%evec(:,:), &
-                                                            geometry%n(geometry%f(cell%fi(i))%ni,:), &
-                                                            r(:), o(:), intsct, dist)
-                        if(intsct) then ! if ray intersected with this face
-                            j = j + 1 ! update counter
-                            distances(j) = dist ! save distance to intersection
-                            fis(j) = cell%fi(i) ! save facet id
+                        if(present(mask)) then ! if mask present
+                            if(mask(cell%fi(i)) .eqv. .false.) then ! if this facet is masked
+                                ! no check
+                            else ! else, if this facet is unmasked
+                                call ray_polygon_intersection_check(geometry%v(geometry%f(cell%fi(i))%vi(:),:), &
+                                geometry%f(cell%fi(i))%evec(:,:), &
+                                geometry%n(geometry%f(cell%fi(i))%ni,:), &
+                                r(:), o(:), intsct, dist)
+                                if(intsct) then ! if ray intersected with this face
+                                j = j + 1 ! update counter
+                                distances(j) = dist ! save distance to intersection
+                                fis(j) = cell%fi(i) ! save facet id
+                                end if
+                            end if
+                        else ! else, if no mask present
+                            call ray_polygon_intersection_check(geometry%v(geometry%f(cell%fi(i))%vi(:),:), &
+                                                                geometry%f(cell%fi(i))%evec(:,:), &
+                                                                geometry%n(geometry%f(cell%fi(i))%ni,:), &
+                                                                r(:), o(:), intsct, dist)
+                            if(intsct) then ! if ray intersected with this face
+                                j = j + 1 ! update counter
+                                distances(j) = dist ! save distance to intersection
+                                fis(j) = cell%fi(i) ! save facet id
+                            end if
                         end if
                     end do
                     if (j == 0) then ! if no intersection found
@@ -303,13 +321,13 @@ module bvh_mod
         !   or until the cells can no longer be subdivided without having less than 3 vertices in a cell
 
         integer(8), parameter :: max_depth = 20 ! must be 1 or greater
-        integer(8), parameter :: max_num_verts = 4096 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 4096 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 2048 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 1024 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 512 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 256 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 128 ! must be 3 or greater
-        ! integer(8), parameter :: max_num_verts = 64 ! must be 3 or greater
+        integer(8), parameter :: max_num_verts = 64 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 32 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 16 ! must be 3 or greater
         ! integer(8), parameter :: max_num_verts = 8 ! must be 3 or greater
@@ -880,6 +898,7 @@ module bvh_mod
         bvh%depth(1)%cell(1)%id = 1 ! first cell has id 1
         bvh%depth(1)%cell(1)%pid = 0 ! first cell has no parent
         bvh%depth(1)%cell(1)%pi = 0 ! first cell has no parent
+        bvh%depth(1)%cell(1)%nch = 0 ! initialise with no children
         bvh%depth(1)%cell(1)%nv = geometry%nv ! first cell contains all vertices
         allocate(bvh%depth(1)%cell(1)%vi(1:geometry%nv)) ! allocate array to hold all vertex ids
         do i = 1, geometry%nv ! for each vertex

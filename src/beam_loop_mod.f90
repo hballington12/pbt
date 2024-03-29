@@ -6,6 +6,7 @@ module beam_loop_mod
     use misc_submod
     use types_mod
     use omp_lib
+    use bvh_mod
     
     implicit none
     
@@ -563,6 +564,7 @@ module beam_loop_mod
         real(8) rot2(1:2,1:2) ! a 2x2 rotation matrix
         logical, dimension(:), allocatable :: is_shad ! whether each facet was in the shadow of another
         logical, dimension(:), allocatable :: in_beam ! whether each facet was within the beam
+        logical, dimension(:), allocatable :: in_beam2 ! whether each facet was within the beam
         integer(8), dimension(:), allocatable :: id_beam ! the facet id of the beam face which illuminated each facet
         real(8), dimension(:), allocatable :: dist_beam ! the distance from the beam to each facet
         real(8) prop(1:3) ! incoming propagation direction in unrotated system
@@ -596,19 +598,47 @@ module beam_loop_mod
         real(8) int_intensity ! internal intensitiy
         real(8) ext_intensity ! external intensitiy        
         real(8) norm(1:3) ! a facet normal
+        integer(8) cid_start, ci, di, fi ! starting cell id, cell index, and depth index
+        logical intsct
+        logical, dimension(:), allocatable :: mask
+        real(8) start, finish
         
         waveno = 2*pi/job_params%la ! wavenumber
         rbi_int = job_params%rbi ! real part refractive index
         ibi_int = job_params%ibi ! imaginary part refractive index
         m_int = cmplx(rbi_int,ibi_int,kind=8) ! refractive index
         m_ext = cmplx(1d0,0d0,kind=8) ! external refractive index
+        call cpu_time(start)
         
         ! rotate geometry so that the propagation is along the z-axis, save the rotation matrix
         call rotate(beam,geometry,rot_geometry,rot)
         
         ! find the facets illuminated by the beam
         call find_vis_int(in_beam, dist_beam, id_beam, is_shad, beam, rot_geometry)
-        
+        call cpu_time(finish)
+        print*,'time taken',finish-start
+        allocate(in_beam2(1:rot_geometry%nf))
+        allocate(mask(1:rot_geometry%nf))
+        mask = .false.
+        do i = 1, beam%nf_in
+            print*,'beam facets',beam%field_in(i)%fi
+            mask(beam%field_in(i)%fi) = .true.
+        end do
+
+        print*,'facet #','is vis (old)','is vis (ray cast)'
+        call cpu_time(start)
+        do i = 1, rot_geometry%nf
+            di = geometry%bvh%fp(i)%di
+            ci = geometry%bvh%fp(i)%ci
+            cid_start = geometry%bvh%depth(di)%cell(ci)%id
+            call cast_ray(-beam%prop(:),geometry%f(i)%mid(:),cid_start,geometry,intsct,fi,mask)
+            ! if(in_beam(i) .or. intsct) then
+            !     print*,i,in_beam(i),beam%field_in(id_beam(i))%fi,intsct,fi
+            ! end if
+        end do
+        call cpu_time(finish)
+        print*,'time taken',finish-start
+        stop
         ! get the total number of facets illuminated by this beam
         num_ill_facets = 0
         do i = 1, rot_geometry%na
