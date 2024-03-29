@@ -10,27 +10,110 @@ module bvh_mod
 
     contains 
 
+    subroutine test(v)
+
+        real(8), dimension(:,:), intent(in) :: v
+
+        print*,'number of vertices',size(v,1)
+
+    end subroutine
+
+    subroutine ray_polygon_intersection_check(v,e,n,r,o,intsct,d)
+
+        real(8), dimension(:,:), intent(in) :: v ! polygon vertices, N x 3, ordered anti-clockwise from outside
+        real(8), dimension(:,:), intent(in) :: e ! polygon edge vectors, N x 3, ordered anti-clockwise from outside
+        real(8), intent(in) :: n(1:3) ! polygon normal, facing outwards
+        real(8), intent(in) :: r(1:3) ! ray propagation direction
+        real(8), intent(in) :: o(1:3) ! ray origin
+        real(8), intent(out) :: d
+        logical, intent(out) :: intsct ! whether or not there was an intersection
+
+        integer nv, i, j
+        real(8) rdotn
+        ! real(8) d
+        real(8) p(1:3) ! vector to intersection with plane
+        real(8) rr(1:3) ! vector from vertex to intersection with plane
+        real(8) en(1:3) ! edge normal vector
+
+        intsct = .false. ! init
+        nv = size(v,1) ! get number of vertices in polygon
+        rdotn = dot_product(r(:),n(:)) ! dot product of ray and polygon normal
+        d = dot_product(v(1,:)-o(:),n(:)) / rdotn ! get signed distance to plane intersection
+        if(d > 1d-6) then ! if intersection is in forwards direction
+            j = 0 ! init counter
+            p(:) = d*r(:) + o(:) ! vector to intersection with plane
+            do i = 1, nv ! for each vertex in polygon
+                call cross(e(i,:),n(:),en(:),.false.) ! get en, the edge normal
+                rr(:) = p(:) - v(i,:) ! get vector from vertex to intersection with plane
+                if(dot_product(en(:),rr(:)) <= 0d0) j = j + 1 ! if edge check was true
+            end do
+            if(j == nv) then ! if edge check was true for all edges
+                print*,'intersection found' ! intersection was within bounded polygon
+                intsct = .true.
+            end if
+        end if
+
+    end subroutine
+
+    subroutine bvh_cell_intersection_check(cell,ray_origin,ray,intersection)
+        type(bvh_cell_type), intent(in) :: cell
+        real(8), intent(in) :: ray_origin(1:3)
+        real(8), intent(in) :: ray(1:3)
+        logical, intent(out) :: intersection
+    
+        integer :: i, j
+        real(8) :: dist
+        real(8) :: ray_dot_normal
+        real(8) :: vec_to_intersection(1:3) ! vector position of intersection
+        real(8) :: v1(3), v2(3), n(3), p(3), w(3), m(3)
+        integer :: counter
+
+        ! modify this subroutine so that the intersection check is 
+
+        print*,'--------------------------------'
+        print*,'start cell intersection check... cell id=',cell%id
+
+        intersection = .false.
+    
+        do i = 1, 6 ! for each face in the cell
+
+            call ray_polygon_intersection_check(cell%f(i)%v(:,:),cell%f(i)%e(:,:),cell%f(i)%c(1:3),ray(:),ray_origin(:),intersection, dist)
+            if(intersection) exit
+
+        end do
+
+    end subroutine bvh_cell_intersection_check
+    
+    
     subroutine test_bvh(job_params,geometry)
 
         type(job_parameters_type), intent(in) :: job_params
         type(geometry_type), intent(in) :: geometry
 
-        type(bvh_cell_type) cell
-        integer(8) fi, i, j, pid, di, ci, cid, chid
+        type(bvh_cell_type) cell, child_cell
+        integer(8) fi, i, pid, di, ci, cid, chid, nf
+        integer j
         real(8) vec(1:3), ray_origin(1:3)
+        real(8) dist
         logical done
         logical intersection
         logical, dimension(:), allocatable :: checked
+        integer(8), dimension(:), allocatable :: fis ! facet ids which found intersection
+        real(8), dimension(:), allocatable :: distances ! distances to facet ids with intersection
 
         print*,'testing bvh...'
 
+        ! init
         allocate(checked(1:geometry%bvh%nc_total))
+        allocate(fis(1:geometry%nf))
+        allocate(distances(1:geometry%nf))
+        print*,'geometry%bvh%nc_total',geometry%bvh%nc_total
         checked(:) = .false. ! init
 
-        fi = 2000 ! start facet
+        fi = 2010 ! start facet
         print*,'start facet is:',fi
 
-        vec(:) = (/1,2,3/)
+        vec(:) = (/-1,0,0/)
         call normalise_vec(vec)
         print*,'propagation direction is:',vec(:)
 
@@ -40,8 +123,8 @@ module bvh_mod
         ! find cell in which the ray originates
         di = geometry%bvh%fp(fi)%di
         ci = geometry%bvh%fp(fi)%ci
-        print*,'di',di
-        print*,'ci',ci
+        print*,'starting cell depth index: di',di
+        print*,'starting cell cell index: ci',ci
         cell = geometry%bvh%depth(di)%cell(ci)
         cid = cell%id
         print*,'smallest cell containing this point is cell id:',cid,'at depth:',di
@@ -49,18 +132,42 @@ module bvh_mod
         ! cast ray
         done = .false.
         do while (.not. done)
+            print*,'======================'
             cell = geometry%bvh%depth(di)%cell(ci)
-            print*,'cell:',cell%id
+            cid = cell%id
+            intersection = .false. ! reset
+            print*,'cell:',cell%id,'parent=',cell%pid
+            print*,'cell vertices (x):',celL%xmin,cell%xmax
+            print*,'cell vertices (y):',celL%ymin,cell%ymax
+            print*,'cell vertices (z):',celL%zmin,cell%zmax
             if(cell%nch > 0) then ! if cell has childeren
-                print*,'cell has children: checking for intersection with children'
+                print*,'cell has,',cell%nch,' children: checking for intersection with children',cell%chid(:)
                 do i = 1, cell%nch ! for each child cell
                     chid = cell%chid(i)
-                    print*,'child id: ',chid
-                    ! if(.not. checked(cell))
+                    print*,'child:',cell%chid(i),'checked?',checked(chid)
+                    if(.not. checked(chid)) then
+                        print*,'checking for intersection with child cell id: ',chid
+                        ! insert cell intersection check -> outcome: intersection
+                        print*,'child id has position, depth=',geometry%bvh%cp(chid)%di,'cell index=',geometry%bvh%cp(chid)%ci
+                        child_cell = geometry%bvh%depth(geometry%bvh%cp(chid)%di)%cell(geometry%bvh%cp(chid)%ci)
+                        call bvh_cell_intersection_check(child_cell,ray_origin(:),vec(:),intersection)
+                    else
+                        print*,'this cell has already been checked'
+                    end if
+
+                    if(intersection) then
+                        exit ! break out the do loop if intersection found, could sort by distance at a later date...
+                    else
+                        checked(cid) = .true. ! if no intersection, cell has been checked
+                    end if
+
                 end do
                 ! check and sort intersection with unchecked children
                 if(intersection) then
                     ! traverse down
+                    print*,'traversing down...'
+                    di = geometry%bvh%cp(chid)%di
+                    ci = geometry%bvh%cp(chid)%ci
                 else
                     if(cell%id /= 1) then ! if not root cell
                         print*,'no intersection with unchecked children. traversing up...'
@@ -79,14 +186,33 @@ module bvh_mod
                 if(checked(cid)) then ! if cell has been checked
                     print*,'this cell has already been checked'
                     ! traverse up
-                    done = .true. ! temp stop
+                    pid = geometry%bvh%depth(di)%cell(ci)%pid
+                    print*,'parent id is:',pid,'at depth:',geometry%bvh%cp(pid)%di,'cell index:',geometry%bvh%cp(pid)%ci
+                    di = geometry%bvh%cp(pid)%di
+                    ci = geometry%bvh%cp(pid)%ci
+                    ! done = .true. ! temp stop
                 else ! if cell has not been checked
                     print*,'cell has not been checked. checking...'
                     ! check for geometry intersection
-                    if(intersection) then ! if intersected with geometry
-                        print*,'found intersection with geometry'
-                        done = .true.
-                    else ! if no intersection with geometry
+                    print*,'=== perform geometry intersection check for cell',cell%id,' ==='
+                    ! insert check with geometry in cell here
+                    nf = size(cell%fi(:),1)
+                    print*,'number of faces inside this cell:',nf
+                    j = 0 ! init counter for number of intersections found
+                    do i = 1, nf ! for each face inside this cell
+                        ! print*,'vertices for this face are:',geometry%v(geometry%f(cell%fi(i))%vi(:),:)
+                        call ray_polygon_intersection_check(geometry%v(geometry%f(cell%fi(i))%vi(:),:), &
+                                                            geometry%f(cell%fi(i))%evec(:,:), &
+                                                            geometry%n(geometry%f(cell%fi(i))%ni,:), &
+                                                            vec(:), ray_origin(:), intersection, dist)
+                        if(intersection) then
+                            ! print*,'found intersection with facet ',cell%fi(i),'!!!'
+                            j = j + 1 ! update counter
+                            distances(j) = dist ! distance to intersection
+                            fis(j) = cell%fi(i) ! save facet id
+                        end if
+                    end do
+                    if (j == 0) then ! if no intersection found
                         if(cell%id /= 1) then ! if not root cell
                             print*,'no intersection. traversing up...'
                             checked(cid) = .true.
@@ -96,10 +222,16 @@ module bvh_mod
                             di = geometry%bvh%cp(pid)%di
                             ci = geometry%bvh%cp(pid)%ci
                         else ! if root cell
-                            print*,'no intersection at cell root. stopping...'
+                            print*,'no intersection and at cell root. stopping...'
                             done = .true. ! temp stop
                         end if
+                    else if(j == 1) then ! if 1 intersection found
+                        print*,'ending... intersection found with facet',fis(1),'distance travelled to intersection:',distances(1)
+                        done = .true.
+                    else ! if more than 1 intersection found, find location of shortest distance
+                        print*,'closest facet intersection was:',fis(minloc(distances(1:j)))
                     end if
+
                 end if
 
 
@@ -126,7 +258,7 @@ module bvh_mod
         !   or until a maximum number of vertices in each cell is less than a threshold number,
         !   or until the cells can no longer be subdivided without having less than 3 vertices in a cell
 
-        integer(8), parameter :: max_depth = 10 ! must be 1 or greater
+        integer(8), parameter :: max_depth = 6 ! must be 1 or greater
         integer(8), parameter :: max_num_verts = 3 ! must be 3 or greater
 
         type(job_parameters_type), intent(in) :: job_params
@@ -195,6 +327,11 @@ module bvh_mod
                     if(.not. success) call split_cell(geometry,bvh%depth(i-1)%cell(j),mod(dim+1,3),cell_a,cell_b,success)
                     if(.not. success) call split_cell(geometry,bvh%depth(i-1)%cell(j),mod(dim+2,3),cell_a,cell_b,success)
                     if(success) then ! if successfully split the cell
+                        ! assign cell ids
+                        nc_total = nc_total + 1
+                        cell_a%id = nc_total
+                        nc_total = nc_total + 1
+                        cell_b%id = nc_total
                         ! allocate space to hold the children cell ids
                         allocate(bvh%depth(i-1)%cell(j)%chid(1:2)) ! cell has 2 children
                         bvh%depth(i-1)%cell(j)%nch = 2 ! cell has 2 children
@@ -203,11 +340,6 @@ module bvh_mod
                         ! shrink the cells
                         call shrink_cell(cell_a,geometry)
                         call shrink_cell(cell_b,geometry)
-                        ! assign cell ids
-                        nc_total = nc_total + 1
-                        cell_a%id = nc_total
-                        nc_total = nc_total + 1
-                        cell_b%id = nc_total
                         ! add the cells to this depth
                         bvh%depth(i)%cell(2*k-1) = cell_a
                         bvh%depth(i)%cell(2*k) = cell_b
@@ -253,6 +385,7 @@ module bvh_mod
 
         if(job_params%debug >= 2) write(101,*) 'bvh actual max depth:',actual_max_depth
         if(job_params%debug >= 2) write(101,*) 'bvh total cells:',nc_total
+        geometry%bvh%nc_total = nc_total
 
         ! also add information about the facets with vertices in each cell
         ! first, get a mapping for each vertex that connects it with the facets
@@ -327,6 +460,75 @@ module bvh_mod
                 end do
             end do
             ! print*,'smallest cell containing the midpoint of facet:',i,'was at depth:',geometry%bvh%fp(i)%di,'and cell index:',geometry%bvh%fp(i)%ci
+        end do
+
+        ! make the bvh faces
+        do i = 1, size(geometry%bvh%depth(:),1) ! for each level of depth in the bvh
+            do j = 1, size(geometry%bvh%depth(i)%cell(:),1) ! for each cell at this depth
+                cell = geometry%bvh%depth(i)%cell(j) ! get cell
+                ! make faces (bit messy)
+                ! plane coefficients
+                cell%f(1)%c(1:4) = (/0d0,-1d0,0d0,cell%ymin/)
+                cell%f(2)%c(1:4) = (/0d0,0d0,1d0,cell%zmax/)
+                cell%f(3)%c(1:4) = (/1d0,0d0,0d0,cell%xmax/)
+                cell%f(4)%c(1:4) = (/-1d0,0d0,0d0,cell%xmin/)
+                cell%f(5)%c(1:4) = (/0d0,0d0,-1d0,cell%zmin/)
+                cell%f(6)%c(1:4) = (/0d0,1d0,0d0,cell%ymax/)
+                ! vertices
+                cell%f(1)%v(1,1:3) = (/cell%xmax,cell%ymin,cell%zmin/)
+                cell%f(1)%v(2,1:3) = (/cell%xmin,cell%ymin,cell%zmin/)
+                cell%f(1)%v(3,1:3) = (/cell%xmax,cell%ymin,cell%zmax/)
+                cell%f(1)%v(4,1:3) = (/cell%xmin,cell%ymin,cell%zmax/)
+                cell%f(2)%v(1,1:3) = (/cell%xmin,cell%ymin,cell%zmax/)
+                cell%f(2)%v(2,1:3) = (/cell%xmax,cell%ymin,cell%zmax/)
+                cell%f(2)%v(3,1:3) = (/cell%xmax,cell%ymax,cell%zmax/)
+                cell%f(2)%v(4,1:3) = (/cell%xmin,cell%ymax,cell%zmax/)
+                cell%f(3)%v(1,1:3) = (/cell%xmax,cell%ymin,cell%zmax/)
+                cell%f(3)%v(2,1:3) = (/cell%xmax,cell%ymin,cell%zmin/)
+                cell%f(3)%v(3,1:3) = (/cell%xmax,cell%ymax,cell%zmin/)
+                cell%f(3)%v(4,1:3) = (/cell%xmax,cell%ymax,cell%zmax/)
+                cell%f(4)%v(1,1:3) = (/cell%xmin,cell%ymin,cell%zmin/)
+                cell%f(4)%v(2,1:3) = (/cell%xmin,cell%ymin,cell%zmax/)
+                cell%f(4)%v(3,1:3) = (/cell%xmin,cell%ymax,cell%zmax/)
+                cell%f(4)%v(4,1:3) = (/cell%xmin,cell%ymax,cell%zmin/)
+                cell%f(5)%v(1,1:3) = (/cell%xmin,cell%ymin,cell%zmin/)
+                cell%f(5)%v(2,1:3) = (/cell%xmin,cell%ymax,cell%zmin/)
+                cell%f(5)%v(3,1:3) = (/cell%xmax,cell%ymax,cell%zmin/)
+                cell%f(5)%v(4,1:3) = (/cell%xmax,cell%ymin,cell%zmin/)
+                cell%f(6)%v(1,1:3) = (/cell%xmax,cell%ymax,cell%zmax/)
+                cell%f(6)%v(2,1:3) = (/cell%xmax,cell%ymax,cell%zmin/)
+                cell%f(6)%v(3,1:3) = (/cell%xmin,cell%ymax,cell%zmin/)
+                cell%f(6)%v(4,1:3) = (/cell%xmin,cell%ymax,cell%zmax/)
+                ! edge vectors
+                cell%f(1)%e(1,1:3) = cell%f(1)%v(2,1:3) - cell%f(1)%v(1,1:3)
+                cell%f(1)%e(2,1:3) = cell%f(1)%v(3,1:3) - cell%f(1)%v(2,1:3)
+                cell%f(1)%e(3,1:3) = cell%f(1)%v(4,1:3) - cell%f(1)%v(3,1:3)
+                cell%f(1)%e(4,1:3) = cell%f(1)%v(1,1:3) - cell%f(1)%v(4,1:3)
+                cell%f(2)%e(1,1:3) = cell%f(2)%v(2,1:3) - cell%f(2)%v(1,1:3)
+                cell%f(2)%e(2,1:3) = cell%f(2)%v(3,1:3) - cell%f(2)%v(2,1:3)
+                cell%f(2)%e(3,1:3) = cell%f(2)%v(4,1:3) - cell%f(2)%v(3,1:3)
+                cell%f(2)%e(4,1:3) = cell%f(2)%v(1,1:3) - cell%f(2)%v(4,1:3)
+                cell%f(3)%e(1,1:3) = cell%f(3)%v(2,1:3) - cell%f(3)%v(1,1:3)
+                cell%f(3)%e(2,1:3) = cell%f(3)%v(3,1:3) - cell%f(3)%v(2,1:3)
+                cell%f(3)%e(3,1:3) = cell%f(3)%v(4,1:3) - cell%f(3)%v(3,1:3)
+                cell%f(3)%e(4,1:3) = cell%f(3)%v(1,1:3) - cell%f(3)%v(4,1:3)
+                cell%f(4)%e(1,1:3) = cell%f(4)%v(2,1:3) - cell%f(4)%v(1,1:3)
+                cell%f(4)%e(2,1:3) = cell%f(4)%v(3,1:3) - cell%f(4)%v(2,1:3)
+                cell%f(4)%e(3,1:3) = cell%f(4)%v(4,1:3) - cell%f(4)%v(3,1:3)
+                cell%f(4)%e(4,1:3) = cell%f(4)%v(1,1:3) - cell%f(4)%v(4,1:3)
+                cell%f(5)%e(1,1:3) = cell%f(5)%v(2,1:3) - cell%f(5)%v(1,1:3)
+                cell%f(5)%e(2,1:3) = cell%f(5)%v(3,1:3) - cell%f(5)%v(2,1:3)
+                cell%f(5)%e(3,1:3) = cell%f(5)%v(4,1:3) - cell%f(5)%v(3,1:3)
+                cell%f(5)%e(4,1:3) = cell%f(5)%v(1,1:3) - cell%f(5)%v(4,1:3)
+                cell%f(6)%e(1,1:3) = cell%f(6)%v(2,1:3) - cell%f(6)%v(1,1:3)
+                cell%f(6)%e(2,1:3) = cell%f(6)%v(3,1:3) - cell%f(6)%v(2,1:3)
+                cell%f(6)%e(3,1:3) = cell%f(6)%v(4,1:3) - cell%f(6)%v(3,1:3)
+                cell%f(6)%e(4,1:3) = cell%f(6)%v(1,1:3) - cell%f(6)%v(4,1:3)
+
+                print*,'cell id:',cell%id,'children id:',cell%chid(:)
+
+                geometry%bvh%depth(i)%cell(j) = cell
+            end do
         end do
 
         if(job_params%debug >= 2) write(101,*)'finished making bvh'

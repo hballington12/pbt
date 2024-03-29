@@ -107,6 +107,8 @@ end if
 
 call make_bvh(job_params,geometry) ! make bounding volume hierarchy
 
+call test_bvh(job_params,geometry)
+
 call export_bvh(geometry%bvh,job_params%output_dir) ! export bounding bolume hierarchy
 
 ! write geometry info to log file

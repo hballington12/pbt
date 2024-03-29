@@ -171,10 +171,17 @@ type aperture_type
     integer(8) nf ! number of faces in this aperture
 end type aperture_type
 
+type bvh_face_type
+    real(8) c(1:4) ! plane coefficients 1 to 3
+    real(8) v(1:4,1:3) ! vertices
+    real(8) e(1:4,1:3) ! edge vectors
+end type bvh_face_type
+
 type bvh_cell_type
     ! bvh cell type: contains information about a bounding volume hierarchy cell
     integer(8) id ! cell id
     integer(8) pid ! parent cell id
+    integer(8) pi ! parent index in the branch above
     integer(8) nv ! number of vertices in cell
     integer(8), dimension(:), allocatable :: vi ! vertices in cell ids
     integer(8) nf ! number of facets in cell
@@ -186,17 +193,29 @@ type bvh_cell_type
     real(8) ymin ! cell min y coordinate
     real(8) ymax ! cell max y coordinate
     real(8) zmin ! cell min z coordinate
-    real(8) zmax ! cell max z coordinate   
+    real(8) zmax ! cell max z coordinate
+    type(bvh_face_type) f(1:6) ! 6 faces for each cell
 end type bvh_cell_type
 
 type bvh_depth_type
     ! bvh depth type: contains information about a bounding volume hierarchy depth
     type(bvh_cell_type), dimension(:), allocatable :: cell
+    integer(8) nc ! number of cells at this depth
 end type bvh_depth_type
+
+type bvh_cell_pointer_type
+    ! bvh f pointer type: points to the location of a facet midpoint in the bvh
+    integer(8) di ! depth index
+    integer(8) ci ! cell index
+end type bvh_cell_pointer_type
 
 type bvh_type
     ! bvh type: contains information about the bounding volume hierarchy
-    type(bvh_depth_type), dimension(:), allocatable :: depth
+    type(bvh_depth_type), dimension(:), allocatable :: depth ! a depth level in the bvh
+    type(bvh_cell_pointer_type), dimension(:), allocatable :: fp ! points to the cell location of each facet midpoint in the bvh
+    type(bvh_cell_pointer_type), dimension(:), allocatable :: cp ! points to the cell location in the bvh based on id
+    integer(8) nd ! number of depths
+    integer(8) nc_total ! total number of cells
 end type bvh_type 
 
 type geometry_type
