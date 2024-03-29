@@ -107,7 +107,7 @@ end if
 
 call make_bvh(job_params,geometry) ! make bounding volume hierarchy
 
-call test_bvh(job_params,geometry)
+! call test_bvh(job_params,geometry)
 
 call export_bvh(geometry%bvh,job_params%output_dir) ! export bounding bolume hierarchy
 
@@ -118,7 +118,7 @@ call write_geometry_info(geometry)
 call PDAS(  job_params%output_dir,  & ! <-  output directory
             "unrotated",            & ! <-  filename
             geometry)                 ! <-  geometry
-stop
+! stop
 call RANDOM_SEED(put=seed) ! Set the seed for the random number generator
 ! initialise the euler angles to be used
 call init_loop( alpha_vals, &

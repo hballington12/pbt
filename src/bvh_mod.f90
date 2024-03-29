@@ -10,11 +10,133 @@ module bvh_mod
 
     contains 
 
-    subroutine test(v)
+    subroutine cast_ray(r,o,cid_start,geometry,intsct,fi)
 
-        real(8), dimension(:,:), intent(in) :: v
+        ! sr cast_ray
+        ! overview:
+        ! casts a ray with propagation direction r from ray starting coordinate o
+        ! cid_start specifies the cell in which the ray starts
+        ! geometry is the geometry data strucure, which contains the bvh
+        ! intsct returns true if an intersection is found, and false if the ray is outgoing
+        ! fi returns the face index of the intersection if an intersection is found, otherwise returns 0
+        ! provides several times speedup over searching all facets
+        ! this is done by utilising the bvh to reduce the number of facets that need to be looked at        
 
-        print*,'number of vertices',size(v,1)
+        real(8), intent(in) :: r(1:3) ! ray propagation direction
+        real(8), intent(in) :: o(1:3) ! ray origin
+        type(geometry_type), intent(in) :: geometry ! geoemtry structure
+        integer(8), intent(in) :: cid_start ! starting cell id
+        logical, intent(out) :: intsct ! whether or not an intersection was found
+        integer(8), intent(out) :: fi ! intersected facet id
+
+        logical done ! whether or not we are done
+        integer(8) i, j ! counters
+        integer(8) pid ! a parent cell id
+        integer(8) di ! a depth index (1 to number of depth levels in bvh)
+        integer(8) ci ! a cell index (1 to number of cells at current depth)
+        integer(8) chid ! a child cell id
+        integer(8) cid ! a cell id
+        type(bvh_cell_type) cell, child_cell ! a cell, a child cell
+        logical, dimension(:), allocatable :: checked ! whether or not this cell has been checked
+        real(8) dist ! a distance to an intersection
+        integer(8), dimension(:), allocatable :: fis ! facet ids which found intersection
+        real(8), dimension(:), allocatable :: distances ! distances to facet ids with intersection
+
+        ! initialise
+        allocate(checked(1:geometry%bvh%nc_total))
+        allocate(fis(1:geometry%nf))
+        allocate(distances(1:geometry%nf))
+        checked(:) = .false.
+        fi = 0
+        intsct = .false.
+
+        ! cast ray
+        ! input: ray direction, ray origin, origin cell id
+        ! output: intersection, facet id
+        cid = cid_start ! starting cell
+        di = geometry%bvh%cp(cid)%di ! get the depth of this cell
+        ci = geometry%bvh%cp(cid)%ci ! get the cell index of this cell
+        done = .false. ! init
+        do while (.not. done) ! do while not finished casting ray
+            cell = geometry%bvh%depth(di)%cell(ci) ! get cell from bvh
+            cid = cell%id ! get cell id
+            intsct = .false. ! reset
+            ! print*,'cell:',cell%id,'parent=',cell%pid
+            if(cell%nch > 0) then ! if cell has childeren
+                do i = 1, cell%nch ! for each child cell
+                    chid = cell%chid(i) ! get child cell id
+                    if(.not. checked(chid)) then ! if child cell has not been checked
+                        child_cell = geometry%bvh%depth(geometry%bvh%cp(chid)%di)%cell(geometry%bvh%cp(chid)%ci) ! get child cell
+                        call bvh_cell_intersection_check(child_cell,o(:),r(:),intsct) ! see if the ray passes through this cell
+                    end if
+                    if(intsct) then ! if the ray passes through this cell... and then traverse down (see below)
+                        exit ! break out the do loop if intersection found, could sort by distance at a later date...
+                    else
+                        checked(cid) = .true. ! if no intersection, cell has been checked
+                    end if
+                end do
+                if(intsct) then ! if the ray passes through a child cell
+                    ! traverse down to the child cell
+                    di = geometry%bvh%cp(chid)%di ! new depth is child depth
+                    ci = geometry%bvh%cp(chid)%ci ! new cell index is child index
+                else ! else, if ray did not pass through a child cell
+                    if(cell%id /= 1) then ! if not root cell
+                        ! traverse up
+                        pid = geometry%bvh%depth(di)%cell(ci)%pid
+                        di = geometry%bvh%cp(pid)%di
+                        ci = geometry%bvh%cp(pid)%ci
+                    else ! if root cell
+                        ! print*,'reached cell root. ray must be outgoing. stopping...'
+                        done = .true. ! finished
+                    end if
+                end if
+            else ! if cell has no children
+                if(checked(cid)) then ! if cell has been checked
+                    ! traverse up
+                    pid = geometry%bvh%depth(di)%cell(ci)%pid ! get parent cell id
+                    di = geometry%bvh%cp(pid)%di ! new depth is parent depth
+                    ci = geometry%bvh%cp(pid)%ci ! new cell index is parent index
+                else ! if cell has not been checked
+                    ! check for geometry intersection
+                    j = 0 ! init counter for number of intersections found
+                    do i = 1, size(cell%fi(:),1) ! for each face inside this cell
+                        ! look for intersection with this facet
+                        call ray_polygon_intersection_check(geometry%v(geometry%f(cell%fi(i))%vi(:),:), &
+                                                            geometry%f(cell%fi(i))%evec(:,:), &
+                                                            geometry%n(geometry%f(cell%fi(i))%ni,:), &
+                                                            r(:), o(:), intsct, dist)
+                        if(intsct) then ! if ray intersected with this face
+                            j = j + 1 ! update counter
+                            distances(j) = dist ! save distance to intersection
+                            fis(j) = cell%fi(i) ! save facet id
+                        end if
+                    end do
+                    if (j == 0) then ! if no intersection found
+                        if(cell%id /= 1) then ! if not root cell
+                            checked(cid) = .true. ! cell has now been checked
+                            ! traverse up
+                            pid = geometry%bvh%depth(di)%cell(ci)%pid ! get parent cell id
+                            di = geometry%bvh%cp(pid)%di ! new depth is parent depth
+                            ci = geometry%bvh%cp(pid)%ci ! new cell index is parent index
+                        else ! if root cell
+                            ! print*,'no intersection and at cell root. ray is outgoing...'
+                            intsct = .false. ! no intersection found
+                            done = .true. ! finished
+                        end if
+                    else if(j == 1) then ! if 1 intersection found
+                        ! print*,'ending... intersection found with facet',fis(1),'distance travelled to intersection:',distances(1)
+                        fi = fis(1) ! get facet id
+                        intsct = .true. ! intersection found
+                        done = .true. ! finished
+                    else ! if more than 1 intersection found, find location of shortest distance
+                        ! print*,'multiple intersections... closest facet was:',fis(minloc(distances(1:j)))
+                        fi = fis(minloc(distances(1:j),1)) ! get the id of the closest facet
+                        intsct = .true. ! intersection found
+                        done = .true. ! finished
+                    end if
+                end if
+            end if
+        end do
 
     end subroutine
 
@@ -48,7 +170,7 @@ module bvh_mod
                 if(dot_product(en(:),rr(:)) <= 0d0) j = j + 1 ! if edge check was true
             end do
             if(j == nv) then ! if edge check was true for all edges
-                print*,'intersection found' ! intersection was within bounded polygon
+                ! print*,'intersection found' ! intersection was within bounded polygon
                 intsct = .true.
             end if
         end if
@@ -61,17 +183,8 @@ module bvh_mod
         real(8), intent(in) :: ray(1:3)
         logical, intent(out) :: intersection
     
-        integer :: i, j
+        integer :: i
         real(8) :: dist
-        real(8) :: ray_dot_normal
-        real(8) :: vec_to_intersection(1:3) ! vector position of intersection
-        real(8) :: v1(3), v2(3), n(3), p(3), w(3), m(3)
-        integer :: counter
-
-        ! modify this subroutine so that the intersection check is 
-
-        print*,'--------------------------------'
-        print*,'start cell intersection check... cell id=',cell%id
 
         intersection = .false.
     
@@ -91,7 +204,7 @@ module bvh_mod
         type(geometry_type), intent(in) :: geometry
 
         type(bvh_cell_type) cell, child_cell
-        integer(8) fi, i, pid, di, ci, cid, chid, nf
+        integer(8) fi, i, pid, di, ci, cid, chid, nf, fi2
         integer j
         real(8) vec(1:3), ray_origin(1:3)
         real(8) dist
@@ -100,6 +213,7 @@ module bvh_mod
         logical, dimension(:), allocatable :: checked
         integer(8), dimension(:), allocatable :: fis ! facet ids which found intersection
         real(8), dimension(:), allocatable :: distances ! distances to facet ids with intersection
+        real(8) start, finish
 
         print*,'testing bvh...'
 
@@ -110,137 +224,67 @@ module bvh_mod
         print*,'geometry%bvh%nc_total',geometry%bvh%nc_total
         checked(:) = .false. ! init
 
-        fi = 2010 ! start facet
+        fi = 6000 ! start facet
         print*,'start facet is:',fi
 
-        vec(:) = (/-1,0,0/)
+        vec(:) = (/0,0,-1/)
         call normalise_vec(vec)
         print*,'propagation direction is:',vec(:)
 
-        ray_origin = geometry%f(fi)%mid(:)
-        print*,'ray origin is:',ray_origin(:)
+        call cpu_time(start)
+        print*,'num facets',geometry%nf
+        do i = 1, geometry%nf ! test
 
-        ! find cell in which the ray originates
-        di = geometry%bvh%fp(fi)%di
-        ci = geometry%bvh%fp(fi)%ci
-        print*,'starting cell depth index: di',di
-        print*,'starting cell cell index: ci',ci
-        cell = geometry%bvh%depth(di)%cell(ci)
-        cid = cell%id
-        print*,'smallest cell containing this point is cell id:',cid,'at depth:',di
+            fi = i
 
-        ! cast ray
-        done = .false.
-        do while (.not. done)
-            print*,'======================'
+            ray_origin = geometry%f(fi)%mid(:)
+            ! print*,'ray origin is:',ray_origin(:)
+
+            ! find cell in which the ray originates
+            di = geometry%bvh%fp(fi)%di
+            ci = geometry%bvh%fp(fi)%ci
+            ! print*,'starting cell depth index: di',di
+            ! print*,'starting cell cell index: ci',ci
             cell = geometry%bvh%depth(di)%cell(ci)
             cid = cell%id
-            intersection = .false. ! reset
-            print*,'cell:',cell%id,'parent=',cell%pid
-            print*,'cell vertices (x):',celL%xmin,cell%xmax
-            print*,'cell vertices (y):',celL%ymin,cell%ymax
-            print*,'cell vertices (z):',celL%zmin,cell%zmax
-            if(cell%nch > 0) then ! if cell has childeren
-                print*,'cell has,',cell%nch,' children: checking for intersection with children',cell%chid(:)
-                do i = 1, cell%nch ! for each child cell
-                    chid = cell%chid(i)
-                    print*,'child:',cell%chid(i),'checked?',checked(chid)
-                    if(.not. checked(chid)) then
-                        print*,'checking for intersection with child cell id: ',chid
-                        ! insert cell intersection check -> outcome: intersection
-                        print*,'child id has position, depth=',geometry%bvh%cp(chid)%di,'cell index=',geometry%bvh%cp(chid)%ci
-                        child_cell = geometry%bvh%depth(geometry%bvh%cp(chid)%di)%cell(geometry%bvh%cp(chid)%ci)
-                        call bvh_cell_intersection_check(child_cell,ray_origin(:),vec(:),intersection)
-                    else
-                        print*,'this cell has already been checked'
-                    end if
+            ! print*,'smallest cell containing this point is cell id:',cid,'at depth:',di
 
-                    if(intersection) then
-                        exit ! break out the do loop if intersection found, could sort by distance at a later date...
-                    else
-                        checked(cid) = .true. ! if no intersection, cell has been checked
-                    end if
+            call cast_ray(vec(:),ray_origin(:),cid,geometry,intersection,fi2)
+            ! print*,'ray cast found intersection?',intersection,'fi',fi2
 
-                end do
-                ! check and sort intersection with unchecked children
-                if(intersection) then
-                    ! traverse down
-                    print*,'traversing down...'
-                    di = geometry%bvh%cp(chid)%di
-                    ci = geometry%bvh%cp(chid)%ci
-                else
-                    if(cell%id /= 1) then ! if not root cell
-                        print*,'no intersection with unchecked children. traversing up...'
-                        ! traverse up
-                        pid = geometry%bvh%depth(di)%cell(ci)%pid
-                        print*,'parent id is:',pid,'at depth:',geometry%bvh%cp(pid)%di,'cell index:',geometry%bvh%cp(pid)%ci
-                        di = geometry%bvh%cp(pid)%di
-                        ci = geometry%bvh%cp(pid)%ci
-                    else ! if root cell
-                        print*,'reached cell root. ray must be outgoing. stopping...'
-                        done = .true. ! temp stop
-                    end if
-                end if
-            else ! if cell has no children
-                print*,'cell has no children...'
-                if(checked(cid)) then ! if cell has been checked
-                    print*,'this cell has already been checked'
-                    ! traverse up
-                    pid = geometry%bvh%depth(di)%cell(ci)%pid
-                    print*,'parent id is:',pid,'at depth:',geometry%bvh%cp(pid)%di,'cell index:',geometry%bvh%cp(pid)%ci
-                    di = geometry%bvh%cp(pid)%di
-                    ci = geometry%bvh%cp(pid)%ci
-                    ! done = .true. ! temp stop
-                else ! if cell has not been checked
-                    print*,'cell has not been checked. checking...'
-                    ! check for geometry intersection
-                    print*,'=== perform geometry intersection check for cell',cell%id,' ==='
-                    ! insert check with geometry in cell here
-                    nf = size(cell%fi(:),1)
-                    print*,'number of faces inside this cell:',nf
-                    j = 0 ! init counter for number of intersections found
-                    do i = 1, nf ! for each face inside this cell
-                        ! print*,'vertices for this face are:',geometry%v(geometry%f(cell%fi(i))%vi(:),:)
-                        call ray_polygon_intersection_check(geometry%v(geometry%f(cell%fi(i))%vi(:),:), &
-                                                            geometry%f(cell%fi(i))%evec(:,:), &
-                                                            geometry%n(geometry%f(cell%fi(i))%ni,:), &
-                                                            vec(:), ray_origin(:), intersection, dist)
-                        if(intersection) then
-                            ! print*,'found intersection with facet ',cell%fi(i),'!!!'
-                            j = j + 1 ! update counter
-                            distances(j) = dist ! distance to intersection
-                            fis(j) = cell%fi(i) ! save facet id
-                        end if
-                    end do
-                    if (j == 0) then ! if no intersection found
-                        if(cell%id /= 1) then ! if not root cell
-                            print*,'no intersection. traversing up...'
-                            checked(cid) = .true.
-                            ! traverse up
-                            pid = geometry%bvh%depth(di)%cell(ci)%pid
-                            print*,'parent id is:',pid,'at depth:',geometry%bvh%cp(pid)%di,'cell index:',geometry%bvh%cp(pid)%ci
-                            di = geometry%bvh%cp(pid)%di
-                            ci = geometry%bvh%cp(pid)%ci
-                        else ! if root cell
-                            print*,'no intersection and at cell root. stopping...'
-                            done = .true. ! temp stop
-                        end if
-                    else if(j == 1) then ! if 1 intersection found
-                        print*,'ending... intersection found with facet',fis(1),'distance travelled to intersection:',distances(1)
-                        done = .true.
-                    else ! if more than 1 intersection found, find location of shortest distance
-                        print*,'closest facet intersection was:',fis(minloc(distances(1:j)))
-                    end if
-
-                end if
-
-
-
-            end if
-            ! stop
         end do
+        call cpu_time(finish)
+        print'(a,f9.6)','time taken with bvh: ',finish-start
 
-        
+        ! call cpu_time(start)
+        ! ! test compatison without bvh
+        ! j = 0 ! init counter for number of intersections found
+        ! do i = 1, geometry%nf ! for each face in geometry
+        !     ! print*,'vertices for this face are:',geometry%v(geometry%f(cell%fi(i))%vi(:),:)
+        !     call ray_polygon_intersection_check(geometry%v(geometry%f(i)%vi(:),:), &
+        !                                         geometry%f(i)%evec(:,:), &
+        !                                         geometry%n(geometry%f(i)%ni,:), &
+        !                                         vec(:), ray_origin(:), intersection, dist)
+        !     if(intersection) then
+        !         ! print*,'found intersection with facet ',i,'!!!'
+        !         j = j + 1 ! update counter
+        !         distances(j) = dist ! distance to intersection
+        !         fis(j) = i ! save facet id
+        !     end if
+        ! end do
+        ! if (j == 0) then ! if no intersection found
+        !     if(cell%id /= 1) then ! if not root cell
+        !         print*,'no intersection.'
+        !     end if
+        ! else if(j == 1) then ! if 1 intersection found
+        !     print*,'ending... intersection found with facet',fis(1),'distance travelled to intersection:',distances(1)
+        ! else ! if more than 1 intersection found, find location of shortest distance
+        !     print*,'closest facet intersection was:',fis(minloc(distances(1:j)))
+        ! end if
+        ! call cpu_time(finish)
+
+        ! print*,'time taken without bvh:',finish-start
+
             
 
         ! stop
@@ -258,8 +302,19 @@ module bvh_mod
         !   or until a maximum number of vertices in each cell is less than a threshold number,
         !   or until the cells can no longer be subdivided without having less than 3 vertices in a cell
 
-        integer(8), parameter :: max_depth = 6 ! must be 1 or greater
-        integer(8), parameter :: max_num_verts = 3 ! must be 3 or greater
+        integer(8), parameter :: max_depth = 20 ! must be 1 or greater
+        integer(8), parameter :: max_num_verts = 4096 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 2048 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 1024 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 512 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 256 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 128 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 64 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 32 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 16 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 8 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 4 ! must be 3 or greater
+        ! integer(8), parameter :: max_num_verts = 3 ! must be 3 or greater
 
         type(job_parameters_type), intent(in) :: job_params
         type(geometry_type), intent(inout) :: geometry
@@ -324,8 +379,8 @@ module bvh_mod
                     ! split the cell along the chosen dimension
                     call split_cell(geometry,bvh%depth(i-1)%cell(j),dim,cell_a,cell_b,success)
                     ! if split failed, try to split along a different dimension
-                    if(.not. success) call split_cell(geometry,bvh%depth(i-1)%cell(j),mod(dim+1,3),cell_a,cell_b,success)
-                    if(.not. success) call split_cell(geometry,bvh%depth(i-1)%cell(j),mod(dim+2,3),cell_a,cell_b,success)
+                    if(.not. success) call split_cell(geometry,bvh%depth(i-1)%cell(j),mod(dim,3)+1,cell_a,cell_b,success)
+                    if(.not. success) call split_cell(geometry,bvh%depth(i-1)%cell(j),mod(dim+1,3)+1,cell_a,cell_b,success)
                     if(success) then ! if successfully split the cell
                         ! assign cell ids
                         nc_total = nc_total + 1
@@ -524,8 +579,6 @@ module bvh_mod
                 cell%f(6)%e(2,1:3) = cell%f(6)%v(3,1:3) - cell%f(6)%v(2,1:3)
                 cell%f(6)%e(3,1:3) = cell%f(6)%v(4,1:3) - cell%f(6)%v(3,1:3)
                 cell%f(6)%e(4,1:3) = cell%f(6)%v(1,1:3) - cell%f(6)%v(4,1:3)
-
-                print*,'cell id:',cell%id,'children id:',cell%chid(:)
 
                 geometry%bvh%depth(i)%cell(j) = cell
             end do
@@ -747,6 +800,8 @@ module bvh_mod
                 nv_b = nv_b + 1 ! update number of vertices in cell b
             end if
         end do
+        if(allocated(cell_a%vi)) deallocate(cell_a%vi)
+        if(allocated(cell_b%vi)) deallocate(cell_b%vi)
         allocate(cell_a%vi(1:nv_a)) ! allocate space in cell_a to hold new vertices
         allocate(cell_b%vi(1:nv_b)) ! allocate space in cell_b to hold new vertices
         cell_a%nv = nv_a ! save the number of vertices in cell a
