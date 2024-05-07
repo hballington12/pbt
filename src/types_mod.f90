@@ -94,6 +94,7 @@ type job_parameters_type
     character(len=255) output_dir ! output directory
     logical is_fast_diff ! whether or not to use fast, approximate diffraction
     logical is_fast ! whether to prioritise speed (true) or memory use (false)
+    logical disable_alpha ! whether or not to disable alpha euler angle
 end type job_parameters_type
 
 type field_in_type

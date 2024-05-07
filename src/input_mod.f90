@@ -305,6 +305,7 @@ job_params%export_beam = .false. ! default is do not export the beam
 job_params%refl = 10 ! default is max 10 total internal reflections
 job_params%is_fast_diff = .false. ! default is no fast diffraction
 job_params%is_fast = .true. ! default is to prioritise speed
+job_params%disable_alpha = .false. ! default is dont disable alpha euler angle
 
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'
@@ -829,6 +830,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             ! print*,'prioritising for speed or memory: memory'
             job_params%is_fast = .false.
 
+        case ('-disable_alpha')
+            ! print*,'disabling alpha euler angle'
+            job_params%disable_alpha = .true.
+
         case ('-tri')
             ! print*,'found command line specifier "mt"'
             ! print*,'automatic triangulation: enabled'
@@ -1326,9 +1331,12 @@ subroutine init_loop(   alpha_vals, &
     else
         do i = 1, size(alpha_vals,1) ! loop here so that the angles are reproducable regardless of number of orientations
             ! random alpha value
-            ! call random_number(alpha_vals(i))
-            ! for random orientation, alpha has no effect on the 1d patterns, so set it to a constant
-            alpha_vals(i) = 0D0
+            if (job_params%disable_alpha) then
+                ! for random orientation, alpha has no effect on the 1d patterns, so set it to a constant
+                alpha_vals(i) = 0D0
+            else
+                call random_number(alpha_vals(i))
+            end if
             call random_number(rand)
             beta_vals(i) = rand*h + job_params%beta_lims(1)/180D0
             call random_number(rand)

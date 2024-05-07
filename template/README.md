@@ -58,4 +58,5 @@ This directory contains various template files you may wish to use for running t
 -gamma_max # set the maximum gamma angle, to account for particle symmetry
 -speed # prioritse speed over memory use
 -memory # prioritise memory use over speed
+-disable_alpha # disables averaging of the alpha angle during orientation averaging
 ```
