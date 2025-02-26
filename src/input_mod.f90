@@ -703,9 +703,21 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                     job_params%euler_method = 5
                 case('zxz')
                     job_params%euler_method = 6
+                case('xzy')
+                    job_params%euler_method = 7
+                case('xyz')
+                    job_params%euler_method = 8
+                case('yxz')
+                    job_params%euler_method = 9
+                case('yzx')
+                    job_params%euler_method = 10
+                case('zyx')
+                    job_params%euler_method = 11
+                case('zxy')
+                    job_params%euler_method = 12
                 case default ! if argument was unrecognised
                     print '(2a, /)', 'unrecognised euler method: ', trim(arg)
-                    print*,'(the available options are xzx, xyx, yxy, yzy, zyz (default), zxz)'
+                    print*,'(the available options are xzx, xyx, yxy, yzy, zyz (default), zxz, xzy, xyz, yxz, yzx, zyx, zxy)'
                     stop
                 end select
             end if
@@ -1928,6 +1940,79 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
             rot(3,1) = s3*s2
             rot(3,2) = c3*s2
             rot(3,3) = c2
+        
+        ! xzy
+        case (7)
+            rot(1,1) = c2*c3
+            rot(1,2) = -s2
+            rot(1,3) = c2*s3
+            rot(2,1) = s1*s3 + c1*c3*s2
+            rot(2,2) = c1*c2
+            rot(2,3) = c1*s2*s3 - c3*s1
+            rot(3,1) = c3*s1*s2 - c1*s3
+            rot(3,2) = c2*s1
+            rot(3,3) = c1*c3 + s1*s2*s3
+            
+        !xyz
+        case (8)
+            rot(1,1) = c2*c3
+            rot(1,2) = -c2*s3
+            rot(1,3) = s2
+            rot(2,1) = c1*s3 + c3*s1*s2
+            rot(2,2) = c1*c3 - s1*s2*s3
+            rot(2,3) = -c2*s1
+            rot(3,1) = s1*s3 - c1*c3*s2
+            rot(3,2) = c3*s1 + c1*s2*s3
+            rot(3,3) = c1*c2
+            
+        !yxz
+        case (9)
+            rot(1,1) = c1*c3 + s1*s2*s3
+            rot(1,2) = c3*s1*s2 - c1*s3
+            rot(1,3) = c2*s1
+            rot(2,1) = c2*s3
+            rot(2,2) = c2*c3
+            rot(2,3) = -s2
+            rot(3,1) = c1*s2*s3 - c3*s1
+            rot(3,2) = s1*s3 + c1*c3*s2
+            rot(3,3) = c1*c2
+            
+        !yzx
+        case (10)
+            rot(1,1) = c1*c2
+            rot(1,2) = c1*s2*s3 - c3*s1
+            rot(1,3) = s1*s3 + c1*c3*s2
+            rot(2,1) = s2
+            rot(2,2) = c2*c3
+            rot(2,3) = -c2*s3
+            rot(3,1) = -c2*s1
+            rot(3,2) = c1*s3 + c3*s1*s2
+            rot(3,3) = c1*c3 - s1*s2*s3
+            
+        !zyx
+        case (11)
+            rot(1,1) = c1*c2
+            rot(1,2) = c1*s2*s3 - c3*s1
+            rot(1,3) = s1*s3 + c1*c3*s2
+            rot(2,1) = c2*s1
+            rot(2,2) = c1*c3 + s1*s2*s3
+            rot(2,3) = c3*s1*s2 - c1*s3
+            rot(3,1) = -s2
+            rot(3,2) = c2*s3
+            rot(3,3) = c2*c3
+            
+        !zxy
+        case (12)
+            rot(1,1) = c1*c3 - s1*s2*s3
+            rot(1,2) = -c2*s1
+            rot(1,3) = c1*s3 + c3*s1*s2
+            rot(2,1) = c3*s1 + c1*s2*s3
+            rot(2,2) = c1*c2
+            rot(2,3) = s1*s3 - c1*c3*s2
+            rot(3,1) = -c2*s3
+            rot(3,2) = s2
+            rot(3,3) = c2*c3
+            
         end select
 
         do i = 1, geometry%nv ! for each vertex
