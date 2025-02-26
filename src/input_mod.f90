@@ -306,6 +306,7 @@ job_params%refl = 10 ! default is max 10 total internal reflections
 job_params%is_fast_diff = .false. ! default is no fast diffraction
 job_params%is_fast = .true. ! default is to prioritise speed
 job_params%disable_alpha = .false. ! default is dont disable alpha euler angle
+job_params%euler_method = 5 ! default is zyz
 
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'
@@ -681,6 +682,34 @@ do while (i .lt. command_argument_count()) ! looping over command line args
                 ! print*,'rec: ', rec
                 found_rec = .true.
             end if
+
+        case ('-euler_method')
+            i = i + 1 ! update counter to read the rotation method
+            call get_command_argument(i,arg,status=my_status)
+            if (my_status .eq. 1) then ! if no argument found
+                print*,'error: no option found for "euler_method"'
+                stop
+            else ! else, parse the specifier
+                select case (arg)
+                case('xzx')
+                    job_params%euler_method = 1
+                case('xyx')
+                    job_params%euler_method = 2
+                case('yxy')
+                    job_params%euler_method = 3
+                case('yzy')
+                    job_params%euler_method = 4
+                case('zyz')
+                    job_params%euler_method = 5
+                case('zxz')
+                    job_params%euler_method = 6
+                case default ! if argument was unrecognised
+                    print '(2a, /)', 'unrecognised euler method: ', trim(arg)
+                    print*,'(the available options are xzx, xyx, yxy, yzy, zyz (default), zxz)'
+                    stop
+                end select
+            end if
+
 
         case ('-jobname')
             ! print*,'found command line specifier "jobname"'
@@ -1806,15 +1835,9 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
         ! print*,'verts(2,1:3)',verts(2,1:3)
 
     else if(rot_method(1:len(trim(rot_method))) .eq. 'euler') then
-        ! call read_input_vals_real(ifn,"rot euler",eulers,3)
-        ! print*,'alpha:',eulers(1)
-        ! write(101,*)'alpha:',eulers(1)
-        ! print*,'beta: ',eulers(2)
-        ! write(101,*)'beta: ',eulers(2)
-        ! print*,'gamma:',eulers(3)
-        ! write(101,*)'gamma:',eulers(3)
-
         if(abs(eulers(2)) < 1d-4) eulers(2) = 1d-4 ! fix
+
+        print*,'start prot'
 
         eulers = eulers*pi/180.0 ! convert to rad
 
@@ -1826,16 +1849,86 @@ subroutine PROT_MPI(alpha_vals,         & ! list of values for euler alpha angle
         c2 = cos(eulers(2))
         c3 = cos(eulers(3))
 
-        ! make rotation matrix
-        rot(1,1) = c1*c2*c3 - s1*s3
-        rot(1,2) = -c1*c2*s3 - s1*c3
-        rot(1,3) = c1*s2
-        rot(2,1) = s1*c2*c3 + c1*s3
-        rot(2,2) = -s1*c2*s3 + c1*c3
-        rot(2,3) = s1*s2
-        rot(3,1) = -s2*c3
-        rot(3,2) = s2*s3
-        rot(3,3) = c2
+        select case (job_params%euler_method)
+
+        case (1)
+            ! print*,'euler method 1, xzx'
+            ! make rotation matrix (xzx)
+            rot(1,1) = c2
+            rot(1,2) = -c3*s2
+            rot(1,3) = s2*s3
+            rot(2,1) = c1*s2
+            rot(2,2) = c1*c2*c3 - s1*s3
+            rot(2,3) = -c3*s1 - c1*c2*s3
+            rot(3,1) = s1*s2
+            rot(3,2) = c1*s3 + c2*c3*s1
+            rot(3,3) = c1*c3 - c2*s1*s3
+
+        case (2) 
+            ! print*,'euler method 2, xyx'
+            ! make rotation matrix (xyx)
+            rot(1,1) = c2
+            rot(1,2) = s2*s3
+            rot(1,3) = c3*s2
+            rot(2,1) = s1*s2
+            rot(2,2) = c1*c3 - c2*s1*s3
+            rot(2,3) = -c1*s3 - c2*c3*s1
+            rot(3,1) = -c1*s2
+            rot(3,2) = c2*s1 + c1*c2*s3
+            rot(3,3) = c1*c2*c3 - s1*s3
+
+        case (3)
+            ! print*,'euler method 3, yxy'
+            ! make rotation matrix (yxy)
+            rot(1,1) = c1*c3 - c2*s1*s3
+            rot(1,2) = s1*s2
+            rot(1,3) = c1*s3 + c2*c3*s1
+            rot(2,1) = s2*s3
+            rot(2,2) = c2
+            rot(2,3) = -c3*s2
+            rot(3,1) = -c3*s1 - c1*c2*s3
+            rot(3,2) = c1*s2
+            rot(3,3) = c1*c2*c3 - s1*s3
+
+        case (4)
+            ! print*,'euler method 4, yzy'
+            ! make rotation matrix (yzy)  
+            rot(1,1) = c1*c2*c3 - s1*s3
+            rot(1,2) = -c1*s2
+            rot(1,3) = c1*s3 + c1*c2*s3
+            rot(2,1) = c3*s2
+            rot(2,2) = c2
+            rot(2,3) = s2*s3
+            rot(3,1) = -s1*c2*c3 - c1*s3
+            rot(3,2) = s1*s2
+            rot(3,3) = c1*c3 - c2*s1*s3
+
+        case (5)
+            ! print*,'euler method 5, zyz'
+            ! make rotation matrix (zyz)
+            rot(1,1) = c1*c2*c3 - s1*s3
+            rot(1,2) = -c1*c2*s3 - s1*c3
+            rot(1,3) = c1*s2
+            rot(2,1) = s1*c2*c3 + c1*s3
+            rot(2,2) = -s1*c2*s3 + c1*c3
+            rot(2,3) = s1*s2
+            rot(3,1) = -s2*c3
+            rot(3,2) = s2*s3
+            rot(3,3) = c2
+
+        case (6)
+            ! print*,'euler method 6, zxz'
+            ! make rotation matrix (zxz)
+            rot(1,1) = c1*c3 - s1*s3*c2
+            rot(1,2) = -c1*s3 - s1*c3*c2
+            rot(1,3) = s1*s2
+            rot(2,1) = s1*c3 + c1*s3*c2
+            rot(2,2) = -s1*s3 + c1*c3*c2
+            rot(2,3) = -c1*s2
+            rot(3,1) = s3*s2
+            rot(3,2) = c3*s2
+            rot(3,3) = c2
+        end select
 
         do i = 1, geometry%nv ! for each vertex
             verts_rot(i,1:3) = matmul(rot,geometry%v(i,1:3)) ! rotate

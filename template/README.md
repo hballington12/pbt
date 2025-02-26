@@ -59,4 +59,5 @@ This directory contains various template files you may wish to use for running t
 -speed # prioritse speed over memory use
 -memory # prioritise memory use over speed
 -disable_alpha # disables averaging of the alpha angle during orientation averaging
+-euler_method zyz # sets the euler angle rotation method (xzx, xyx, yxy, yzy, zyz, zxz)
 ```
