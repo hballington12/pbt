@@ -412,7 +412,7 @@ subroutine pbt()
 
             ! writing to file
             call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)
-            call writeup(mueller%mueller_total, mueller%mueller_1d_total, job_params%output_dir, output_parameters_total, job_params) ! write to file
+            call writeup(mueller, job_params%output_dir, output_parameters_total, job_params) ! write to file
 
             ! clean up temporary files
             call system("rm -r "//trim(job_params%output_dir)//"/tmp") ! remove directory for temp files
