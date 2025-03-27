@@ -379,8 +379,7 @@ subroutine pbt()
                             mpi%p,                          & ! mpi parameter
                             mpi%status,                     & ! mpi parameter
                             mpi%rank,                    & ! process rank
-                            mueller%mueller_1d_total,           & ! 1d mueller matrix total for each process
-                            mueller%mueller_total,              & ! 2d mueller matrix total for each process
+                            mueller,                         & ! mueller matrix struct
                             output_parameters_total)      ! output parameters total for each process
 
         ! then rank 0 writes to cached files
@@ -402,8 +401,7 @@ subroutine pbt()
                             mpi%p,                          & ! mpi parameter
                             mpi%status,                     & ! mpi parameter
                             mpi%rank,                    & ! process rank
-                            mueller%mueller_1d_total,           & ! 1d mueller matrix total for each process
-                            mueller%mueller_total,              & ! 2d mueller matrix total for each process
+                            mueller,                         & ! mueller matrix struct  
                             output_parameters_total)      ! output parameters total for each process
 
 
