@@ -189,6 +189,14 @@ type geometry_type
     real(8) com(1:3) ! centre of mass
 end type geometry_type
 
+type muellers_type
+    real(8), dimension(:,:,:), allocatable :: mueller
+    real(8), dimension(:,:,:), allocatable :: mueller_total
+    real(8), dimension(:,:,:), allocatable :: mueller_recv
+    real(8), dimension(:,:), allocatable :: mueller_1d
+    real(8), dimension(:,:), allocatable :: mueller_1d_total
+    real(8), dimension(:,:), allocatable :: mueller_1d_recv
+end type muellers_type
 ! format specifiers
 
 character(len=111), parameter :: fmt_mueller_2d = '(f12.4,f12.4,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8)'

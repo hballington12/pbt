@@ -62,8 +62,7 @@
    
    subroutine finalise( ampl_far_beam,     & ! amplitude matrix due to beam diffraction
                         ampl_far_ext_diff, & ! amplitude matrix due to external diffraction
-                        mueller,             & ! 2d mueller matrix
-                        mueller_1d,          & ! 1d mueller matrix
+                        mueller,             & ! mueller struct
                         output_parameters,   & ! output parameters
                         job_params)
       
@@ -77,8 +76,9 @@
       complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: ampl_far_beam ! beam
       complex(8), dimension(:,:,:,:), allocatable, intent(inout)  :: ampl_far_ext_diff ! ext diff
       real(8), dimension(:), allocatable :: theta_vals, phi_vals
-      real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
-      real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
+      type(muellers_type), intent(inout) :: mueller ! muller struct
+    !   real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
+    !   real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
       real(8) la ! wavelength
       type(output_parameters_type), intent(out) :: output_parameters 
       type(job_parameters_type), intent(in) :: job_params
@@ -111,7 +111,7 @@
          write(101,*)'making 2d mueller matrices...'
       end if
 
-      call ampl_to_mueller(ampl_far,mueller)
+      call ampl_to_mueller(ampl_far,mueller%mueller)
       call ampl_to_mueller(ampl_far_beam,mueller_beam)
       call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
 
@@ -121,7 +121,7 @@
 
       write(101,*)'------------------------------------------------------'
       
-      call get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller%mueller, mueller%mueller_1d, theta_vals, phi_vals)
       call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
       call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
 
@@ -130,7 +130,7 @@
       end if
 
       ! theta integrations...
-      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
       call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
       call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
       
@@ -159,7 +159,7 @@
             write(101,*)'remaking 2d mueller matrices...'
          end if
 
-         call ampl_to_mueller(ampl_far,mueller)
+         call ampl_to_mueller(ampl_far,mueller%mueller)
          call ampl_to_mueller(ampl_far_beam,mueller_beam)
          call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
    
@@ -167,7 +167,7 @@
             write(101,*)'remaking 1d mueller matrices...'
          end if
          
-         call get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller%mueller, mueller%mueller_1d, theta_vals, phi_vals)
          call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
          call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
    
@@ -176,7 +176,7 @@
          end if
 
          ! theta integrations...
-         call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
+         call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
          call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
          call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
          
@@ -195,14 +195,14 @@
       
       ext = absorption + scatt
       albedo = 1-(ext-scatt)/ext
-      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt/(waveno**2),asymmetry) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt/(waveno**2),asymmetry) ! p11*sin(theta)
       call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam/(waveno**2),asymmetry_beam) ! p11*sin(theta)
       call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff/(waveno**2),asymmetry_ext_diff) ! p11*sin(theta)
 
       ! calculate back-scattering cross section
       ! find closest theta value to direct back-scattering
       i = minloc(abs(theta_vals - 2*pi),1)
-      back_scatt = mueller(1,i,1)*4*pi/waveno**2 ! calculate back-scattering cross section (B&H definition)
+      back_scatt = mueller%mueller(1,i,1)*4*pi/waveno**2 ! calculate back-scattering cross section (B&H definition)
 
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
