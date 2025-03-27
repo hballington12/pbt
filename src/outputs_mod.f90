@@ -114,8 +114,8 @@
       end if
 
       call ampl_to_mueller(ampl_far,mueller%mueller)
-      call ampl_to_mueller(ampl_far_beam,mueller_beam)
-      call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
+      call ampl_to_mueller(ampl_far_beam,mueller%mueller_beam)
+      call ampl_to_mueller(ampl_far_ext_diff,mueller%mueller_ext_diff)
 
       if(job_params%debug >= 1) then
          write(101,*)'making 1d mueller matrices...'
@@ -124,8 +124,8 @@
       write(101,*)'------------------------------------------------------'
       
       call get_1d_mueller(mueller%mueller, mueller%mueller_1d, theta_vals, phi_vals)
-      call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
-      call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller%mueller_beam, mueller%mueller_beam_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller%mueller_ext_diff, mueller%mueller_ext_diff_1d, theta_vals, phi_vals)
 
       if(job_params%debug >= 1) then
          write(101,*)'calculating integrated parameters...'
@@ -133,8 +133,8 @@
 
       ! theta integrations...
       call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
       
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
@@ -162,16 +162,16 @@
          end if
 
          call ampl_to_mueller(ampl_far,mueller%mueller)
-         call ampl_to_mueller(ampl_far_beam,mueller_beam)
-         call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
+         call ampl_to_mueller(ampl_far_beam,mueller%mueller_beam)
+         call ampl_to_mueller(ampl_far_ext_diff,mueller%mueller_ext_diff)
    
          if(job_params%debug >= 2) then  
             write(101,*)'remaking 1d mueller matrices...'
          end if
          
          call get_1d_mueller(mueller%mueller, mueller%mueller_1d, theta_vals, phi_vals)
-         call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
-         call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller%mueller_beam, mueller%mueller_beam_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller%mueller_ext_diff, mueller%mueller_ext_diff_1d, theta_vals, phi_vals)
    
          if(job_params%debug >= 2) then  
             write(101,*)'recalculating integrated parameters...'
@@ -179,8 +179,8 @@
 
          ! theta integrations...
          call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
-         call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
-         call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
+         call simpne(size(theta_vals,1),theta_vals,mueller%mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
+         call simpne(size(theta_vals,1),theta_vals,mueller%mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
          
 
       end if
@@ -198,8 +198,8 @@
       ext = absorption + scatt
       albedo = 1-(ext-scatt)/ext
       call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt/(waveno**2),asymmetry) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam/(waveno**2),asymmetry_beam) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff/(waveno**2),asymmetry_ext_diff) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam/(waveno**2),asymmetry_beam) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff/(waveno**2),asymmetry_ext_diff) ! p11*sin(theta)
 
       ! calculate back-scattering cross section
       ! find closest theta value to direct back-scattering
@@ -421,7 +421,11 @@
       ! if its the first call to summation, allocate the total mueller 1d and 2d arrays
       if(.not. allocated(mueller%mueller_total)) then
          allocate(mueller%mueller_total(1:size(mueller%mueller,1),1:size(mueller%mueller,2),1:size(mueller%mueller,3)))
+         allocate(mueller%mueller_beam_total(1:size(mueller%mueller,1),1:size(mueller%mueller,2),1:size(mueller%mueller,3)))
+         allocate(mueller%mueller_ext_diff_total(1:size(mueller%mueller,1),1:size(mueller%mueller,2),1:size(mueller%mueller,3)))
          mueller%mueller_total = 0d0 ! init
+         mueller%mueller_beam_total = 0d0 ! init
+         mueller%mueller_ext_diff_total = 0d0 ! init
          output_parameters_total%abs = 0d0 ! init
          output_parameters_total%scatt = 0d0 ! init
          output_parameters_total%ext = 0d0 ! init
@@ -444,10 +448,22 @@
          allocate(mueller%mueller_1d_total(1:size(mueller%mueller_1d,1),1:size(mueller%mueller_1d,2)))
          mueller%mueller_1d_total = 0d0 ! init
       end if
+      if(.not. allocated(mueller%mueller_beam_1d_total)) then
+         allocate(mueller%mueller_beam_1d_total(1:size(mueller%mueller_1d,1),1:size(mueller%mueller_1d,2)))
+         mueller%mueller_beam_1d_total = 0d0 ! init
+      end if
+      if(.not. allocated(mueller%mueller_ext_diff_1d_total)) then
+         allocate(mueller%mueller_ext_diff_1d_total(1:size(mueller%mueller_1d,1),1:size(mueller%mueller_1d,2)))
+         mueller%mueller_ext_diff_1d_total = 0d0 ! init
+      end if
       
       ! sum
       mueller%mueller_total = mueller%mueller_total + mueller%mueller
       mueller%mueller_1d_total = mueller%mueller_1d_total + mueller%mueller_1d
+      mueller%mueller_beam_total = mueller%mueller_beam_total + mueller%mueller_beam
+      mueller%mueller_beam_1d_total = mueller%mueller_beam_1d_total + mueller%mueller_beam_1d
+      mueller%mueller_ext_diff_total = mueller%mueller_ext_diff_total + mueller%mueller_ext_diff
+      mueller%mueller_ext_diff_1d_total = mueller%mueller_ext_diff_1d_total + mueller%mueller_ext_diff_1d
       output_parameters_total%abs = output_parameters_total%abs + output_parameters%abs
       output_parameters_total%scatt = output_parameters_total%scatt + output_parameters%scatt
       output_parameters_total%back_scatt = output_parameters_total%back_scatt + output_parameters%back_scatt

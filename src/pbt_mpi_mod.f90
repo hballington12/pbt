@@ -21,7 +21,7 @@ contains
 
 subroutine pbt()
 
-    ! to do:
+    ! to do:_
     ! add support to avoid crash if nan detected
 
     ! ########## variable declaration ##########
@@ -116,7 +116,11 @@ subroutine pbt()
         call resume_job(job_params,num_remaining_orients,remaining_orients,mueller,output_parameters_total)
         if(mpi%rank /= 0) then ! only rank 0 should keep summed parameters from the cache, reset vals for all other processes
             deallocate(mueller%mueller_total)
+            deallocate(mueller%mueller_beam_total)
+            deallocate(mueller%mueller_ext_diff_total)
             deallocate(mueller%mueller_1d_total)
+            deallocate(mueller%mueller_beam_1d_total)
+            deallocate(mueller%mueller_ext_diff_1d_total)
         end if
     end if ! end if resuming a cached job
 

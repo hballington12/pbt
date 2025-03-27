@@ -192,9 +192,17 @@ end type geometry_type
 type muellers_type
     real(8), dimension(:,:,:), allocatable :: mueller
     real(8), dimension(:,:,:), allocatable :: mueller_total
+    real(8), dimension(:,:,:), allocatable :: mueller_beam
+    real(8), dimension(:,:,:), allocatable :: mueller_beam_total
+    real(8), dimension(:,:,:), allocatable :: mueller_ext_diff
+    real(8), dimension(:,:,:), allocatable :: mueller_ext_diff_total
     real(8), dimension(:,:,:), allocatable :: mueller_recv
     real(8), dimension(:,:), allocatable :: mueller_1d
     real(8), dimension(:,:), allocatable :: mueller_1d_total
+    real(8), dimension(:,:), allocatable :: mueller_beam_1d
+    real(8), dimension(:,:), allocatable :: mueller_beam_1d_total
+    real(8), dimension(:,:), allocatable :: mueller_ext_diff_1d
+    real(8), dimension(:,:), allocatable :: mueller_ext_diff_1d_total
     real(8), dimension(:,:), allocatable :: mueller_1d_recv
 end type muellers_type
 ! format specifiers
