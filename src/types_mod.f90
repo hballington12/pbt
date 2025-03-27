@@ -95,6 +95,7 @@ type job_parameters_type
     logical is_fast_diff ! whether or not to use fast, approximate diffraction
     logical is_fast ! whether to prioritise speed (true) or memory use (false)
     logical disable_alpha ! whether or not to disable alpha euler angle
+    logical split_output ! whether or not to split the beam and diffraction parts in the output
 end type job_parameters_type
 
 type field_in_type

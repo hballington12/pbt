@@ -306,6 +306,7 @@ job_params%refl = 10 ! default is max 10 total internal reflections
 job_params%is_fast_diff = .false. ! default is no fast diffraction
 job_params%is_fast = .true. ! default is to prioritise speed
 job_params%disable_alpha = .false. ! default is dont disable alpha euler angle
+job_params%split_output = .false. ! default is do not output beam and diff parts separately
 
 ! print*,'command_argument_count(): ',command_argument_count()
 ! print*,'parsing command line...'
@@ -967,10 +968,10 @@ do while (i .lt. command_argument_count()) ! looping over command line args
             end if 
             
         case ('-timing')
-            ! print*,'found command line specifier "timing"'
             job_params%timing = .true.
-            ! print*,'timing: enabled'
-            ! do something
+
+        case ('-split_output')
+            job_params%split_output = .true.
 
         case ('-export_beam')
             print*,'found command line specifier "export_beam"'

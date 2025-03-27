@@ -24,6 +24,10 @@
 
       mueller%mueller_total = mueller%mueller_total / job_params%num_orients 
       mueller%mueller_1d_total = mueller%mueller_1d_total / job_params%num_orients 
+      mueller%mueller_beam_total = mueller%mueller_beam_total / job_params%num_orients 
+      mueller%mueller_beam_1d_total = mueller%mueller_beam_1d_total / job_params%num_orients 
+      mueller%mueller_ext_diff_total = mueller%mueller_ext_diff_total / job_params%num_orients 
+      mueller%mueller_ext_diff_1d_total = mueller%mueller_ext_diff_1d_total / job_params%num_orients 
       output_parameters%abs = output_parameters%abs / job_params%num_orients 
       output_parameters%scatt = output_parameters%scatt / job_params%num_orients 
       output_parameters%ext = output_parameters%ext / job_params%num_orients 
@@ -350,20 +354,47 @@
       if(job_params%debug >= 1) then   
          print*,'writing mueller to file...'
       end if
-      if(.not. job_params%suppress_2d) then
-         open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
-         do i = 1, size(theta_vals,1)
+    if(.not. job_params%suppress_2d) then
+       open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
+       do i = 1, size(theta_vals,1)
+        do j = 1, size(phi_vals,1)
+           write(10,fmt_mueller_2d) &
+           theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
+           mueller%mueller_total(j,i,1), mueller%mueller_total(j,i,2), mueller%mueller_total(j,i,3), mueller%mueller_total(j,i,4), &
+           mueller%mueller_total(j,i,5), mueller%mueller_total(j,i,6), mueller%mueller_total(j,i,7), mueller%mueller_total(j,i,8), &
+           mueller%mueller_total(j,i,9), mueller%mueller_total(j,i,10), mueller%mueller_total(j,i,11), mueller%mueller_total(j,i,12), &
+           mueller%mueller_total(j,i,13), mueller%mueller_total(j,i,14), mueller%mueller_total(j,i,15), mueller%mueller_total(j,i,16)                                                                             
+        end do
+       end do
+       close(10)
+       if (job_params%split_output) then
+        open(10,file=trim(output_dir)//"/"//"mueller_beam_scatgrid")
+        do i = 1, size(theta_vals,1)
             do j = 1, size(phi_vals,1)
-               write(10,fmt_mueller_2d) &
-               theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
-               mueller%mueller_total(j,i,1), mueller%mueller_total(j,i,2), mueller%mueller_total(j,i,3), mueller%mueller_total(j,i,4), &
-               mueller%mueller_total(j,i,5), mueller%mueller_total(j,i,6), mueller%mueller_total(j,i,7), mueller%mueller_total(j,i,8), &
-               mueller%mueller_total(j,i,9), mueller%mueller_total(j,i,10), mueller%mueller_total(j,i,11), mueller%mueller_total(j,i,12), &
-               mueller%mueller_total(j,i,13), mueller%mueller_total(j,i,14), mueller%mueller_total(j,i,15), mueller%mueller_total(j,i,16)                                                                             
+            write(10,fmt_mueller_2d) &
+            theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
+            mueller%mueller_beam_total(j,i,1), mueller%mueller_beam_total(j,i,2), mueller%mueller_beam_total(j,i,3), mueller%mueller_beam_total(j,i,4), &
+            mueller%mueller_beam_total(j,i,5), mueller%mueller_beam_total(j,i,6), mueller%mueller_beam_total(j,i,7), mueller%mueller_beam_total(j,i,8), &
+            mueller%mueller_beam_total(j,i,9), mueller%mueller_beam_total(j,i,10), mueller%mueller_beam_total(j,i,11), mueller%mueller_beam_total(j,i,12), &
+            mueller%mueller_beam_total(j,i,13), mueller%mueller_beam_total(j,i,14), mueller%mueller_beam_total(j,i,15), mueller%mueller_beam_total(j,i,16)                                                                             
             end do
-         end do
-         close(10)
+        end do
+        close(10)
+        open(10,file=trim(output_dir)//"/"//"mueller_ext_diff_scatgrid")
+        do i = 1, size(theta_vals,1)
+            do j = 1, size(phi_vals,1)
+            write(10,fmt_mueller_2d) &
+            theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
+            mueller%mueller_ext_diff_total(j,i,1), mueller%mueller_ext_diff_total(j,i,2), mueller%mueller_ext_diff_total(j,i,3), mueller%mueller_ext_diff_total(j,i,4), &
+            mueller%mueller_ext_diff_total(j,i,5), mueller%mueller_ext_diff_total(j,i,6), mueller%mueller_ext_diff_total(j,i,7), mueller%mueller_ext_diff_total(j,i,8), &
+            mueller%mueller_ext_diff_total(j,i,9), mueller%mueller_ext_diff_total(j,i,10), mueller%mueller_ext_diff_total(j,i,11), mueller%mueller_ext_diff_total(j,i,12), &
+            mueller%mueller_ext_diff_total(j,i,13), mueller%mueller_ext_diff_total(j,i,14), mueller%mueller_ext_diff_total(j,i,15), mueller%mueller_ext_diff_total(j,i,16)                                                                             
+            end do
+        end do
+        close(10)
+    end if
       end if
+
       open(10,file=trim(output_dir)//"/"//"mueller_scatgrid_1d")
       do j = 1, size(theta_vals,1)
          write(10,fmt_mueller_1d) &
@@ -374,6 +405,28 @@
          mueller%mueller_1d_total(j,13), mueller%mueller_1d_total(j,14), mueller%mueller_1d_total(j,15), mueller%mueller_1d_total(j,16)   
       end do
       close(10)
+      if (job_params%split_output) then
+        open(10,file=trim(output_dir)//"/"//"mueller_beam_scatgrid_1d")
+        do j = 1, size(theta_vals,1)
+        write(10,fmt_mueller_1d) &
+        theta_vals(j)*180/pi, &
+        mueller%mueller_beam_1d_total(j,1), mueller%mueller_beam_1d_total(j,2), mueller%mueller_beam_1d_total(j,3), mueller%mueller_beam_1d_total(j,4), &
+        mueller%mueller_beam_1d_total(j,5), mueller%mueller_beam_1d_total(j,6), mueller%mueller_beam_1d_total(j,7), mueller%mueller_beam_1d_total(j,8), &
+        mueller%mueller_beam_1d_total(j,9), mueller%mueller_beam_1d_total(j,10), mueller%mueller_beam_1d_total(j,11), mueller%mueller_beam_1d_total(j,12), &
+        mueller%mueller_beam_1d_total(j,13), mueller%mueller_beam_1d_total(j,14), mueller%mueller_beam_1d_total(j,15), mueller%mueller_beam_1d_total(j,16)   
+        end do
+        close(10)
+        open(10,file=trim(output_dir)//"/"//"mueller_ext_diff_scatgrid_1d")
+        do j = 1, size(theta_vals,1)
+        write(10,fmt_mueller_1d) &
+        theta_vals(j)*180/pi, &
+        mueller%mueller_ext_diff_1d_total(j,1), mueller%mueller_ext_diff_1d_total(j,2), mueller%mueller_ext_diff_1d_total(j,3), mueller%mueller_ext_diff_1d_total(j,4), &
+        mueller%mueller_ext_diff_1d_total(j,5), mueller%mueller_ext_diff_1d_total(j,6), mueller%mueller_ext_diff_1d_total(j,7), mueller%mueller_ext_diff_1d_total(j,8), &
+        mueller%mueller_ext_diff_1d_total(j,9), mueller%mueller_ext_diff_1d_total(j,10), mueller%mueller_ext_diff_1d_total(j,11), mueller%mueller_ext_diff_1d_total(j,12), &
+        mueller%mueller_ext_diff_1d_total(j,13), mueller%mueller_ext_diff_1d_total(j,14), mueller%mueller_ext_diff_1d_total(j,15), mueller%mueller_ext_diff_1d_total(j,16)   
+        end do
+        close(10)
+    end if
       
       open(10,file=trim(output_dir)//"/"//"params")
       write(10,*) 'scattering parameters (orientation averaged)...'
