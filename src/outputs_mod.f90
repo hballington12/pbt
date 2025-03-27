@@ -549,22 +549,16 @@
    subroutine cache_job(job_params,                 & ! job parameters
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
-                        mueller_total,              & ! total 2d mueller
-                        mueller_1d_total,           & ! total 1d mueller
+                        mueller,                    & ! current 2d mueller
                         cache_dir,                  &
                         geometry)
       
       ! saves the job to the cache directory, possibly to be resumed later
       
-      real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
-      integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
-      integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
-      integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
       type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
       integer(8), intent(in) :: i_loop
       type(output_parameters_type), intent(inout) :: output_parameters_total
-      real(8), dimension(:,:,:), allocatable , intent(in):: mueller_total ! mueller matrices
-      real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d_total ! phi-integrated mueller matrices
+      type(muellers_type), intent(inout) :: mueller ! muller struct
       character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
       type(geometry_type), intent(in) :: geometry
       
@@ -575,7 +569,7 @@
       call PDAS(cache_dir, "unrotated", geometry)
       call save_apertures(geometry, cache_dir)
       call save_params(job_params,i_loop,cache_dir,output_parameters_total)
-      call writeup(mueller_total, mueller_1d_total, cache_dir, output_parameters_total, job_params) ! write to file
+      call writeup(mueller%mueller_total, mueller%mueller_1d_total, cache_dir, output_parameters_total, job_params) ! write to file
       
       print*,'saved job files to cache.'
       print*,'to resume this job, include the "-resume '//trim(cache_dir(7:len(cache_dir)))//'" flag when you call abt.'

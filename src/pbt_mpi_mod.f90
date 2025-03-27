@@ -270,7 +270,7 @@ subroutine pbt()
 
 
         if(job_params%debug >= 3) then
-            if(mpi%rank == 0) print*,'computing mueller matrix and parameters...'
+            if(mpi%rank == 0) print*,'computing muellen matrix and parameters...'
             write(101,*)'computing mueller matrix and parameters...'
         end if
 
@@ -387,8 +387,7 @@ subroutine pbt()
             call cache_job( job_params,                 & ! job parameters
                             i_loop,                     & ! current loop index
                             output_parameters_total,    & ! total output parameters
-                            mueller%mueller_total,              & ! total 2d mueller
-                            mueller%mueller_1d_total,           & ! total 1d mueller
+                            mueller,                    & ! mueller matrix struct
                             cache_dir,                  &
                             geometry)
         end if
