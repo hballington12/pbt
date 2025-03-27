@@ -281,7 +281,7 @@ subroutine pbt()
                         job_params)           ! <-  job parameters
 
         ! sum the total mueller and output parameters
-        call summation(mueller%mueller, mueller%mueller_total, mueller%mueller_1d, mueller%mueller_1d_total,output_parameters,output_parameters_total)
+        call summation(mueller,output_parameters,output_parameters_total)
 
         if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .and. i /= mpi%end) then
             i_finished_early = .true. ! set logical which exits loop and starts caching routine

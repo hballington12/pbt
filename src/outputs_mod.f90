@@ -405,25 +405,23 @@
    end subroutine
    
    subroutine summation(mueller,                & ! current 2d mueller
-      mueller_total,          & ! total 2d mueller
-      mueller_1d,             & ! current 1d mueller
-      mueller_1d_total,       & ! total 1d mueller
       output_parameters,      & 
       output_parameters_total)
       
       ! sr summation adds the current mueller matrices to the total
       
-      real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
-      real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller_total ! mueller matrices
-      real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
-      real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d_total ! phi-integrated mueller matrices
+      type(muellers_type), intent(inout) :: mueller ! muller struct
+    !   real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
+    !   real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller_total ! mueller matrices
+    !   real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
+    !   real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d_total ! phi-integrated mueller matrices
       type(output_parameters_type), intent(in) :: output_parameters 
       type(output_parameters_type), intent(inout) :: output_parameters_total
       
       ! if its the first call to summation, allocate the total mueller 1d and 2d arrays
-      if(.not. allocated(mueller_total)) then
-         allocate(mueller_total(1:size(mueller,1),1:size(mueller,2),1:size(mueller,3)))
-         mueller_total = 0d0 ! init
+      if(.not. allocated(mueller%mueller_total)) then
+         allocate(mueller%mueller_total(1:size(mueller%mueller,1),1:size(mueller%mueller,2),1:size(mueller%mueller,3)))
+         mueller%mueller_total = 0d0 ! init
          output_parameters_total%abs = 0d0 ! init
          output_parameters_total%scatt = 0d0 ! init
          output_parameters_total%ext = 0d0 ! init
@@ -442,14 +440,14 @@
          output_parameters_total%scatt_eff_beam = 0d0 ! init
          output_parameters_total%scatt_eff_ext_diff = 0d0 ! init
       end if
-      if(.not. allocated(mueller_1d_total)) then
-         allocate(mueller_1d_total(1:size(mueller_1d,1),1:size(mueller_1d,2)))
-         mueller_1d_total = 0d0 ! init
+      if(.not. allocated(mueller%mueller_1d_total)) then
+         allocate(mueller%mueller_1d_total(1:size(mueller%mueller_1d,1),1:size(mueller%mueller_1d,2)))
+         mueller%mueller_1d_total = 0d0 ! init
       end if
       
       ! sum
-      mueller_total = mueller_total + mueller
-      mueller_1d_total = mueller_1d_total + mueller_1d
+      mueller%mueller_total = mueller%mueller_total + mueller%mueller
+      mueller%mueller_1d_total = mueller%mueller_1d_total + mueller%mueller_1d
       output_parameters_total%abs = output_parameters_total%abs + output_parameters%abs
       output_parameters_total%scatt = output_parameters_total%scatt + output_parameters%scatt
       output_parameters_total%back_scatt = output_parameters_total%back_scatt + output_parameters%back_scatt
