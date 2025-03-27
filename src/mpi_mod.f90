@@ -258,6 +258,10 @@ subroutine mpi_send_sum(ierr,                       & ! mpi parameter
     if (my_rank .ne. 0) then ! if not rank 0 process, send mueller to rank 0
         call MPI_SEND(mueller%mueller_1d_total,size(mueller%mueller_1d_total,1)*size(mueller%mueller_1d_total,2),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(mueller%mueller_total,size(mueller%mueller_total,1)*size(mueller%mueller_total,2)*size(mueller%mueller_total,3),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(mueller%mueller_beam_1d_total,size(mueller%mueller_1d_total,1)*size(mueller%mueller_1d_total,2),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(mueller%mueller_beam_total,size(mueller%mueller_total,1)*size(mueller%mueller_total,2)*size(mueller%mueller_total,3),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(mueller%mueller_ext_diff_1d_total,size(mueller%mueller_1d_total,1)*size(mueller%mueller_1d_total,2),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
+        call MPI_SEND(mueller%mueller_ext_diff_total,size(mueller%mueller_total,1)*size(mueller%mueller_total,2)*size(mueller%mueller_total,3),MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(output_parameters_total%abs,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(output_parameters_total%scatt,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
         call MPI_SEND(output_parameters_total%ext,1,MPI_REAL8,0,tag,MPI_COMM_WORLD,ierr)
@@ -288,6 +292,14 @@ subroutine mpi_send_sum(ierr,                       & ! mpi parameter
             mueller%mueller_1d_total = mueller%mueller_1d_total + mueller%mueller_1d_recv ! sum
             call MPI_RECV(mueller%mueller_recv,size(mueller%mueller_recv,1)*size(mueller%mueller_recv,2)*size(mueller%mueller_recv,3),MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
             mueller%mueller_total = mueller%mueller_total + mueller%mueller_recv ! sum        
+            call MPI_RECV(mueller%mueller_1d_recv,size(mueller%mueller_1d_recv,1)*size(mueller%mueller_1d_recv,2),MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            mueller%mueller_beam_1d_total = mueller%mueller_beam_1d_total + mueller%mueller_1d_recv ! sum
+            call MPI_RECV(mueller%mueller_recv,size(mueller%mueller_recv,1)*size(mueller%mueller_recv,2)*size(mueller%mueller_recv,3),MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            mueller%mueller_beam_total = mueller%mueller_beam_total + mueller%mueller_recv ! sum        
+            call MPI_RECV(mueller%mueller_1d_recv,size(mueller%mueller_1d_recv,1)*size(mueller%mueller_1d_recv,2),MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            mueller%mueller_ext_diff_1d_total = mueller%mueller_ext_diff_1d_total + mueller%mueller_1d_recv ! sum
+            call MPI_RECV(mueller%mueller_recv,size(mueller%mueller_recv,1)*size(mueller%mueller_recv,2)*size(mueller%mueller_recv,3),MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
+            mueller%mueller_ext_diff_total = mueller%mueller_ext_diff_total + mueller%mueller_recv ! sum        
             call MPI_RECV(output_parameters_recv%abs,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
             output_parameters_total%abs = output_parameters_total%abs + output_parameters_recv%abs ! sum  
             call MPI_RECV(output_parameters_recv%scatt,1,MPI_REAL8,source,tag,MPI_COMM_WORLD,status,ierr)
