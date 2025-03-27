@@ -406,7 +406,7 @@ subroutine pbt()
 
         if (mpi%rank .eq. 0) then
 
-            call divide_by_num_orientations(mueller%mueller_total,mueller%mueller_1d_total,output_parameters_total,job_params)
+            call divide_by_num_orientations(mueller,output_parameters_total,job_params)
             
             call print_output_params(output_parameters_total)
 

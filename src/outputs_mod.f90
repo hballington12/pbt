@@ -10,18 +10,20 @@
    
    contains
    
-   subroutine divide_by_num_orientations(mueller,mueller_1d,output_parameters,job_params)
+   subroutine divide_by_num_orientations(mueller,output_parameters,job_params)
 
       ! sr divide_by_num_orientations
       ! divides the mueller matrix and output parameters by the total number of orientations
 
-      real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller
-      real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d
+
+    !   real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller
+    !   real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d
+      type(muellers_type), intent(inout) :: mueller ! muller struct
       type(output_parameters_type), intent(inout) :: output_parameters
       type(job_parameters_type), intent(in) :: job_params
 
-      mueller = mueller / job_params%num_orients 
-      mueller_1d = mueller_1d / job_params%num_orients 
+      mueller%mueller_total = mueller%mueller_total / job_params%num_orients 
+      mueller%mueller_1d_total = mueller%mueller_1d_total / job_params%num_orients 
       output_parameters%abs = output_parameters%abs / job_params%num_orients 
       output_parameters%scatt = output_parameters%scatt / job_params%num_orients 
       output_parameters%ext = output_parameters%ext / job_params%num_orients 
