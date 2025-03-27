@@ -545,9 +545,7 @@
             
             print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid_1d"
             open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid_1d") ! open job_params file
-            
             allocate(mueller%mueller_1d_total(1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
-            
             do i = 1, size(job_params%theta_vals,1)
                 read(10,fmt_mueller_1d) &
                 Junk, &
@@ -556,14 +554,37 @@
                 mueller%mueller_1d_total(i,9), mueller%mueller_1d_total(i,10), mueller%mueller_1d_total(i,11), mueller%mueller_1d_total(i,12), &
                 mueller%mueller_1d_total(i,13), mueller%mueller_1d_total(i,14), mueller%mueller_1d_total(i,15), mueller%mueller_1d_total(i,16)
             end do
-            
+            close(10)
+
+            print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_beam_scatgrid_1d"
+            open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_beam_scatgrid_1d") ! open job_params file
+            allocate(mueller%mueller_beam_1d_total(1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
+            do i = 1, size(job_params%theta_vals,1)
+                read(10,fmt_mueller_1d) &
+                Junk, &
+                mueller%mueller_beam_1d_total(i,1), mueller%mueller_beam_1d_total(i,2), mueller%mueller_beam_1d_total(i,3), mueller%mueller_beam_1d_total(i,4), &
+                mueller%mueller_beam_1d_total(i,5), mueller%mueller_beam_1d_total(i,6), mueller%mueller_beam_1d_total(i,7), mueller%mueller_beam_1d_total(i,8), &
+                mueller%mueller_beam_1d_total(i,9), mueller%mueller_beam_1d_total(i,10), mueller%mueller_beam_1d_total(i,11), mueller%mueller_beam_1d_total(i,12), &
+                mueller%mueller_beam_1d_total(i,13), mueller%mueller_beam_1d_total(i,14), mueller%mueller_beam_1d_total(i,15), mueller%mueller_beam_1d_total(i,16)
+            end do
+            close(10)
+
+            print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_ext_diff_scatgrid_1d"
+            open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_ext_diff_scatgrid_1d") ! open job_params file
+            allocate(mueller%mueller_ext_diff_1d_total(1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
+            do i = 1, size(job_params%theta_vals,1)
+                read(10,fmt_mueller_1d) &
+                Junk, &
+                mueller%mueller_ext_diff_1d_total(i,1), mueller%mueller_ext_diff_1d_total(i,2), mueller%mueller_ext_diff_1d_total(i,3), mueller%mueller_ext_diff_1d_total(i,4), &
+                mueller%mueller_ext_diff_1d_total(i,5), mueller%mueller_ext_diff_1d_total(i,6), mueller%mueller_ext_diff_1d_total(i,7), mueller%mueller_ext_diff_1d_total(i,8), &
+                mueller%mueller_ext_diff_1d_total(i,9), mueller%mueller_ext_diff_1d_total(i,10), mueller%mueller_ext_diff_1d_total(i,11), mueller%mueller_ext_diff_1d_total(i,12), &
+                mueller%mueller_ext_diff_1d_total(i,13), mueller%mueller_ext_diff_1d_total(i,14), mueller%mueller_ext_diff_1d_total(i,15), mueller%mueller_ext_diff_1d_total(i,16)
+            end do
             close(10)
             
             print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid"
             open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_scatgrid") ! open job_params file
-            
             allocate(mueller%mueller_total(1:size(job_params%phi_vals,1),1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
-            
             do i = 1, size(job_params%theta_vals,1)
                 do j = 1, size(job_params%phi_vals,1)
                     read(10,fmt_mueller_2d) &
@@ -574,7 +595,36 @@
                     mueller%mueller_total(j,i,13), mueller%mueller_total(j,i,14), mueller%mueller_total(j,i,15), mueller%mueller_total(j,i,16)                                                                             
                 end do
             end do
-            
+            close(10)
+
+            print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_beam_scatgrid"
+            open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_beam_scatgrid") ! open job_params file
+            allocate(mueller%mueller_beam_total(1:size(job_params%phi_vals,1),1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
+            do i = 1, size(job_params%theta_vals,1)
+                do j = 1, size(job_params%phi_vals,1)
+                    read(10,fmt_mueller_2d) &
+                    junk, junk, &
+                    mueller%mueller_beam_total(j,i,1), mueller%mueller_beam_total(j,i,2), mueller%mueller_beam_total(j,i,3), mueller%mueller_beam_total(j,i,4), &
+                    mueller%mueller_beam_total(j,i,5), mueller%mueller_beam_total(j,i,6), mueller%mueller_beam_total(j,i,7), mueller%mueller_beam_total(j,i,8), &
+                    mueller%mueller_beam_total(j,i,9), mueller%mueller_beam_total(j,i,10), mueller%mueller_beam_total(j,i,11), mueller%mueller_beam_total(j,i,12), &
+                    mueller%mueller_beam_total(j,i,13), mueller%mueller_beam_total(j,i,14), mueller%mueller_beam_total(j,i,15), mueller%mueller_beam_total(j,i,16)                                                                             
+                end do
+            end do
+            close(10)
+
+            print*,'trying to open: "',"cache/"//trim(adjustl(cache_id_string))//"/mueller_ext_diff_scatgrid"
+            open(10,file="cache/"//trim(adjustl(cache_id_string))//"/mueller_ext_diff_scatgrid") ! open job_params file
+            allocate(mueller%mueller_ext_diff_total(1:size(job_params%phi_vals,1),1:size(job_params%theta_vals,1),1:16)) ! 1:1 is for each element
+            do i = 1, size(job_params%theta_vals,1)
+                do j = 1, size(job_params%phi_vals,1)
+                    read(10,fmt_mueller_2d) &
+                    junk, junk, &
+                    mueller%mueller_ext_diff_total(j,i,1), mueller%mueller_ext_diff_total(j,i,2), mueller%mueller_ext_diff_total(j,i,3), mueller%mueller_ext_diff_total(j,i,4), &
+                    mueller%mueller_ext_diff_total(j,i,5), mueller%mueller_ext_diff_total(j,i,6), mueller%mueller_ext_diff_total(j,i,7), mueller%mueller_ext_diff_total(j,i,8), &
+                    mueller%mueller_ext_diff_total(j,i,9), mueller%mueller_ext_diff_total(j,i,10), mueller%mueller_ext_diff_total(j,i,11), mueller%mueller_ext_diff_total(j,i,12), &
+                    mueller%mueller_ext_diff_total(j,i,13), mueller%mueller_ext_diff_total(j,i,14), mueller%mueller_ext_diff_total(j,i,15), mueller%mueller_ext_diff_total(j,i,16)                                                                             
+                end do
+            end do
             close(10)
             
             print*,'read cached files. numer of orients remaining: ',num_remaining_orients,"/",job_params%num_orients

@@ -52,8 +52,7 @@ subroutine pbt()
     complex(8), dimension(:,:,:,:), allocatable :: ampl_far_ext_diff ! far-field amplitude matrix due to external diffraction
 
     ! sr make_mueller
-    real(8), dimension(:,:,:), allocatable :: mueller, mueller_total ! mueller matrices
-    real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total ! phi-integrated mueller matrices
+    type(muellers_type) mueller ! combined mueller matrix struct
 
     ! sr finalise
     type(output_parameters_type) output_parameters 
@@ -84,7 +83,7 @@ subroutine pbt()
     if(job_params%resume) then ! if resuming a cached job
         print*,'attempting to resume job using cache #',job_params%cache_id
         ! get cached data and continue
-        call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
+        call resume_job(job_params,num_remaining_orients,remaining_orients,mueller,output_parameters_total)
     end if ! end if resuming a cached job
 
     call make_dir(job_params%job_name,job_params%output_dir)
@@ -241,14 +240,13 @@ subroutine pbt()
         call finalise(  ampl_far_beam,      & ! <-  amplitude matrix due to beam diffraction
                         ampl_far_ext_diff,  & ! <-  amplitude matrix due to external diffraction
                         mueller,            & !  -> 2d mueller matrix
-                        mueller_1d,         & !  -> 1d mueller matrix
                         output_parameters,  & !  -> some output parameters
                         job_params)           ! <-  job parameters
                         
         ! call writeup(mueller, mueller_1d, theta_vals, phi_vals) ! write current mueller to file
 
         ! sum the total mueller and output parameters
-        call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
+        call summation(mueller,output_parameters,output_parameters_total)
 
         if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit) then ! if job time limit exceeded
             ! make cache directory
@@ -259,8 +257,7 @@ subroutine pbt()
             call cache_job( job_params,                 & ! <-  job parameters
                             i_loop,                     & ! <-  current loop index
                             output_parameters_total,    & ! <-  total output parameters
-                            mueller_total,              & ! <-  total 2d mueller
-                            mueller_1d_total,           & ! <-  total 1d mueller
+                            mueller,                    & ! <-  mueller struct
                             cache_dir,                  & ! <-  cache directory
                             geometry)                     ! <-  unrotated particle geometry
             stop
@@ -271,14 +268,14 @@ subroutine pbt()
     print*,'end orientation loop.'
 
     ! divide by no. of orientations
-    call divide_by_num_orientations(mueller_total,mueller_1d_total,output_parameters_total,job_params)
+    call divide_by_num_orientations(mueller,output_parameters_total,job_params)
 
     ! print final output parameters to std out
     call print_output_params(output_parameters_total)
 
     ! writing to file
     call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)
-    call writeup(mueller_total, mueller_1d_total, job_params%output_dir, output_parameters_total, job_params) ! write to file
+    call writeup(mueller, job_params%output_dir, output_parameters_total, job_params) ! write to file
 
     ! clean up temporary files
     call system("rm -r "//trim(job_params%output_dir)//"/tmp") ! remove directory for temp files
