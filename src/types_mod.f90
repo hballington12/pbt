@@ -96,6 +96,7 @@ type job_parameters_type
     logical is_fast ! whether to prioritise speed (true) or memory use (false)
     logical disable_alpha ! whether or not to disable alpha euler angle
     integer euler_method ! euler angle rotation method
+    logical split_output ! whether or not to split the beam and diffraction parts in the output
 end type job_parameters_type
 
 type field_in_type
@@ -190,6 +191,22 @@ type geometry_type
     real(8) com(1:3) ! centre of mass
 end type geometry_type
 
+type muellers_type
+    real(8), dimension(:,:,:), allocatable :: mueller
+    real(8), dimension(:,:,:), allocatable :: mueller_total
+    real(8), dimension(:,:,:), allocatable :: mueller_beam
+    real(8), dimension(:,:,:), allocatable :: mueller_beam_total
+    real(8), dimension(:,:,:), allocatable :: mueller_ext_diff
+    real(8), dimension(:,:,:), allocatable :: mueller_ext_diff_total
+    real(8), dimension(:,:,:), allocatable :: mueller_recv
+    real(8), dimension(:,:), allocatable :: mueller_1d
+    real(8), dimension(:,:), allocatable :: mueller_1d_total
+    real(8), dimension(:,:), allocatable :: mueller_beam_1d
+    real(8), dimension(:,:), allocatable :: mueller_beam_1d_total
+    real(8), dimension(:,:), allocatable :: mueller_ext_diff_1d
+    real(8), dimension(:,:), allocatable :: mueller_ext_diff_1d_total
+    real(8), dimension(:,:), allocatable :: mueller_1d_recv
+end type muellers_type
 ! format specifiers
 
 character(len=111), parameter :: fmt_mueller_2d = '(f12.4,f12.4,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8,e16.8)'

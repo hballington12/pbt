@@ -21,7 +21,7 @@ contains
 
 subroutine pbt()
 
-    ! to do:
+    ! to do:_
     ! add support to avoid crash if nan detected
 
     ! ########## variable declaration ##########
@@ -59,8 +59,7 @@ subroutine pbt()
     complex(8), dimension(:,:,:,:), allocatable :: ampl_far_ext_diff ! total
 
     ! sr make_mueller
-    real(8), dimension(:,:,:), allocatable :: mueller, mueller_total, mueller_recv ! mueller matrices
-    real(8), dimension(:,:), allocatable :: mueller_1d, mueller_1d_total, mueller_1d_recv ! phi-integrated mueller matrices
+    type(muellers_type) mueller ! combined mueller matrix struct
 
     ! mpi (some of this is unused)
     integer source, dest
@@ -114,10 +113,14 @@ subroutine pbt()
     if(job_params%resume) then ! if resuming a cached job
         if(mpi%rank == 0) print*,'attempting to resume job using cache #',job_params%cache_id
         ! get cached data and continue
-        call resume_job(job_params,num_remaining_orients,remaining_orients,mueller_total,mueller_1d_total,output_parameters_total)
+        call resume_job(job_params,num_remaining_orients,remaining_orients,mueller,output_parameters_total)
         if(mpi%rank /= 0) then ! only rank 0 should keep summed parameters from the cache, reset vals for all other processes
-            deallocate(mueller_total)
-            deallocate(mueller_1d_total)
+            deallocate(mueller%mueller_total)
+            deallocate(mueller%mueller_beam_total)
+            deallocate(mueller%mueller_ext_diff_total)
+            deallocate(mueller%mueller_1d_total)
+            deallocate(mueller%mueller_beam_1d_total)
+            deallocate(mueller%mueller_ext_diff_1d_total)
         end if
     end if ! end if resuming a cached job
 
@@ -271,19 +274,18 @@ subroutine pbt()
 
 
         if(job_params%debug >= 3) then
-            if(mpi%rank == 0) print*,'computing mueller matrix and parameters...'
+            if(mpi%rank == 0) print*,'computing muellen matrix and parameters...'
             write(101,*)'computing mueller matrix and parameters...'
         end if
 
         call finalise(  ampl_far_beam,      & ! <-  amplitude matrix due to beam diffraction
                         ampl_far_ext_diff,  & ! <-  amplitude matrix due to external diffraction
-                        mueller,            & !  -> 2d mueller matrix
-                        mueller_1d,         & !  -> 1d mueller matrix
+                        mueller,             & ! -> mueller matrix struct
                         output_parameters,  & !  -> some output parameters
                         job_params)           ! <-  job parameters
 
         ! sum the total mueller and output parameters
-        call summation(mueller, mueller_total, mueller_1d, mueller_1d_total,output_parameters,output_parameters_total)
+        call summation(mueller,output_parameters,output_parameters_total)
 
         if((omp_get_wtime() - start)/3600D0 .gt. job_params%time_limit .and. i /= mpi%end) then
             i_finished_early = .true. ! set logical which exits loop and starts caching routine
@@ -381,8 +383,7 @@ subroutine pbt()
                             mpi%p,                          & ! mpi parameter
                             mpi%status,                     & ! mpi parameter
                             mpi%rank,                    & ! process rank
-                            mueller_1d_total,           & ! 1d mueller matrix total for each process
-                            mueller_total,              & ! 2d mueller matrix total for each process
+                            mueller,                         & ! mueller matrix struct
                             output_parameters_total)      ! output parameters total for each process
 
         ! then rank 0 writes to cached files
@@ -390,8 +391,7 @@ subroutine pbt()
             call cache_job( job_params,                 & ! job parameters
                             i_loop,                     & ! current loop index
                             output_parameters_total,    & ! total output parameters
-                            mueller_total,              & ! total 2d mueller
-                            mueller_1d_total,           & ! total 1d mueller
+                            mueller,                    & ! mueller matrix struct
                             cache_dir,                  &
                             geometry)
         end if
@@ -404,20 +404,19 @@ subroutine pbt()
                             mpi%p,                          & ! mpi parameter
                             mpi%status,                     & ! mpi parameter
                             mpi%rank,                    & ! process rank
-                            mueller_1d_total,           & ! 1d mueller matrix total for each process
-                            mueller_total,              & ! 2d mueller matrix total for each process
+                            mueller,                         & ! mueller matrix struct  
                             output_parameters_total)      ! output parameters total for each process
 
 
         if (mpi%rank .eq. 0) then
 
-            call divide_by_num_orientations(mueller_total,mueller_1d_total,output_parameters_total,job_params)
+            call divide_by_num_orientations(mueller,output_parameters_total,job_params)
             
             call print_output_params(output_parameters_total)
 
             ! writing to file
             call write_outbins(job_params%output_dir,job_params%theta_vals,job_params%phi_vals)
-            call writeup(mueller_total, mueller_1d_total, job_params%output_dir, output_parameters_total, job_params) ! write to file
+            call writeup(mueller, job_params%output_dir, output_parameters_total, job_params) ! write to file
 
             ! clean up temporary files
             call system("rm -r "//trim(job_params%output_dir)//"/tmp") ! remove directory for temp files

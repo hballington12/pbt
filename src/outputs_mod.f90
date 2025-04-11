@@ -10,18 +10,24 @@
    
    contains
    
-   subroutine divide_by_num_orientations(mueller,mueller_1d,output_parameters,job_params)
+   subroutine divide_by_num_orientations(mueller,output_parameters,job_params)
 
       ! sr divide_by_num_orientations
       ! divides the mueller matrix and output parameters by the total number of orientations
 
-      real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller
-      real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d
+
+    !   real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller
+    !   real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d
+      type(muellers_type), intent(inout) :: mueller ! muller struct
       type(output_parameters_type), intent(inout) :: output_parameters
       type(job_parameters_type), intent(in) :: job_params
 
-      mueller = mueller / job_params%num_orients 
-      mueller_1d = mueller_1d / job_params%num_orients 
+      mueller%mueller_total = mueller%mueller_total / job_params%num_orients 
+      mueller%mueller_1d_total = mueller%mueller_1d_total / job_params%num_orients 
+      mueller%mueller_beam_total = mueller%mueller_beam_total / job_params%num_orients 
+      mueller%mueller_beam_1d_total = mueller%mueller_beam_1d_total / job_params%num_orients 
+      mueller%mueller_ext_diff_total = mueller%mueller_ext_diff_total / job_params%num_orients 
+      mueller%mueller_ext_diff_1d_total = mueller%mueller_ext_diff_1d_total / job_params%num_orients 
       output_parameters%abs = output_parameters%abs / job_params%num_orients 
       output_parameters%scatt = output_parameters%scatt / job_params%num_orients 
       output_parameters%ext = output_parameters%ext / job_params%num_orients 
@@ -62,8 +68,7 @@
    
    subroutine finalise( ampl_far_beam,     & ! amplitude matrix due to beam diffraction
                         ampl_far_ext_diff, & ! amplitude matrix due to external diffraction
-                        mueller,             & ! 2d mueller matrix
-                        mueller_1d,          & ! 1d mueller matrix
+                        mueller,             & ! mueller struct
                         output_parameters,   & ! output parameters
                         job_params)
       
@@ -77,8 +82,9 @@
       complex(8), dimension(:,:,:,:), allocatable, intent(inout) :: ampl_far_beam ! beam
       complex(8), dimension(:,:,:,:), allocatable, intent(inout)  :: ampl_far_ext_diff ! ext diff
       real(8), dimension(:), allocatable :: theta_vals, phi_vals
-      real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
-      real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
+      type(muellers_type), intent(inout) :: mueller ! muller struct
+    !   real(8), dimension(:,:,:), allocatable, intent(out) :: mueller ! mueller matrices
+    !   real(8), dimension(:,:), allocatable, intent(out) :: mueller_1d ! phi-integrated mueller matrices
       real(8) la ! wavelength
       type(output_parameters_type), intent(out) :: output_parameters 
       type(job_parameters_type), intent(in) :: job_params
@@ -111,9 +117,9 @@
          write(101,*)'making 2d mueller matrices...'
       end if
 
-      call ampl_to_mueller(ampl_far,mueller)
-      call ampl_to_mueller(ampl_far_beam,mueller_beam)
-      call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
+      call ampl_to_mueller(ampl_far,mueller%mueller)
+      call ampl_to_mueller(ampl_far_beam,mueller%mueller_beam)
+      call ampl_to_mueller(ampl_far_ext_diff,mueller%mueller_ext_diff)
 
       if(job_params%debug >= 1) then
          write(101,*)'making 1d mueller matrices...'
@@ -121,18 +127,18 @@
 
       write(101,*)'------------------------------------------------------'
       
-      call get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
-      call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
-      call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller%mueller, mueller%mueller_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller%mueller_beam, mueller%mueller_beam_1d, theta_vals, phi_vals)
+      call get_1d_mueller(mueller%mueller_ext_diff, mueller%mueller_ext_diff_1d, theta_vals, phi_vals)
 
       if(job_params%debug >= 1) then
          write(101,*)'calculating integrated parameters...'
       end if
 
       ! theta integrations...
-      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
       
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8,A2,f10.6,A3)')'scatt. cross (ext diff):',scatt_ext_diff," (",scatt_ext_diff/output_parameters%ext_energy_out*100," %)"
@@ -159,26 +165,26 @@
             write(101,*)'remaking 2d mueller matrices...'
          end if
 
-         call ampl_to_mueller(ampl_far,mueller)
-         call ampl_to_mueller(ampl_far_beam,mueller_beam)
-         call ampl_to_mueller(ampl_far_ext_diff,mueller_ext_diff)
+         call ampl_to_mueller(ampl_far,mueller%mueller)
+         call ampl_to_mueller(ampl_far_beam,mueller%mueller_beam)
+         call ampl_to_mueller(ampl_far_ext_diff,mueller%mueller_ext_diff)
    
          if(job_params%debug >= 2) then  
             write(101,*)'remaking 1d mueller matrices...'
          end if
          
-         call get_1d_mueller(mueller, mueller_1d, theta_vals, phi_vals)
-         call get_1d_mueller(mueller_beam, mueller_beam_1d, theta_vals, phi_vals)
-         call get_1d_mueller(mueller_ext_diff, mueller_ext_diff_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller%mueller, mueller%mueller_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller%mueller_beam, mueller%mueller_beam_1d, theta_vals, phi_vals)
+         call get_1d_mueller(mueller%mueller_ext_diff, mueller%mueller_ext_diff_1d, theta_vals, phi_vals)
    
          if(job_params%debug >= 2) then  
             write(101,*)'recalculating integrated parameters...'
          end if
 
          ! theta integrations...
-         call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
-         call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
-         call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
+         call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt) ! p11*sin(theta)
+         call simpne(size(theta_vals,1),theta_vals,mueller%mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_beam) ! p11*sin(theta)
+         call simpne(size(theta_vals,1),theta_vals,mueller%mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)/(waveno**2),scatt_ext_diff) ! p11*sin(theta)
          
 
       end if
@@ -195,14 +201,14 @@
       
       ext = absorption + scatt
       albedo = 1-(ext-scatt)/ext
-      call simpne(size(theta_vals,1),theta_vals,mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt/(waveno**2),asymmetry) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam/(waveno**2),asymmetry_beam) ! p11*sin(theta)
-      call simpne(size(theta_vals,1),theta_vals,mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff/(waveno**2),asymmetry_ext_diff) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt/(waveno**2),asymmetry) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_beam_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_beam/(waveno**2),asymmetry_beam) ! p11*sin(theta)
+      call simpne(size(theta_vals,1),theta_vals,mueller%mueller_ext_diff_1d(1:size(theta_vals,1),1)*sin(theta_vals)*cos(theta_vals)/scatt_ext_diff/(waveno**2),asymmetry_ext_diff) ! p11*sin(theta)
 
       ! calculate back-scattering cross section
       ! find closest theta value to direct back-scattering
       i = minloc(abs(theta_vals - 2*pi),1)
-      back_scatt = mueller(1,i,1)*4*pi/waveno**2 ! calculate back-scattering cross section (B&H definition)
+      back_scatt = mueller%mueller(1,i,1)*4*pi/waveno**2 ! calculate back-scattering cross section (B&H definition)
 
       if(job_params%debug >= 1) then  
          write(101,'(A40,f16.8)')'scatt. cross (total):',scatt
@@ -329,15 +335,13 @@
    end subroutine
 
    subroutine writeup(  mueller,    &
-      mueller_1d, &
       output_dir, &
       output_parameters_total, &
       job_params)
       
       ! sr writeup writes the 1d and 2d mueller matrices to the job directory
       
-      real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
-      real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
+      type(muellers_type), intent(in) :: mueller ! muller struct
       real(8), dimension(:), allocatable :: theta_vals, phi_vals
       character(len=*), intent(in) :: output_dir
       type(output_parameters_type), intent(inout) :: output_parameters_total
@@ -350,30 +354,79 @@
       if(job_params%debug >= 1) then   
          print*,'writing mueller to file...'
       end if
-      if(.not. job_params%suppress_2d) then
-         open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
-         do i = 1, size(theta_vals,1)
+    if(.not. job_params%suppress_2d) then
+       open(10,file=trim(output_dir)//"/"//"mueller_scatgrid")
+       do i = 1, size(theta_vals,1)
+        do j = 1, size(phi_vals,1)
+           write(10,fmt_mueller_2d) &
+           theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
+           mueller%mueller_total(j,i,1), mueller%mueller_total(j,i,2), mueller%mueller_total(j,i,3), mueller%mueller_total(j,i,4), &
+           mueller%mueller_total(j,i,5), mueller%mueller_total(j,i,6), mueller%mueller_total(j,i,7), mueller%mueller_total(j,i,8), &
+           mueller%mueller_total(j,i,9), mueller%mueller_total(j,i,10), mueller%mueller_total(j,i,11), mueller%mueller_total(j,i,12), &
+           mueller%mueller_total(j,i,13), mueller%mueller_total(j,i,14), mueller%mueller_total(j,i,15), mueller%mueller_total(j,i,16)                                                                             
+        end do
+       end do
+       close(10)
+       if (job_params%split_output) then
+        open(10,file=trim(output_dir)//"/"//"mueller_beam_scatgrid")
+        do i = 1, size(theta_vals,1)
             do j = 1, size(phi_vals,1)
-               write(10,fmt_mueller_2d) &
-               theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
-               mueller(j,i,1), mueller(j,i,2), mueller(j,i,3), mueller(j,i,4), &
-               mueller(j,i,5), mueller(j,i,6), mueller(j,i,7), mueller(j,i,8), &
-               mueller(j,i,9), mueller(j,i,10), mueller(j,i,11), mueller(j,i,12), &
-               mueller(j,i,13), mueller(j,i,14), mueller(j,i,15), mueller(j,i,16)                                                                             
+            write(10,fmt_mueller_2d) &
+            theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
+            mueller%mueller_beam_total(j,i,1), mueller%mueller_beam_total(j,i,2), mueller%mueller_beam_total(j,i,3), mueller%mueller_beam_total(j,i,4), &
+            mueller%mueller_beam_total(j,i,5), mueller%mueller_beam_total(j,i,6), mueller%mueller_beam_total(j,i,7), mueller%mueller_beam_total(j,i,8), &
+            mueller%mueller_beam_total(j,i,9), mueller%mueller_beam_total(j,i,10), mueller%mueller_beam_total(j,i,11), mueller%mueller_beam_total(j,i,12), &
+            mueller%mueller_beam_total(j,i,13), mueller%mueller_beam_total(j,i,14), mueller%mueller_beam_total(j,i,15), mueller%mueller_beam_total(j,i,16)                                                                             
             end do
-         end do
-         close(10)
+        end do
+        close(10)
+        open(10,file=trim(output_dir)//"/"//"mueller_ext_diff_scatgrid")
+        do i = 1, size(theta_vals,1)
+            do j = 1, size(phi_vals,1)
+            write(10,fmt_mueller_2d) &
+            theta_vals(i)*180/pi, phi_vals(j)*180/pi, &
+            mueller%mueller_ext_diff_total(j,i,1), mueller%mueller_ext_diff_total(j,i,2), mueller%mueller_ext_diff_total(j,i,3), mueller%mueller_ext_diff_total(j,i,4), &
+            mueller%mueller_ext_diff_total(j,i,5), mueller%mueller_ext_diff_total(j,i,6), mueller%mueller_ext_diff_total(j,i,7), mueller%mueller_ext_diff_total(j,i,8), &
+            mueller%mueller_ext_diff_total(j,i,9), mueller%mueller_ext_diff_total(j,i,10), mueller%mueller_ext_diff_total(j,i,11), mueller%mueller_ext_diff_total(j,i,12), &
+            mueller%mueller_ext_diff_total(j,i,13), mueller%mueller_ext_diff_total(j,i,14), mueller%mueller_ext_diff_total(j,i,15), mueller%mueller_ext_diff_total(j,i,16)                                                                             
+            end do
+        end do
+        close(10)
+    end if
       end if
+
       open(10,file=trim(output_dir)//"/"//"mueller_scatgrid_1d")
       do j = 1, size(theta_vals,1)
          write(10,fmt_mueller_1d) &
          theta_vals(j)*180/pi, &
-         mueller_1d(j,1), mueller_1d(j,2), mueller_1d(j,3), mueller_1d(j,4), &
-         mueller_1d(j,5), mueller_1d(j,6), mueller_1d(j,7), mueller_1d(j,8), &
-         mueller_1d(j,9), mueller_1d(j,10), mueller_1d(j,11), mueller_1d(j,12), &
-         mueller_1d(j,13), mueller_1d(j,14), mueller_1d(j,15), mueller_1d(j,16)   
+         mueller%mueller_1d_total(j,1), mueller%mueller_1d_total(j,2), mueller%mueller_1d_total(j,3), mueller%mueller_1d_total(j,4), &
+         mueller%mueller_1d_total(j,5), mueller%mueller_1d_total(j,6), mueller%mueller_1d_total(j,7), mueller%mueller_1d_total(j,8), &
+         mueller%mueller_1d_total(j,9), mueller%mueller_1d_total(j,10), mueller%mueller_1d_total(j,11), mueller%mueller_1d_total(j,12), &
+         mueller%mueller_1d_total(j,13), mueller%mueller_1d_total(j,14), mueller%mueller_1d_total(j,15), mueller%mueller_1d_total(j,16)   
       end do
       close(10)
+      if (job_params%split_output) then
+        open(10,file=trim(output_dir)//"/"//"mueller_beam_scatgrid_1d")
+        do j = 1, size(theta_vals,1)
+        write(10,fmt_mueller_1d) &
+        theta_vals(j)*180/pi, &
+        mueller%mueller_beam_1d_total(j,1), mueller%mueller_beam_1d_total(j,2), mueller%mueller_beam_1d_total(j,3), mueller%mueller_beam_1d_total(j,4), &
+        mueller%mueller_beam_1d_total(j,5), mueller%mueller_beam_1d_total(j,6), mueller%mueller_beam_1d_total(j,7), mueller%mueller_beam_1d_total(j,8), &
+        mueller%mueller_beam_1d_total(j,9), mueller%mueller_beam_1d_total(j,10), mueller%mueller_beam_1d_total(j,11), mueller%mueller_beam_1d_total(j,12), &
+        mueller%mueller_beam_1d_total(j,13), mueller%mueller_beam_1d_total(j,14), mueller%mueller_beam_1d_total(j,15), mueller%mueller_beam_1d_total(j,16)   
+        end do
+        close(10)
+        open(10,file=trim(output_dir)//"/"//"mueller_ext_diff_scatgrid_1d")
+        do j = 1, size(theta_vals,1)
+        write(10,fmt_mueller_1d) &
+        theta_vals(j)*180/pi, &
+        mueller%mueller_ext_diff_1d_total(j,1), mueller%mueller_ext_diff_1d_total(j,2), mueller%mueller_ext_diff_1d_total(j,3), mueller%mueller_ext_diff_1d_total(j,4), &
+        mueller%mueller_ext_diff_1d_total(j,5), mueller%mueller_ext_diff_1d_total(j,6), mueller%mueller_ext_diff_1d_total(j,7), mueller%mueller_ext_diff_1d_total(j,8), &
+        mueller%mueller_ext_diff_1d_total(j,9), mueller%mueller_ext_diff_1d_total(j,10), mueller%mueller_ext_diff_1d_total(j,11), mueller%mueller_ext_diff_1d_total(j,12), &
+        mueller%mueller_ext_diff_1d_total(j,13), mueller%mueller_ext_diff_1d_total(j,14), mueller%mueller_ext_diff_1d_total(j,15), mueller%mueller_ext_diff_1d_total(j,16)   
+        end do
+        close(10)
+    end if
       
       open(10,file=trim(output_dir)//"/"//"params")
       write(10,*) 'scattering parameters (orientation averaged)...'
@@ -405,25 +458,27 @@
    end subroutine
    
    subroutine summation(mueller,                & ! current 2d mueller
-      mueller_total,          & ! total 2d mueller
-      mueller_1d,             & ! current 1d mueller
-      mueller_1d_total,       & ! total 1d mueller
       output_parameters,      & 
       output_parameters_total)
       
       ! sr summation adds the current mueller matrices to the total
       
-      real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
-      real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller_total ! mueller matrices
-      real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
-      real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d_total ! phi-integrated mueller matrices
+      type(muellers_type), intent(inout) :: mueller ! muller struct
+    !   real(8), dimension(:,:,:), allocatable, intent(in) :: mueller ! mueller matrices
+    !   real(8), dimension(:,:,:), allocatable, intent(inout) :: mueller_total ! mueller matrices
+    !   real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d ! phi-integrated mueller matrices
+    !   real(8), dimension(:,:), allocatable, intent(inout) :: mueller_1d_total ! phi-integrated mueller matrices
       type(output_parameters_type), intent(in) :: output_parameters 
       type(output_parameters_type), intent(inout) :: output_parameters_total
       
       ! if its the first call to summation, allocate the total mueller 1d and 2d arrays
-      if(.not. allocated(mueller_total)) then
-         allocate(mueller_total(1:size(mueller,1),1:size(mueller,2),1:size(mueller,3)))
-         mueller_total = 0d0 ! init
+      if(.not. allocated(mueller%mueller_total)) then
+         allocate(mueller%mueller_total(1:size(mueller%mueller,1),1:size(mueller%mueller,2),1:size(mueller%mueller,3)))
+         allocate(mueller%mueller_beam_total(1:size(mueller%mueller,1),1:size(mueller%mueller,2),1:size(mueller%mueller,3)))
+         allocate(mueller%mueller_ext_diff_total(1:size(mueller%mueller,1),1:size(mueller%mueller,2),1:size(mueller%mueller,3)))
+         mueller%mueller_total = 0d0 ! init
+         mueller%mueller_beam_total = 0d0 ! init
+         mueller%mueller_ext_diff_total = 0d0 ! init
          output_parameters_total%abs = 0d0 ! init
          output_parameters_total%scatt = 0d0 ! init
          output_parameters_total%ext = 0d0 ! init
@@ -442,14 +497,26 @@
          output_parameters_total%scatt_eff_beam = 0d0 ! init
          output_parameters_total%scatt_eff_ext_diff = 0d0 ! init
       end if
-      if(.not. allocated(mueller_1d_total)) then
-         allocate(mueller_1d_total(1:size(mueller_1d,1),1:size(mueller_1d,2)))
-         mueller_1d_total = 0d0 ! init
+      if(.not. allocated(mueller%mueller_1d_total)) then
+         allocate(mueller%mueller_1d_total(1:size(mueller%mueller_1d,1),1:size(mueller%mueller_1d,2)))
+         mueller%mueller_1d_total = 0d0 ! init
+      end if
+      if(.not. allocated(mueller%mueller_beam_1d_total)) then
+         allocate(mueller%mueller_beam_1d_total(1:size(mueller%mueller_1d,1),1:size(mueller%mueller_1d,2)))
+         mueller%mueller_beam_1d_total = 0d0 ! init
+      end if
+      if(.not. allocated(mueller%mueller_ext_diff_1d_total)) then
+         allocate(mueller%mueller_ext_diff_1d_total(1:size(mueller%mueller_1d,1),1:size(mueller%mueller_1d,2)))
+         mueller%mueller_ext_diff_1d_total = 0d0 ! init
       end if
       
       ! sum
-      mueller_total = mueller_total + mueller
-      mueller_1d_total = mueller_1d_total + mueller_1d
+      mueller%mueller_total = mueller%mueller_total + mueller%mueller
+      mueller%mueller_1d_total = mueller%mueller_1d_total + mueller%mueller_1d
+      mueller%mueller_beam_total = mueller%mueller_beam_total + mueller%mueller_beam
+      mueller%mueller_beam_1d_total = mueller%mueller_beam_1d_total + mueller%mueller_beam_1d
+      mueller%mueller_ext_diff_total = mueller%mueller_ext_diff_total + mueller%mueller_ext_diff
+      mueller%mueller_ext_diff_1d_total = mueller%mueller_ext_diff_1d_total + mueller%mueller_ext_diff_1d
       output_parameters_total%abs = output_parameters_total%abs + output_parameters%abs
       output_parameters_total%scatt = output_parameters_total%scatt + output_parameters%scatt
       output_parameters_total%back_scatt = output_parameters_total%back_scatt + output_parameters%back_scatt
@@ -551,22 +618,16 @@
    subroutine cache_job(job_params,                 & ! job parameters
                         i_loop,                     & ! current loop index
                         output_parameters_total,    & ! total output parameters
-                        mueller_total,              & ! total 2d mueller
-                        mueller_1d_total,           & ! total 1d mueller
+                        mueller,                    & ! current 2d mueller
                         cache_dir,                  &
                         geometry)
       
       ! saves the job to the cache directory, possibly to be resumed later
       
-      real(8), dimension(:,:), allocatable :: vert_in ! unique vertices (unrotated)
-      integer(8), dimension(:,:), allocatable :: face_ids ! face vertex IDs
-      integer(8), dimension(:), allocatable :: num_face_vert ! number of vertices in each face
-      integer(8), dimension(:), allocatable :: apertures ! apertures asignments for each facet
       type(job_parameters_type), intent(in) :: job_params ! job parameters, contains wavelength, rbi, etc., see types mod for more details
       integer(8), intent(in) :: i_loop
       type(output_parameters_type), intent(inout) :: output_parameters_total
-      real(8), dimension(:,:,:), allocatable , intent(in):: mueller_total ! mueller matrices
-      real(8), dimension(:,:), allocatable, intent(in) :: mueller_1d_total ! phi-integrated mueller matrices
+      type(muellers_type), intent(inout) :: mueller ! muller struct
       character(len=255), intent(in) :: cache_dir ! cached files directory (if job stops early)
       type(geometry_type), intent(in) :: geometry
       
@@ -577,7 +638,7 @@
       call PDAS(cache_dir, "unrotated", geometry)
       call save_apertures(geometry, cache_dir)
       call save_params(job_params,i_loop,cache_dir,output_parameters_total)
-      call writeup(mueller_total, mueller_1d_total, cache_dir, output_parameters_total, job_params) ! write to file
+      call writeup(mueller, cache_dir, output_parameters_total, job_params) ! write to file
       
       print*,'saved job files to cache.'
       print*,'to resume this job, include the "-resume '//trim(cache_dir(7:len(cache_dir)))//'" flag when you call abt.'
