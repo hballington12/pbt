@@ -2,7 +2,7 @@
 
 ## Foreword
 
-The authors hope that the users find this code useful and we kindly ask that you cite the source of this code. The general reference is - Ballington H. and Hesse E. A light scattering model for large particles with surface roughness, [J. Quant. Spectrosc. Radiat. Transfer **323**, 109054](https://doi.org/10.1016/j.jqsrt.2024.109054) (2024).
+> The authors hope that the users find this code useful and we kindly ask that you cite the source of this code. The general reference is - Ballington H. and Hesse E. A light scattering model for large particles with surface roughness, [J. Quant. Spectrosc. Radiat. Transfer **323**, 109054](https://doi.org/10.1016/j.jqsrt.2024.109054) (2024). For particles with smooth surfaces, the authors recommend using [GOAD](https://github.com/hballington12/goad), which uses the same physics as the PBT method but with a significant computational speedup.
 
 ## Table of Contents
 
@@ -34,7 +34,7 @@ Example shell scripts and a short summary of command line flags for submitting j
 
 ## Basic Usage
 
-Once compiled, the pbt code can be run with no input arguments straight from the command line with `./src/seq/pbt` (or `mpiexec ./src/mpi/pbt` for the mpi version). This will execute the code for a hexagonal column of hexagonal radius `5` and length `10`, with incident wavelength `0.532` and refractive index `1.31+0i`. The mpi version of the code is designed for orientation averaging, and should only be run with fewer mpi processes than the number of orientations. Although the code ships with a built-in method for scattering from hexagonal prisms, an attractive prospect of using this code is that it can be run for arbitrary non-spherical particle geometries. The code reads in particle geometries in wavefront `.obj` format, or in the Macke ray-tracing style `.cry` or `.crystal`. Due to the way by which the near-field is computed, the particle geometry must sufficiently meshed. This can be performed automatically by use of the `-tri`, and `-tri-edge` flags, which make use the wonderful '[Triangle](https://www.cs.cmu.edu/~quake/triangle.html)' code written by Jonathan Richard Shewchuk. Alternatively, the user may choose to input a pre-meshed particle geometry. In this case, the user should also specify an apertures file using the `-afn` flag, which defines the parents used as macroscopic features of the geometry and therefore has a primary role in the accuracy of the near-field compuatation. For more details on how to customise and run the code, see the sections below on [input flags](#input-flags) and [guidelines](#guidelines).
+Once compiled, the pbt code can be run with no input arguments straight from the command line with `./src/seq/pbt` (or `mpiexec ./src/mpi/pbt` for the mpi version). This will execute the code for a hexagonal column of hexagonal radius `5` and length `10`, with incident wavelength `0.532` and refractive index `1.31+0i`. The mpi version of the code is designed for orientation averaging, and should only be run with fewer mpi processes than the number of orientations. Although the code ships with a built-in method for scattering from hexagonal prisms, an attractive prospect of using this code is that it can be run for arbitrary non-spherical particle geometries. The code reads in particle geometries in wavefront `.obj` format, or in the Macke ray-tracing style `.cry` or `.crystal`. Due to the way by which the near-field is computed, the particle geometry must sufficiently meshed. This can be performed automatically by use of the `-tri`, and `-tri-edge` flags, which make use the wonderful '[Triangle](https://www.cs.cmu.edu/~quake/triangle.html)' code written by Jonathan Richard Shewchuk. *Note that you will need to compile Triangle yourself inside `src/tri`.* Alternatively, the user may choose to input a pre-meshed particle geometry. In this case, the user should also specify an apertures file using the `-afn` flag, which defines the parents used as macroscopic features of the geometry and therefore has a primary role in the accuracy of the near-field compuatation. For more details on how to customise and run the code, see the sections below on [input flags](#input-flags) and [guidelines](#guidelines).
 
 ## Input Flags
 
@@ -49,19 +49,19 @@ Main source file. It contains the program entry point. The PBT reads input param
 - `-cmethod` `<string>` - Defines the method of particle input. If omitted, the PBT will use the `cc_hex` method to make a hexagonal prism with radius 5 and prism length 10. Current supported methods are:
 
     - `read` - attempts to read the particle from the current directory. If `read` is specified, the following arguments may also be specified:
-    
+
         - `-cft` `<string>` - Defines the particle input filetype. The supported particle file input types are:
-        
+
             - `obj` - wavefront style geometry file
-        
+
             - `mrt` - Macke ray-tracing style
 
             If `-cfn` is omitted, the PBT will attempt to guess the particle filetype based on the file extension. Macke ray-tracing style is assumed for file extensions `.cry` and `.crystal`, and wavefront style is assumed for file extension `.obj`.
-        
+
         - `-cfn` `<string>` - Defines the particle filename. If the particle file is not a sufficiently discretised triangular mesh, see information on the `-tri` flag for triangulation. If the mesh consists only of triangles, the PBT will assume it is sufficiently discretised and automatic triangulation will be disabled. If the mesh contains a facet with more than 3 vertices, the PBT will enable triangulation by default because the code does not currently directly support this.
-    
+
         - `-afn` `<string>` - Defines the apertures filename. The apertures file contains a single column defining which aperture each face belongs to. The number of lines in the apertures file must match the total number of faces in the particle file.
-    
+
     - `cc_hex` - Attempts to make gaussian rough hexagonal column/plate. Uses method developed by C. Collier, based on Muinonen & Saarinen 2000. If this flag flag is used, several other flags may also be specified:
         - `-cc_hex_l` `<value>` - L from Muinonen & Saarinen 2000. Should be large compared to the correlation length (see below). If omitted, the default value is `20`.
         - `-cc_hex_hr` - Hexagonal edge length. If omitted, the default value is `5`.
@@ -167,9 +167,9 @@ The computation of the PBT code is basically composed of 2 parts: the near field
 
 - The pbt code uses principles of geometric optics to calculate an approximation for the near-field on the particle surface. In order for geometric optics to be valid, the particle size must be much larger than the wavelength of light.
 
-- A crucial principal of the near-field computation to be familiar with, is the concept of a *parent*. A parent is defined as a collection of facets which produce 1 reflected (and possibly one refracted) wave with a single propagation direction in the near-field. Each parent is a collection of similar facets in the particle geometry which represent the macroscopic features of the particle. In this way, the pbt maintains accuracy even when the length scale of the local surface becomes comparable to, or smaller than the wavelength. If the user inputs a pre-meshed geometry with the `-cfn` flag, then they should also input an apertures file with the `-afn` flag. The pbt is designed to work with a large number of parents, but not huge numbers. The length scale of each parent should be large when compared with the wavelength. The code has been tested with a few hundred parents, but at this point the near-field computation becomes significantly slower.
+- A crucial principal of the near-field computation to be familiar with, is the concept of a *parent*. A parent is defined as a collection of facets which produce 1 reflected (and possibly one refracted) wave with a single propagation direction in the near-field. Each parent is a collection of similar facets in the particle geometry which represent the macroscopic features of the particle. In this way, the pbt maintains accuracy even when the length scale of the local surface becomes comparable to the wavelength. If the user inputs a pre-meshed geometry with the `-cfn` flag, then they should also input an apertures file with the `-afn` flag. The pbt is designed to work with a large number of parents, but not huge numbers. The length scale of each parent should be large when compared with the wavelength. The code has been tested with a few hundred parents, but at this point the near-field computation becomes significantly slower.
 
-- In order for the far-field mapping to be accurate, the pbt relies on the Fraunhofer approximation, which approximates the total field at an aperture as that of the incident field. If the near-field approximation is poor, the far-field mapping tends to become less accurate. It is for this reason, that in its current state the pbt code cannot be used for spherical particle geometries, since the propagation of light deviates in this case from a plane wave and therefore the near-field computation loses accuracy. In general, this tends to lead to very large scattering cross sections for the beam diffraction contribution. This can be rescaled with the `-scaling` flag, but this should be used with caution.
+- In order for the far-field mapping to be accurate, the pbt relies on the Fraunhofer approximation, which approximates the total field at an aperture as that of the incident field. If the near-field approximation is poor, the far-field mapping tends to become less accurate. For this reason, the current version the pbt code cannot be used for spherical particle geometries, since the propagation of light deviates in this case from a plane wave and therefore the near-field computation loses accuracy. In general, this tends to lead to very large scattering cross sections for the beam diffraction contribution. This can be rescaled with the `-scaling` flag, but should be used with caution.
 
 ### Far Field Computation
 
@@ -178,4 +178,3 @@ The computation of the PBT code is basically composed of 2 parts: the near field
 ## Examples
 
  `abt -lambda 0.532 -rbi 1.3117 -ibi 0 -rec 10 -rot euler 20 35 2 -cmethod read -cft obj -cfn my_particle.obj -afn my_apertures.dat -mt -theta 0 1 180 -phi 0 2 360` - run `abt` executable with wavelength 0.532, refractive index 1.3117 + 0i, 10 beam recursions, particle rotated with euler angles 20, 35, read the particle with particle file type `.obj`, filename `my_particle.obj`, apertures specified in the file `my_apertures.dat`, with multithreading enabled. Evaluate the far-field at polar angle 0 in 1 degree steps to 180 and at azimuthal angle 0 in 2 degree steps to 360.
-
